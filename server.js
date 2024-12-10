@@ -70,6 +70,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/cat', catRoutes);
 
 // Handle 404 errors (Route not found)
 app.use((req, res) => {
