@@ -1,13 +1,12 @@
-// controllers/SubcatController.js
-
-import Subcat from '../models/Subcat';
+import Subcat from '../models/Subcat.js';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
 // Set up multer storage options
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, './uploads'); // Directory where the image will be stored
+    cb(null, './uploads'); // Directory where the images will be stored
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`); // Unique filename for each upload
@@ -15,7 +14,17 @@ const storage = multer.diskStorage({
 });
 
 // Create the multer instance with the storage configuration
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      cb(new Error('Only JPEG, PNG, and JPG image files are allowed'));
+    } else {
+      cb(null, true);
+    }
+  },
+});
 
 // Create a new subcategory
 const createSubcat = async (req, res) => {
@@ -27,15 +36,15 @@ const createSubcat = async (req, res) => {
     }
 
     // Handle the image upload using multer
-    let imageUrl = null;
+    let imagePath = null;
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`; // Save the relative path to the database
+      imagePath = path.join('uploads', req.file.filename); // Save the relative path to the database
     }
 
     // Create the subcategory
     const subcat = await Subcat.create({
       name,
-      image: imageUrl,
+      image: imagePath,
     });
 
     res.status(201).json({
@@ -99,7 +108,14 @@ const updateSubcat = async (req, res) => {
 
     // Handle the image update if a new image is uploaded
     if (req.file) {
-      subcat.image = `/uploads/${req.file.filename}`;
+      // Delete the old image file from the server if it exists
+      if (subcat.image) {
+        const oldImagePath = path.join(__dirname, '../', subcat.image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      subcat.image = path.join('uploads', req.file.filename);
     }
 
     await subcat.save();
@@ -123,8 +139,10 @@ const deleteSubcat = async (req, res) => {
 
     // Delete the image file from the server if it exists
     if (subcat.image) {
-      const imagePath = path.join(__dirname, '../uploads', subcat.image.split('/')[2]);
-      fs.unlinkSync(imagePath); // Delete the image file
+      const imagePath = path.join(__dirname, '../', subcat.image);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
     }
 
     await subcat.destroy();
