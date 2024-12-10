@@ -1,21 +1,21 @@
 // controllers/SubcatController.js
 
 import Subcat from '../models/Subcat';
+import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 
-// Helper function to upload image
-const uploadImage = (file) => {
-  const fileName = `${Date.now()}-${file.originalname}`;
-  const uploadPath = path.join(__dirname, '../uploads', fileName);
+// Set up multer storage options
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, './uploads'); // Directory where the image will be stored
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`); // Unique filename for each upload
+  },
+});
 
-  // Move the uploaded file to the "uploads" directory
-  file.mv(uploadPath, (err) => {
-    if (err) throw err;
-  });
-
-  return `/uploads/${fileName}`; // Returning the path that can be stored in DB
-};
+// Create the multer instance with the storage configuration
+const upload = multer({ storage: storage });
 
 // Create a new subcategory
 const createSubcat = async (req, res) => {
@@ -26,11 +26,10 @@ const createSubcat = async (req, res) => {
       return res.status(400).json({ message: 'Subcategory name is required' });
     }
 
-    // Handling the image file if it exists
+    // Handle the image upload using multer
     let imageUrl = null;
-    if (req.files && req.files.image) {
-      const file = req.files.image;
-      imageUrl = uploadImage(file);
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`; // Save the relative path to the database
     }
 
     // Create the subcategory
@@ -99,9 +98,8 @@ const updateSubcat = async (req, res) => {
     }
 
     // Handle the image update if a new image is uploaded
-    if (req.files && req.files.image) {
-      const file = req.files.image;
-      subcat.image = uploadImage(file);
+    if (req.file) {
+      subcat.image = `/uploads/${req.file.filename}`;
     }
 
     await subcat.save();
@@ -140,4 +138,5 @@ const deleteSubcat = async (req, res) => {
   }
 };
 
-export { createSubcat, getAllSubcats, getSubcatById, updateSubcat, deleteSubcat };
+// Export the controller functions
+export { upload, createSubcat, getAllSubcats, getSubcatById, updateSubcat, deleteSubcat };
