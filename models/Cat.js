@@ -1,27 +1,27 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../database'); // Adjust path to your Sequelize instance
+import { DataTypes } from 'sequelize';
+import sequelize from '../database.js'; // Adjust path to your Sequelize instance
 
 const Cat = sequelize.define('Cat', {
   name: {
     type: DataTypes.STRING,
-    allowNull: false, // Name is required
+    allowNull: false,
   },
   image: {
     type: DataTypes.STRING,
-    allowNull: false, // Image URL is required
+    allowNull: false,
   },
   parentId: {
     type: DataTypes.INTEGER,
-    allowNull: true, // Null for top-level categories
+    allowNull: true,
     references: {
-      model: 'Cats', // Self-referential relationship
+      model: 'Cats',
       key: 'id',
     },
   },
   type: {
     type: DataTypes.ENUM('category', 'subcategory'),
     allowNull: false,
-    defaultValue: 'category', // Default to 'category'
+    defaultValue: 'category',
   },
 });
 
@@ -35,4 +35,4 @@ Cat.belongsTo(Cat, {
   as: 'parentCategory',
 });
 
-module.exports = Cat;
+export default Cat;
