@@ -23,7 +23,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import checkoutRoutes from './routes/checkoutRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
 import catRoutes from './routes/catRoutes.js';
-import subcatRoutes from './routes/subcatRoutes';
+import subcatRoutes from './routes/subCatRoutes';
 // Import models (for potential associations)
 import Category from './models/Category.js';
 import Subcategory from './models/Subcategory.js';
