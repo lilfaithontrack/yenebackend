@@ -22,7 +22,7 @@ import productRoutes from './routes/productRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import checkoutRoutes from './routes/checkoutRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
-import catRoutes from './routes/catRoutes.js';
+
 import subcatRoutes from './routes/subCatRoutes.js';
 // Import models (for potential associations)
 import Category from './models/Category.js';
@@ -72,7 +72,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/cat', catRoutes);
+
 
 // Handle 404 errors (Route not found)
 app.use((req, res) => {
