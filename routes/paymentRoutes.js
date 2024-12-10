@@ -1,14 +1,15 @@
+// routes/paymentRoutes.js
 import express from 'express';
-import { processChapaPayment, uploadPaymentScreenshot } from '../controllers/paymentController.js';
-
- // Assuming the file upload middleware
+import { createPayment, updatePaymentStatus,getOrderHistory,getAllOrders } from '../controllers/paymentController.js';
 
 const router = express.Router();
 
-// Process Chapa payment
-router.post('/chapa', processChapaPayment);
+// Route to create a payment
+router.post('/create', createPayment);
 
-// Upload payment screenshot
-router.post('/payment/screenshot', uploadPaymentScreenshot);
-
+// Route to update payment status
+router.put('/update-status/:payment_id', updatePaymentStatus);
+router.get('/orders/history', getOrderHistory);
+router.get('/orders', getAllOrders);
 export default router;
+

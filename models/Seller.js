@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../db/dbconnect.js'; // Ensure the path is correct and ends with .js
+import sequelize from '../db/dbConnect.js'; // Ensure the path is correct and ends with .js
 
 const Seller = sequelize.define('Seller', {
   id: {

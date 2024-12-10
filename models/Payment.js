@@ -1,43 +1,57 @@
-import { Sequelize, DataTypes } from 'sequelize';
-import sequelize from '../db/dbconnect.js'; // Make sure you have a correct database connection
+import { DataTypes } from 'sequelize';
+import sequelize from '../db/dbConnect.js';
 
-const Payment = sequelize.define('Payment', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-  },
-  orderId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'orders', // Ensure that the orders model exists and is connected
-      key: 'id',
+const Payment = sequelize.define(
+  'Payment',
+  {
+    payment_method: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'banktransfer', // Default payment method set to 'banktransfer'
+    },
+    payment_screenshot: {
+      type: DataTypes.STRING, // URL or path to the uploaded screenshot
+      allowNull: false,
+    },
+    payment_status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Pending', // Default payment status
+    },
+    cart_items: {
+      type: DataTypes.JSONB, // Store cart items as JSON
+      allowNull: false,
+    },
+    total_price: {
+      type: DataTypes.FLOAT, // Store the total price
+      allowNull: false,
+    },
+    shipping_address: {
+      type: DataTypes.STRING, // Store shipping address
+      allowNull: false,
+    },
+    customer_name: {
+      type: DataTypes.STRING, // Store the customer's name
+      allowNull: false,
+    },
+    customer_email: {
+      type: DataTypes.STRING, // Store the customer's email
+      allowNull: false,
+    },
+    customer_phone: {
+      type: DataTypes.STRING, // Store the customer's phone number
+      allowNull: false,
+    },
+    guest_id: {
+      type: DataTypes.STRING, // Optionally store guest ID (can be null for registered users)
+      allowNull: true, // Nullable if no guest ID is provided
     },
   },
-  paymentMethod: {
-    type: DataTypes.ENUM('chapa', 'screenshot'),
-    allowNull: false,
-  },
-  paymentStatus: {
-    type: DataTypes.ENUM('pending', 'completed', 'failed'),
-    defaultValue: 'pending',
-  },
-  transactionId: {
-    type: DataTypes.STRING,
-    allowNull: true, // This will be for Chapa payment transactions
-  },
-  screenshotUrl: {
-    type: DataTypes.STRING,
-    allowNull: true, // This will store the URL of the uploaded screenshot
-  },
-  paymentDate: {
-    type: DataTypes.DATE,
-    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-  },
-}, {
-  timestamps: false,
-  tableName: 'payments',
-});
+  {
+    tableName: 'Payments', // Ensures the table name is 'Payments'
+    timestamps: true, // Automatically handles createdAt and updatedAt fields
+  }
+);
 
 export default Payment;
+

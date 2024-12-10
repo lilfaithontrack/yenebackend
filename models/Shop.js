@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../db/dbconnect.js';
-import ShopOwner from './ShopOwner.js'; // Ensure the path is correct
+import sequelize from '../db/dbConnect.js'; // Adjust the path if necessary
+import ShopOwner from './ShopOwner.js'; // Import the ShopOwner model
 
 const Shop = sequelize.define('Shop', {
   name: {
@@ -15,17 +15,24 @@ const Shop = sequelize.define('Shop', {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
+    validate: {
+      isEmail: { msg: 'Must be a valid email address.' },
+    },
   },
   phone: {
     type: DataTypes.STRING,
     allowNull: false,
+    validate: {
+      isNumeric: { msg: 'Phone number must contain only digits.' },
+    },
   },
   licenseFile: {
+    // Field for file upload (e.g., scanned copy of the business license)
     type: DataTypes.STRING,
     allowNull: false,
   },
   latitude: {
-    type: DataTypes.DECIMAL(10, 8), // Precision for lat/long
+    type: DataTypes.DECIMAL(10, 8),
     allowNull: false,
   },
   longitude: {
@@ -33,22 +40,29 @@ const Shop = sequelize.define('Shop', {
     allowNull: false,
   },
   status: {
-    type: DataTypes.ENUM('pending', 'approved', 'rejected'), // Status options
-    allowNull: false,
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
     defaultValue: 'pending',
   },
-  createdAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
+  shopOwnerId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: ShopOwner, // Reference the imported model
+      key: 'id',
+    },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   },
-  updatedAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-  },
+}, {
+  tableName: 'shops',
+  timestamps: true, // Adds createdAt and updatedAt fields automatically
 });
 
-// Define relationships with ShopOwner
-Shop.belongsTo(ShopOwner, { foreignKey: 'shopOwnerId', onDelete: 'CASCADE' });
-ShopOwner.hasMany(Shop, { foreignKey: 'shopOwnerId' });
+// Define associations if not already set elsewhere
+Shop.belongsTo(ShopOwner, {
+  foreignKey: 'shopOwnerId',
+  as: 'shopOwner', // Alias for the relationship
+});
 
 export default Shop;
+

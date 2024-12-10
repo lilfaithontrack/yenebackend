@@ -1,106 +1,173 @@
+import multer from 'multer';
+import path from 'path';
 import Payment from '../models/Payment.js';
-import Order from '../models/Order.js';
-import axios from 'axios';
-import { processPaymentGateway} from '../services/paymentService.js'; // Optional if custom service exists
-import { uploadScreenshot } from '../utlis/fileUpload.js'; // Ensure this is implemented
+import fs from 'fs';
+import Joi from 'joi';
 
-// Handle Chapa payment processing
-export const processChapaPayment = async (req, res) => {
-  const { userId, customerName, customerEmail, customerPhone, shippingAddress, totalPrice, servicePayment } = req.body;
+// Ensure the uploads directory exists
+if (!fs.existsSync('uploads/screenshots')) {
+  fs.mkdirSync('uploads/screenshots', { recursive: true });
+}
 
-  try {
-    // Step 1: Generate transaction reference and define callback URL
-    const txRef = `tx-${Date.now()}`; // Unique transaction reference
-    const callbackUrl = 'http://localhost:3000/success'; // Adjust for production environment
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/screenshots');
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
 
-    // Step 2: Initialize Chapa payment
-    const chapaResponse = await axios.post(
-      'https://api.chapa.co/v1/transaction/initialize',
-      {
-        amount: totalPrice,
-        currency: 'ETB',
-        email: customerEmail,
-        first_name: customerName,
-        tx_ref: txRef,
-        callback_url: callbackUrl,
-        customization: {
-          title: 'Yene Suq Checkout',
-          description: 'Payment for your order',
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.CHAPA_SECRET_KEY}`, // Ensure this is set in your .env file
-        },
-      }
-    );
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
 
-    // Step 3: Check response and return the payment URL
-    if (chapaResponse.data.status === 'success') {
-      return res.status(200).json({
-        success: true,
-        paymentUrl: chapaResponse.data.data.checkout_url,
-      });
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only images with jpeg, jpg, or png formats are allowed.'));
     }
+  },
+}).single('payment_screenshot');
 
-    return res.status(400).json({
-      success: false,
-      message: 'Failed to initialize payment with Chapa.',
+// Joi schema for request validation
+const paymentSchema = Joi.object({
+  guest_id: Joi.string().optional(),
+  payment_method: Joi.string().default('Bank Transfer'),
+  cart_items: Joi.string().required(),
+  total_price: Joi.number().required(),
+  shipping_address: Joi.string().required(),
+  customer_name: Joi.string().required(),
+  customer_email: Joi.string().email().required(),
+  customer_phone: Joi.string().required(),
+});
+
+// Create a payment
+const createPayment = async (req, res) => {
+  try {
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ message: err.message });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: 'Payment screenshot is required.' });
+      }
+
+      const { error, value } = paymentSchema.validate(req.body);
+      if (error) {
+        return res.status(400).json({ message: error.details[0].message });
+      }
+
+      // Parse cart_items
+      let parsedCartItems;
+      try {
+        parsedCartItems = JSON.parse(value.cart_items);
+      } catch (err) {
+        return res.status(400).json({ message: 'Invalid cart items format.' });
+      }
+
+      const payment = await Payment.create({
+        ...value,
+        cart_items: parsedCartItems,
+        payment_screenshot: req.file.path,
+        payment_status: 'Pending',
+      });
+
+      return res.status(201).json({
+        message: 'Payment created successfully.',
+        payment,
+      });
     });
   } catch (error) {
-    console.error('Error during Chapa payment:', error.response?.data || error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Error processing Chapa payment. Please try again later.',
-    });
+    console.error('Error creating payment:', error);
+
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({ message: error.errors.map(err => err.message) });
+    }
+
+    res.status(500).json({ message: 'Internal server error.' });
   }
 };
 
-// Handle screenshot upload for payment
-export const uploadPaymentScreenshot = async (req, res) => {
-  const { orderId } = req.body;
-  const screenshotFile = req.file; // Assume file upload middleware (e.g., multer)
-
+// Update payment status (Approve, Decline, Pending, Completed, Failed)
+const updatePaymentStatus = async (req, res) => {
   try {
-    // Step 1: Validate order existence
-    const order = await Order.findByPk(orderId);
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found.',
-      });
+    const { payment_id } = req.params;
+    const { payment_status } = req.body;
+
+    const validStatuses = ['Pending', 'Completed', 'Failed', 'Approved', 'Declined'];
+    if (!validStatuses.includes(payment_status)) {
+      return res.status(400).json({ message: 'Invalid payment status.' });
     }
 
-    // Step 2: Validate screenshot file
-    if (!screenshotFile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Screenshot is required.',
-      });
+    const payment = await Payment.findByPk(payment_id);
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found.' });
     }
 
-    // Step 3: Upload screenshot and save payment details
-    const screenshotUrl = await uploadScreenshot(screenshotFile); // Implement this in `fileUpload.js`
+    payment.payment_status = payment_status;
+    await payment.save();
 
-    const payment = await Payment.create({
-      orderId,
-      paymentMethod: 'screenshot',
-      paymentStatus: 'pending',
-      screenshotUrl,
-    });
-
-    // Step 4: Respond with success message
     return res.status(200).json({
-      success: true,
-      message: 'Screenshot uploaded successfully.',
+      message: 'Payment status updated successfully.',
       payment,
     });
   } catch (error) {
-    console.error('Error uploading screenshot for payment:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Error uploading screenshot for payment.',
-      error: error.message,
-    });
+    console.error('Error updating payment status:', error);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 };
+
+// Fetch order history (by customer_email or guest_id)
+const getOrderHistory = async (req, res) => {
+  try {
+    const { customer_email, guest_id } = req.query;
+
+    if (!customer_email && !guest_id) {
+      return res.status(400).json({ message: 'Customer email or guest ID is required.' });
+    }
+
+    // Fetch orders based on customer_email or guest_id
+    const orders = await Payment.findAll({
+      where: customer_email
+        ? { customer_email } // For registered users
+        : { guest_id },      // For guest users
+      order: [['createdAt', 'DESC']], // Sort orders by most recent
+    });
+
+    if (orders.length === 0) {
+      return res.status(404).json({ message: 'No orders found.' });
+    }
+
+    res.status(200).json({ message: 'Order history retrieved successfully.', orders });
+  } catch (error) {
+    console.error('Error fetching order history:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+// Fetch all orders
+const getAllOrders = async (req, res) => {
+  try {
+    const orders = await Payment.findAll({
+      order: [['createdAt', 'DESC']], // Sort orders by most recent
+    });
+
+    if (orders.length === 0) {
+      return res.status(404).json({ message: 'No orders found.' });
+    }
+
+    res.status(200).json({ message: 'All orders retrieved successfully.', orders });
+  } catch (error) {
+    console.error('Error fetching all orders:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+export { createPayment, updatePaymentStatus, getOrderHistory, getAllOrders };
+

@@ -4,7 +4,7 @@ import path from 'path';
 // Set up multer storage and file handling
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'catimages/'); // Upload directory
+    cb(null, '/catimages'); // Upload directory
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname); // Get file extension

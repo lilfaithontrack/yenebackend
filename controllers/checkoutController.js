@@ -1,123 +1,95 @@
-import Checkout from '../models/Checkout.js';
-import Cart from '../models/Cart.js'; // Assuming Cart model is imported
+import { v4 as uuidv4 } from 'uuid';
+// controllers/checkoutController.js
+import Checkout from '../models/Checkout.js';   // Use the exact file path
+import Cart from '../models/Cart.js';  // Use the exact file path
+ // Make sure the models are correctly imported from your models directory
+import sequelize from '../db/dbConnect.js'; // Assuming sequelize instance is correctly imported from the appropriate file
 
-// Create a new checkout
+
 export const createCheckout = async (req, res) => {
-    const {
-      customerName: customer_name,
-      customerEmail: customer_email,
-      customerPhone: customer_phone,
-      shippingAddress: shipping_address,
-      totalPrice: total_price,
-    } = req.body;
-  
-    // Validate required fields
-    if (!customer_name || !customer_email || !customer_phone || !shipping_address || !total_price) {
-      return res.status(400).json({
-        message: 'All fields (customer_name, customer_email, customer_phone, shipping_address, total_price) are required.',
-      });
-    }
-  
-    try {
-      const newCheckout = await Checkout.create({
-        customer_name,
-        customer_email,
-        customer_phone,
-        shipping_address,
-        total_price,
-      });
-  
-      res.status(201).json({ message: 'Checkout created successfully', checkout: newCheckout });
-    } catch (error) {
-      console.error("Error creating checkout:", error);
-      res.status(500).json({ message: 'Error creating checkout', error: error.message });
-    }
-  };
-  
+  const {
+    customer_name,
+    customer_email,
+    customer_phone,
+    shipping_address,
+    total_price,
+    user_id,  // Optional
+    cartItems,
+  } = req.body;
 
-  
-// Get all checkouts
-export const getAllCheckouts = async (req, res) => {
-  try {
-    const checkouts = await Checkout.findAll({
-      include: [{
-        model: Cart,
-        as: 'carts', // Make sure to define association in Cart model if needed
-        attributes: ['id', 'product_id', 'quantity', 'price'],
-      }]
+  // Validate required fields
+  if (!customer_name || !customer_email || !customer_phone || !shipping_address || !total_price || !cartItems) {
+    return res.status(400).json({
+      message: 'All fields (customer details, total price, and cart items) are required.',
     });
+  }
 
-    res.status(200).json(checkouts);
+  const t = await sequelize.transaction();  // Start a new transaction
+
+  try {
+    // Create the checkout entry within the transaction
+    const newCheckout = await Checkout.create({
+      customer_name,
+      customer_email,
+      customer_phone,
+      shipping_address,
+      total_price,
+      payment_status: 'pending',
+      order_status: 'pending',
+      user_id: user_id || null,  // Optional user_id (set to null if not provided)
+      guest_id: uuidv4(),  // Generate a guest ID
+      created_at: new Date(),
+      updated_at: new Date(),
+    }, { transaction: t });  // Include the transaction here
+
+    // Create associated cart items within the same transaction
+    const cartData = cartItems.map((item) => ({
+      ...item,
+      checkout_id: newCheckout.id,  // Associate with the checkout
+    }));
+
+    await Cart.bulkCreate(cartData, { transaction: t });  // Include the transaction here
+
+    // Commit the transaction
+    await t.commit();
+
+    res.status(201).json({
+      message: 'Checkout created successfully.',
+      checkout: newCheckout,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching checkouts', error: error.message });
+    // Rollback the transaction in case of error
+    await t.rollback();
+    console.error('Error creating checkout:', error);
+    res.status(500).json({
+      message: 'Error creating checkout.',
+      error: error.message,
+    });
   }
 };
 
-// Get a specific checkout by ID
+// Fetch checkout by ID with cart items
 export const getCheckoutById = async (req, res) => {
   const { id } = req.params;
 
   try {
     const checkout = await Checkout.findByPk(id, {
-      include: [{
-        model: Cart,
-        as: 'carts',
-        attributes: ['id', 'product_id', 'quantity', 'price'],
-      }]
+      include: [Cart], // Include associated cart items in the response
     });
 
     if (!checkout) {
-      return res.status(404).json({ message: `Checkout with ID ${id} not found` });
+      return res.status(404).json({
+        message: `Checkout with ID ${id} not found.`,
+      });
     }
 
     res.status(200).json(checkout);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching checkout', error: error.message });
+    console.error('Error fetching checkout:', error);
+    res.status(500).json({
+      message: 'Error fetching checkout.',
+      error: error.message,
+    });
   }
 };
 
-// Update checkout status (payment or order status)
-export const updateCheckoutStatus = async (req, res) => {
-  const { id } = req.params;
-  const { payment_status, order_status } = req.body;
-
-  try {
-    const checkout = await Checkout.findByPk(id);
-
-    if (!checkout) {
-      return res.status(404).json({ message: `Checkout with ID ${id} not found` });
-    }
-
-    if (payment_status) checkout.payment_status = payment_status;
-    if (order_status) checkout.order_status = order_status;
-
-    await checkout.save();
-
-    res.status(200).json({ message: 'Checkout status updated successfully', checkout });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error updating checkout status', error: error.message });
-  }
-};
-
-// Delete a checkout
-export const deleteCheckout = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const checkout = await Checkout.findByPk(id);
-
-    if (!checkout) {
-      return res.status(404).json({ message: `Checkout with ID ${id} not found` });
-    }
-
-    await checkout.destroy();
-
-    res.status(200).json({ message: 'Checkout deleted successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error deleting checkout', error: error.message });
-  }
-};

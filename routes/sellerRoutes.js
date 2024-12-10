@@ -7,7 +7,7 @@ import {
   updateSeller,
   deleteSeller,
 } from '../controllers/sellerController.js';
-import { authenticateSeller } from '../middlewares/sellermiddleware.js'; // Ensure this matches your middleware file path
+import { authenticateSeller } from '../middlewares/sellerMiddleware.js'; // Ensure this matches your middleware file path
 
 const router = express.Router();
 

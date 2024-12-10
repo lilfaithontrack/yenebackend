@@ -1,24 +1,42 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
 
-const Category = sequelize.define('Category', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
+const Category = sequelize.define(
+  'Category',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true, // Ensures no duplicate names
+      validate: {
+        len: [3, 100], // Name must be between 3 and 100 characters
+      },
+    },
+    image: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: null,
+      validate: {
+        isUrl: true, // Optional: Ensures it's a valid URL
+      },
+    },
   },
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  image: {
-    type: DataTypes.STRING, // Store image URL or file path
-    allowNull: true, // Make this nullable if not required
-    defaultValue: null, // Set default to null if no image provided
-  },
-}, {
-  tableName: 'categories',
-  timestamps: false,
+  {
+    tableName: 'categories',
+    timestamps: false, // Set to true if you need createdAt/updatedAt fields
+  }
+);
+
+// Hooks for trimming whitespace from name
+Category.addHook('beforeValidate', (category) => {
+  if (category.name) {
+    category.name = category.name.trim();
+  }
 });
 
 // Define associations
@@ -30,3 +48,4 @@ Category.associate = (models) => {
 };
 
 export default Category;
+

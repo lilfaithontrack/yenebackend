@@ -1,5 +1,5 @@
 import { Sequelize, DataTypes } from 'sequelize';
-import sequelize from '../db/dbconnect.js';
+import sequelize from '../db/dbConnect.js';
 
 const Cart = sequelize.define('Cart', {
   id: {

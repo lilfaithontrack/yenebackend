@@ -1,60 +1,79 @@
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
-// Set up multer storage for screenshots
-const screenshotStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, './uploads/screenshots'); // Screenshot folder
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`); // Filename with timestamp
-  },
-});
+// Ensure that upload directories exist
+const ensureDirectoryExistence = (filePath) => {
+  const dirname = path.dirname(filePath);
+  if (fs.existsSync(dirname)) {
+    return true;
+  }
+  fs.mkdirSync(dirname, { recursive: true });
+  return false;
+};
 
-// Set up multer storage for product images
-const productStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, './uploads/products'); // Product images folder
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`); // Filename with timestamp
-  },
-});
+// Function to create storage configuration dynamically
+const createStorage = (folderName) => {
+  return multer.diskStorage({
+    destination: (req, file, cb) => {
+      const directory = `./uploads/${folderName}`;
+      ensureDirectoryExistence(directory);  // Ensure that the folder exists
+      cb(null, directory);  // Save file to the folder
+    },
+    filename: (req, file, cb) => {
+      // Generate a unique filename using timestamp and original name
+      const fileExtension = path.extname(file.originalname).toLowerCase();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}${fileExtension}`;
+      cb(null, fileName);
+    },
+  });
+};
 
-// Multer upload configuration for screenshots (single file upload)
+// Multer configuration for screenshots (single file upload)
 const uploadScreenshot = multer({
-  storage: screenshotStorage,
+  storage: createStorage('screenshots'),
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
   fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    if (ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png') {
-      return cb(new Error('Only images (JPG, JPEG, PNG) are allowed for screenshots!'), false);
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPG, JPEG, and PNG are allowed for screenshots.'));
     }
-    cb(null, true);
   },
-}).single('screenshot'); // 'screenshot' is the field name for the screenshot
+}).single('payment_screenshot');  // 'payment_screenshot' is the field name for the screenshot
 
-// Multer upload configuration for product images (multiple files upload)
+// Multer configuration for product images (multiple file upload)
 const uploadProductImages = multer({
-  storage: productStorage,
+  storage: createStorage('products'),
+  limits: { fileSize: 10 * 1024 * 1024 }, // Limit file size to 10MB for product images
   fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    if (ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png') {
-      return cb(new Error('Only images (JPG, JPEG, PNG) are allowed for product images!'), false);
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPG, JPEG, PNG, and GIF are allowed for product images.'));
     }
-    cb(null, true);
   },
-}).array('productImages', 5); // 'productImages' is the field name for the product images, max 5 images
+}).array('productImages', 5);  // 'productImages' is the field name for the product images, max 5 images
 
-// Function to handle uploading screenshot
+// Function to handle uploading screenshot and returning file path
 export const uploadScreenshotHandler = async (file) => {
-  const filePath = `/uploads/screenshots/${file.filename}`; // Path for screenshot
+  if (!file) {
+    throw new Error('No file uploaded.');
+  }
+  const filePath = `/uploads/screenshots/${file.filename}`;  // Path for screenshot
   return filePath;
 };
 
-// Function to handle uploading product images
+// Function to handle uploading product images and returning file paths
 export const uploadProductImagesHandler = async (files) => {
-  const filePaths = files.map(file => `/uploads/products/${file.filename}`); // Paths for product images
+  if (!files || files.length === 0) {
+    throw new Error('No files uploaded.');
+  }
+  const filePaths = files.map(file => `/uploads/products/${file.filename}`);  // Paths for product images
   return filePaths;
 };
 
 export { uploadScreenshot, uploadProductImages };
+

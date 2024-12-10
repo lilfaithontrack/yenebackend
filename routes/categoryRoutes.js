@@ -6,17 +6,16 @@ import {
   updateCategory,
   deleteCategory,
 } from '../controllers/categoryController.js';
-import adminAuth from '../middlewares/adminMiddleware.js'; // Ensure the path is correct
-import { upload } from '../utlis/multerConfig.js'; // Import the multer config
+import adminAuth from '../middlewares/adminMiddleware.js'; // Admin authentication middleware
 
 const router = express.Router();
 
 /**
- * @route   POST /api/categories
+ * @route   POST /api/categories/create
  * @desc    Create a new category with subcategories and an optional image
  * @access  Admin only
  */
-router.post('/create', adminAuth, upload.single('image'), createCategory);
+router.post('/create',  createCategory);
 
 /**
  * @route   GET /api/categories
@@ -37,7 +36,7 @@ router.get('/:id', getCategoryById);
  * @desc    Update a category and its subcategories, including image
  * @access  Admin only
  */
-router.put('/:id', adminAuth, upload.single('image'), updateCategory);
+router.put('/:id', adminAuth, updateCategory);
 
 /**
  * @route   DELETE /api/categories/:id
@@ -47,3 +46,4 @@ router.put('/:id', adminAuth, upload.single('image'), updateCategory);
 router.delete('/:id', adminAuth, deleteCategory);
 
 export default router;
+

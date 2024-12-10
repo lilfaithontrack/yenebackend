@@ -1,8 +1,15 @@
+import https from 'https';
+import fs from 'fs';
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import morgan from 'morgan';
-import { connectDB } from './db/dbconnect.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { connectDB } from './db/dbConnect.js';
+import sequelize from './db/dbConnect.js';
+
+// Import routes
 import adminRoutes from './routes/adminRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
 import sellerRoutes from './routes/sellerRoutes.js';
@@ -12,41 +19,47 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import productRoutes from './routes/productRoutes.js';
-import sequelize from './db/dbConnect.js';
 import paymentRoutes from './routes/paymentRoutes.js';
-import receiptRoutes from './routes/receiptRoutes.js';
-import Category from './models/Category.js';
 import checkoutRoutes from './routes/checkoutRoutes.js';
+import receiptRoutes from './routes/receiptRoutes.js';
+
+// Import models (for potential associations)
+import Category from './models/Category.js';
 import Subcategory from './models/Subcategory.js';
-import Payment from './models/Payment.js';  // Import Payment model for storing payment data if applicable
-import { processPaymentGateway } from './services/paymentService.js';  // Import payment service for Chapa
+import Shop from './models/Shop.js';
+import ShopOwner from './models/ShopOwner.js';
+import Payment from './models/Payment.js';
+
+// Define __dirname for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
 const app = express();
 
-// Middleware to handle incoming JSON requests
-app.use(express.json());
-
-// CORS setup to allow requests from frontend
+// Middleware
+app.use(express.json()); // Parse JSON
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'https://mobile.yeniesuq.com'], // Update to match your frontend URLs
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   credentials: true,
 }));
+app.use(morgan('dev')); // Log HTTP requests
 
-// Cache-Control headers to disable caching
+// Disable caching
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });
 
-// Logging HTTP requests
-app.use(morgan('dev'));
+// Serve static files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+console.log('Serving static files from:', path.join(__dirname, 'uploads'));
 
-// Define API routes
+// Routes
 app.use('/api/admin', adminRoutes);
-app.use ('/api/reciept',adminRoutes);
+app.use('/api/receipt', receiptRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/user', userRoutes);
@@ -56,45 +69,72 @@ app.use('/api/category', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
-app.use('/api/payment', paymentRoutes);  // Updated order routes
+app.use('/api/payments', paymentRoutes);
 
-// 404 Fallback Route
+// Handle 404 errors (Route not found)
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Global Error Handling
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({ error: err.message || 'Something went wrong!' });
 });
 
+// Redirect HTTP to HTTPS (for production)
+app.use((req, res, next) => {
+  if (!req.secure && process.env.NODE_ENV === 'production') {
+    return res.redirect(`https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
+// Start Server
 const startServer = async () => {
   try {
-    // Initialize DB connection
+    // Connect to the database
     await connectDB();
 
-    // Ensure that the models are associated properly if needed
-    const models = { Category, Subcategory, Payment };  // Added Payment model
+    // Associate models (if required)
+    const models = { Category, Subcategory, Payment, Shop, ShopOwner };
     Object.keys(models).forEach((modelName) => {
       if (models[modelName].associate) {
         models[modelName].associate(models);
       }
     });
 
-    // Sync database models with possible alterations
-    await sequelize.sync({ alter: true });
-    console.log("Database synchronized with models.");
+    // Sync database models
+    await sequelize.sync({ alter: false });
+    console.log('Database synchronized successfully.');
 
-    // Start the server on the specified port
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+    // Load SSL certificate and key
+    const sslOptions = {
+      key: fs.readFileSync('/etc/letsencrypt/live/backend.yeniesuq.com/privkey.pem'),
+      cert: fs.readFileSync('/etc/letsencrypt/live/backend.yeniesuq.com/fullchain.pem'),
+    };
+
+    // Start HTTPS server
+    const PORT = process.env.PORT || 443;
+    https.createServer(sslOptions, app).listen(PORT, () => {
+      console.log(`Server is running securely on https://backend.yeniesuq.com`);
     });
+
   } catch (error) {
-    console.error("Error connecting to the database or starting the server:", error);
-    process.exit(1);  // Exit the process if there's an error starting the server
+    console.error('Error connecting to the database or starting the server:', error);
+    process.exit(1); // Exit on critical failure
   }
 };
 
+// Uncaught Exception and Rejection Handlers
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Start the server
 startServer();
+

@@ -1,18 +1,13 @@
 import express from 'express';
-import {
-  createCheckout,
-  getAllCheckouts,
-  getCheckoutById,
-  updateCheckoutStatus,
-  deleteCheckout,
-} from '../controllers/checkoutController.js';
+import { createCheckout, getCheckoutById } from '../controllers/checkoutController.js';
 
 const router = express.Router();
 
+// Create a new checkout
 router.post('/create', createCheckout);
-router.get('/checkout', getAllCheckouts);
-router.get('/checkout/:id', getCheckoutById);
-router.put('/checkout/:id', updateCheckoutStatus);
-router.delete('/checkout/:id', deleteCheckout);
+
+// Get a checkout by ID with cart items
+router.get('/:id', getCheckoutById);
 
 export default router;
+

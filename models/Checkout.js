@@ -1,5 +1,5 @@
 import { Sequelize, DataTypes } from 'sequelize';
-import sequelize from '../db/dbconnect.js';
+import sequelize from '../db/dbConnect.js';
 import Cart from './Cart.js'; // Assuming you have the Cart model defined
 
 const Checkout = sequelize.define('Checkout', {
@@ -13,7 +13,7 @@ const Checkout = sequelize.define('Checkout', {
     allowNull: false,
     validate: {
       notEmpty: true, // Prevent empty name
-    }
+    },
   },
   customer_email: {
     type: DataTypes.STRING,
@@ -21,21 +21,21 @@ const Checkout = sequelize.define('Checkout', {
     validate: {
       isEmail: true, // Ensures email is in a valid format
       notEmpty: true, // Prevent empty email
-    }
+    },
   },
   customer_phone: {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
       notEmpty: true, // Prevent empty phone
-    }
+    },
   },
   shipping_address: {
     type: DataTypes.TEXT,
     allowNull: false,
     validate: {
       notEmpty: true, // Prevent empty address
-    }
+    },
   },
   total_price: {
     type: DataTypes.FLOAT,
@@ -43,7 +43,8 @@ const Checkout = sequelize.define('Checkout', {
     validate: {
       isFloat: true, // Ensures that the price is a float number
       notEmpty: true, // Prevent empty price
-    }
+      min: 500, // Ensures that the price is not negative
+    },
   },
   payment_status: {
     type: DataTypes.ENUM('pending', 'completed', 'failed'),
@@ -53,17 +54,28 @@ const Checkout = sequelize.define('Checkout', {
     type: DataTypes.ENUM('pending', 'shipped', 'delivered', 'canceled'),
     defaultValue: 'pending',
   },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true, // Nullable to handle guest checkouts
+  },
+  guest_id: {
+    type: DataTypes.STRING,
+    allowNull: true, // Nullable for logged-in users
+    unique: true, // Ensure guest IDs are unique
+    validate: {
+      isUUID: 4, // Validate it is a UUIDv4
+    },
   },
 }, {
-  timestamps: false,
+  timestamps: true, // Automatically manage createdAt and updatedAt
+  createdAt: 'created_at', // Specify the column name for createdAt
+  updatedAt: 'updated_at', // Specify the column name for updatedAt
   tableName: 'checkouts',
 });
 
 // Association with Cart (One-to-Many)
-Checkout.hasMany(Cart, { foreignKey: 'checkout_id' });
+Checkout.hasMany(Cart, { foreignKey: 'checkout_id', onDelete: 'CASCADE' });
 Cart.belongsTo(Checkout, { foreignKey: 'checkout_id' });
 
 export default Checkout;
+
