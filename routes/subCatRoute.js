@@ -1,7 +1,7 @@
 // routes/subcatRoutes.js
 
 import express from 'express';
-import { createSubcat, getAllSubcats, getSubcatById, updateSubcat, deleteSubcat, upload } from '../controllers/subcatController';
+import { createSubcat, getAllSubcats, getSubcatById, updateSubcat, deleteSubcat, upload } from '../controllers/subcatController.js';
 
 const router = express.Router();
 
