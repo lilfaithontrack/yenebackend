@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../database.js'; // Adjust path to your Sequelize instance
+import sequelize from '../db/dbConnect.js'; // Adjust path to your Sequelize instance
 
 const Cat = sequelize.define('Cat', {
   name: {
