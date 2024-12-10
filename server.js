@@ -4,7 +4,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import morgan from 'morgan';
-import path from 'path';
+import path from 'path'; 
 import { fileURLToPath } from 'url';
 import { connectDB } from './db/dbConnect.js';
 import sequelize from './db/dbConnect.js';
