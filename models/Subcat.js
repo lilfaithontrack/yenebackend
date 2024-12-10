@@ -1,6 +1,6 @@
 
 import { DataTypes } from 'sequelize';
-import sequelize from '../config/database'; // Adjust path if necessary
+import sequelize from '../db/dbConnect.js';// Adjust path if necessary
 
 const Subcat = sequelize.define('Subcat', {
   name: {
