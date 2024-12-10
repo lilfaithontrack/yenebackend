@@ -1,6 +1,5 @@
-
 import { DataTypes } from 'sequelize';
-import sequelize from '../db/dbConnect.js';// Adjust path if necessary
+import sequelize from '../db/dbConnect.js'; // Adjust path if necessary
 
 const Subcat = sequelize.define('Subcat', {
   name: {
@@ -14,11 +13,11 @@ const Subcat = sequelize.define('Subcat', {
     },
   },
   image: {
-    type: DataTypes.STRING, // Store the image URL/path or filename
+    type: DataTypes.STRING, // Store the file path or filename for the uploaded image
     allowNull: true,
     validate: {
-      isUrl: {
-        msg: 'Image must be a valid URL if provided',
+      notEmpty: {
+        msg: 'Image path cannot be empty if provided',
       },
     },
   },
