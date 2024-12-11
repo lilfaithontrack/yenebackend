@@ -62,6 +62,7 @@ console.log('Serving static files from:', path.join(__dirname, 'uploads'));
 // Routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/subcat', subcatRoutes);
+app.use('/api/catitem', catitemRoutes);
 app.use('/api/receipt', receiptRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/seller', sellerRoutes);
