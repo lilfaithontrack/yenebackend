@@ -1,11 +1,11 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../db/dbConnect.js'; // Adjust path if necessary
+import sequelize from '../db/dbConnect.js';
 
 const Subcat = sequelize.define('Subcat', {
   name: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true, // Ensures subcategory names are unique
+    unique: true,
     validate: {
       notEmpty: {
         msg: 'Subcategory name cannot be empty',
@@ -13,18 +13,12 @@ const Subcat = sequelize.define('Subcat', {
     },
   },
   image: {
-    type: DataTypes.STRING, // Store the file path or filename for the uploaded image
+    type: DataTypes.STRING,
     allowNull: true,
-    validate: {
-      notEmpty: {
-        msg: 'Image path cannot be empty if provided',
-      },
-    },
   },
 }, {
-  // Add timestamps for tracking creation and updates
-  timestamps: true, // Sequelize will automatically add 'createdAt' and 'updatedAt'
-  tableName: 'subcats', // Define custom table name if needed
+  timestamps: true,
+  tableName: 'subcats',
 });
 
 export default Subcat;
