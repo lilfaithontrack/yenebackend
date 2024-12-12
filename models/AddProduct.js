@@ -79,6 +79,9 @@ const AddProduct = sequelize.define('AddProduct', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+}, {
+  tableName: 'products', // Explicitly map this model to the "products" table
+  timestamps: true, // Adds createdAt and updatedAt fields automatically
 });
 
 export default AddProduct;
