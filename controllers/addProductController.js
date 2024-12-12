@@ -1,51 +1,39 @@
-import multer from 'multer';
-import path from 'path';
 import AddProduct from '../models/AddProduct.js';
-import CatItem from '../models/CatItem.js';
-import SubCat from '../models/Subcat.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Set up Multer for file uploads
+// Define __dirname for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Middleware for file uploads
+import multer from 'multer';
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Directory to save files
+    cb(null, path.join(__dirname, '../uploads'));
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
+    cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
+export const upload = multer({ storage });
 
-export const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'), false);
-    }
-  },
-  limits: { fileSize: 5 * 1024 * 1024 }, // Max size: 5MB
-});
-
-// Fetch all products
+// Controller functions
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await AddProduct.findAll({
-      include: [
-        { model: CatItem, as: 'CatItem', attributes: ['id', 'name'] },
-        { model: SubCat, as: 'SubCat', attributes: ['id', 'name'] },
-      ],
-    });
+    const products = await AddProduct.findAll();
     res.status(200).json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
-    res.status(500).json({ error: 'Error fetching products' });
+    res.status(500).json({ message: 'Failed to fetch products.' });
   }
 };
 
-// Add a new product
 export const addProduct = async (req, res) => {
   try {
-    const {
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+
+    const productData = {
       title,
       sku,
       color,
@@ -53,77 +41,65 @@ export const addProduct = async (req, res) => {
       brand,
       price,
       description,
-      cat_items,
-      subcats,
-      quantity,
+      catItems,
+      subcat,
       seller_email,
-    } = req.body;
+      image: req.file ? `/uploads/${req.file.filename}` : null,
+    };
 
-    const image = req.file ? req.file.filename : null;
-
-    if (!image) {
-      return res.status(400).json({ error: 'Image is required' });
-    }
-
-    const newProduct = await AddProduct.create({
-      title,
-      sku,
-      color,
-      size,
-      brand,
-      price,
-      description,
-      cat_items,
-      subcats,
-      image,
-      quantity: quantity || 30,
-      seller_email,
-    });
-
-    res.status(201).json(newProduct);
+    const newProduct = await AddProduct.create(productData);
+    res.status(201).json({ message: 'Product added successfully!', product: newProduct });
   } catch (error) {
     console.error('Error adding product:', error);
-    res.status(500).json({ error: 'Error adding product' });
+    res.status(500).json({ message: 'Failed to add product.' });
   }
 };
 
-// Update a product
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updatedData = req.body;
-
-    if (req.file) {
-      updatedData.image = req.file.filename;
-    }
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
 
     const product = await AddProduct.findByPk(id);
     if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ message: 'Product not found.' });
     }
 
+    const updatedData = {
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      ...(req.file && { image: `/uploads/${req.file.filename}` }),
+    };
+
     await product.update(updatedData);
-    res.status(200).json(product);
+    res.status(200).json({ message: 'Product updated successfully!', product });
   } catch (error) {
     console.error('Error updating product:', error);
-    res.status(500).json({ error: 'Error updating product' });
+    res.status(500).json({ message: 'Failed to update product.' });
   }
 };
 
-// Delete a product
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
     const product = await AddProduct.findByPk(id);
     if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ message: 'Product not found.' });
     }
 
     await product.destroy();
-    res.status(200).json({ message: 'Product deleted successfully' });
+    res.status(200).json({ message: 'Product deleted successfully!' });
   } catch (error) {
     console.error('Error deleting product:', error);
-    res.status(500).json({ error: 'Error deleting product' });
+    res.status(500).json({ message: 'Failed to delete product.' });
   }
 };
