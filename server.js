@@ -26,7 +26,7 @@ import receiptRoutes from './routes/receiptRoutes.js';
 import CatItem from './models/CatItem.js';
 import SubCat from './models/Subcat.js';
 import AddProduct from './models/AddProduct.js';
-import addproductRoutes from './routes/addProductRoutes.js'
+import addProductRoutes from './routes/addProductRoutes.js';
 import subcatRoutes from './routes/subCatRoutes.js';
 // Import models (for potential associations)
 import Category from './models/Category.js';
