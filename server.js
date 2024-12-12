@@ -77,7 +77,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/prod', addproductRoutes);
+app.use('/api/prod', addProductRoutes);
 
 AddProduct.belongsTo(CatItem, { foreignKey: 'cat_items', as: 'CatItem' });
 AddProduct.belongsTo(SubCat, { foreignKey: 'subcats', as: 'SubCat' });
