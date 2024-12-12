@@ -8,7 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { connectDB } from './db/dbConnect.js';
 import sequelize from './db/dbConnect.js';
-import catitemsRoutes from './routes/catItemsRoutes.js';
+import catitemRoutes from './routes/catItemRoutes.js';
 // Import routes
 import adminRoutes from './routes/adminRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
