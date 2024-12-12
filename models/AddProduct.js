@@ -47,7 +47,7 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: true,
   },
 }, {
-  tableName: 'products', // Table name remains 'products'
+  tableName: 'AddProducts', // Table name remains 'products'
   timestamps: true, // Enable timestamps for createdAt and updatedAt fields
 });
 
