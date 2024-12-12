@@ -1,87 +1,54 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../db/dbConnect.js';  // Your Sequelize connection
+import sequelize from '../db/dbConnect.js';
 
 const AddProduct = sequelize.define('AddProduct', {
-  id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true,
-  },
   title: {
-    type: DataTypes.TEXT,
+    type: DataTypes.STRING,
     allowNull: false,
   },
   sku: {
-    type: DataTypes.TEXT,
+    type: DataTypes.STRING,
     allowNull: true,
   },
   color: {
-    type: DataTypes.TEXT,
-    allowNull: false,
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   size: {
-    type: DataTypes.TEXT,
-    allowNull: false,
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   brand: {
-    type: DataTypes.TEXT,
-    allowNull: false,
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   price: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-  },
-  image: {
-    type: DataTypes.TEXT,
+    type: DataTypes.FLOAT,
     allowNull: false,
   },
   description: {
     type: DataTypes.TEXT,
     allowNull: false,
   },
-  cat_items: {
+  catItems: { // Changed from categoryId to catItems
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  subcats: {
+  subcat: { // Changed from subcategoryId to subcat
     type: DataTypes.INTEGER,
     allowNull: false,
-  },
-  ordered_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-  },
-  quantity: {
-    type: DataTypes.INTEGER,
-    defaultValue: 30,
-  },
-  Active_Quantity: {
-    type: DataTypes.INTEGER,
-    defaultValue: 30,
-  },
-  verification: {
-    type: DataTypes.INTEGER,
-    defaultValue: 1,
-  },
-  status: {
-    type: DataTypes.TEXT,
-    defaultValue: 'Available',
   },
   seller_email: {
-    type: DataTypes.TEXT,
+    type: DataTypes.STRING,
     allowNull: false,
   },
-  like_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  comment_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
+  image: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
 }, {
-  tableName: 'products', // Explicitly map this model to the "products" table
-  timestamps: true, // Adds createdAt and updatedAt fields automatically
+  tableName: 'products', // Table name remains 'products'
+  timestamps: true, // Enable timestamps for createdAt and updatedAt fields
 });
 
 export default AddProduct;
