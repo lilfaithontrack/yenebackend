@@ -1,6 +1,5 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
-
 const AddProduct = sequelize.define('AddProduct', {
   title: {
     type: DataTypes.STRING,
@@ -30,11 +29,11 @@ const AddProduct = sequelize.define('AddProduct', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
-  catItems: { // Changed from categoryId to catItems
+  categoryId: {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  subcat: { // Changed from subcategoryId to subcat
+  subcategoryId: {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
@@ -43,11 +42,16 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: false,
   },
   image: {
-    type: DataTypes.STRING,
+    type: DataTypes.JSON,  // Allowing an array of image URLs
     allowNull: true,
   },
 }, {
-  tableName: 'AddProducts', // Table name remains 'products'
+  tableName: 'products',
+  timestamps: true, // Enable timestamps for createdAt and updatedAt fields
+});
+
+export default AddProduct;
+
   timestamps: true, // Enable timestamps for createdAt and updatedAt fields
 });
 
