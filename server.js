@@ -79,8 +79,6 @@ app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/prod', addProductRoutes);
 
-AddProduct.belongsTo(CatItem, { foreignKey: 'cat_items', as: 'CatItem' });
-AddProduct.belongsTo(SubCat, { foreignKey: 'subcats', as: 'SubCat' });
 
 // Handle 404 errors (Route not found)
 app.use((req, res) => {
