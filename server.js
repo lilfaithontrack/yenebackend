@@ -23,8 +23,8 @@ import productRoutes from './routes/productRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import checkoutRoutes from './routes/checkoutRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
-import CatItem from './CatItem.js';
-import SubCat from './Subcat.js';
+import CatItem from './models/CatItem.js';
+import SubCat from './models/Subcat.js';
 import AddProduct from './AddProduct.js';
 import addproductRoutes from './routes/AddProductRoutes.js'
 import subcatRoutes from './routes/subCatRoutes.js';
