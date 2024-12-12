@@ -23,7 +23,10 @@ import productRoutes from './routes/productRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import checkoutRoutes from './routes/checkoutRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
-
+import CatItem from './CatItem.js';
+import SubCat from './Subcat.js';
+import AddProduct from './AddProduct.js';
+import addproductRoutes from './routes/AddProductRoutes.js'
 import subcatRoutes from './routes/subCatRoutes.js';
 // Import models (for potential associations)
 import Category from './models/Category.js';
@@ -74,7 +77,10 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/addproducts', addproductRoutes);
 
+AddProduct.belongsTo(CatItem, { foreignKey: 'cat_items', as: 'CatItem' });
+AddProduct.belongsTo(SubCat, { foreignKey: 'subcats', as: 'SubCat' });
 
 // Handle 404 errors (Route not found)
 app.use((req, res) => {
