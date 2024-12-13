@@ -29,11 +29,11 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-export const addProduct = async (req, res) => {
+export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, image } = req.body;
 
-    const productData = {
+    const newProduct = await AddProduct.create({
       title,
       sku,
       color,
@@ -44,16 +44,16 @@ export const addProduct = async (req, res) => {
       catItems,
       subcat,
       seller_email,
-      image: req.file ? `/uploads/${req.file.filename}` : null,
-    };
+      image: image || [], // Default to an empty array if no image is provided
+    });
 
-    const newProduct = await AddProduct.create(productData);
-    res.status(201).json({ message: 'Product added successfully!', product: newProduct });
+    res.status(201).json({ message: 'Product created successfully', product: newProduct });
   } catch (error) {
-    console.error('Error adding product:', error);
-    res.status(500).json({ message: 'Failed to add product.' });
+    console.error('Error creating product:', error);
+    res.status(500).json({ message: 'Failed to create product', error });
   }
 };
+
 
 export const updateProduct = async (req, res) => {
   try {
