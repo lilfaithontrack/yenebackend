@@ -31,7 +31,10 @@ export const getAllProducts = async (req, res) => {
 
 export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, image } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+
+    // If multiple files are uploaded, map their paths; otherwise, default to an empty array
+    const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
 
     const newProduct = await AddProduct.create({
       title,
@@ -44,7 +47,7 @@ export const createProduct = async (req, res) => {
       catItems,
       subcat,
       seller_email,
-      image: image || [], // Default to an empty array if no image is provided
+      image: images,
     });
 
     res.status(201).json({ message: 'Product created successfully', product: newProduct });
@@ -53,7 +56,6 @@ export const createProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to create product', error });
   }
 };
-
 
 export const updateProduct = async (req, res) => {
   try {
@@ -64,6 +66,10 @@ export const updateProduct = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
     }
+
+    // If multiple files are uploaded, map their paths and append to existing images
+    const newImages = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    const updatedImages = [...product.image, ...newImages];
 
     const updatedData = {
       title,
@@ -76,7 +82,7 @@ export const updateProduct = async (req, res) => {
       catItems,
       subcat,
       seller_email,
-      ...(req.file && { image: `/uploads/${req.file.filename}` }),
+      image: updatedImages,
     };
 
     await product.update(updatedData);
