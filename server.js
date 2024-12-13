@@ -46,7 +46,7 @@ const app = express();
 // Middleware
 app.use(express.json()); // Parse JSON
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://mobile.yeniesuq.com'], // Update to match your frontend URLs
+  origin: ['http://localhost:3000', 'https://mobile.yeniesuq.com' ,'https://mobadmin.yeniesuq.com'], // Update to match your frontend URLs
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   credentials: true,
 }));
