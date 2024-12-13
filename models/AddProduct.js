@@ -43,18 +43,18 @@ const AddProduct = sequelize.define('AddProduct', {
       notEmpty: true,  // Ensure description is not empty
     },
   },
-  categoryId: {
-    type: DataTypes.INTEGER,
+  catItems: {
+    type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      isInt: true,  // Ensure categoryId is an integer
+      notEmpty: true,  // Ensure categoryId is an integer
     },
   },
-  subcategoryId: {
-    type: DataTypes.INTEGER,
+  subcat: {
+    type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      isInt: true,  // Ensure subcategoryId is an integer
+      notEmpty: true,  // Ensure subcategoryId is an integer
     },
   },
   seller_email: {
