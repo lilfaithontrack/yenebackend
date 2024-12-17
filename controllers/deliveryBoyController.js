@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
-import DeliveryBoy from '../models/DeliveryBoy.js';
 import jwt from 'jsonwebtoken';
+import DeliveryBoy from '../models/DeliveryBoy.js';
+
 // Create a new delivery boy
 export const createDeliveryBoy = async (req, res) => {
   try {
@@ -27,7 +28,19 @@ export const createDeliveryBoy = async (req, res) => {
       location,
       password: hashedPassword,
     });
-    export const loginDeliveryBoy = async (req, res) => {
+
+    res.status(201).json({
+      message: 'Delivery boy created successfully.',
+      deliveryBoy: { id: newDeliveryBoy.id, full_name, email, location },
+    });
+  } catch (error) {
+    console.error('Error creating delivery boy:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+// Login a delivery boy
+export const loginDeliveryBoy = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -52,7 +65,7 @@ export const createDeliveryBoy = async (req, res) => {
     const token = jwt.sign(
       { id: deliveryBoy.id, email: deliveryBoy.email },
       process.env.JWT_SECRET || 'your_jwt_secret', // Replace with a secure environment variable
-      { expiresIn: '1h' } // Token expiry
+      { expiresIn: '1h' }
     );
 
     res.status(200).json({
@@ -62,16 +75,6 @@ export const createDeliveryBoy = async (req, res) => {
     });
   } catch (error) {
     console.error('Error during login:', error);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-};
-
-    res.status(201).json({
-      message: 'Delivery boy created successfully.',
-      deliveryBoy: { id: newDeliveryBoy.id, full_name, email, location },
-    });
-  } catch (error) {
-    console.error('Error creating delivery boy:', error);
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
