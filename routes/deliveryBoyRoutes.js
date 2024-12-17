@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   createDeliveryBoy,
+  loginDeliveryBoy, // Added login controller
   getAllDeliveryBoys,
   getDeliveryBoyById,
   updateDeliveryBoy,
@@ -10,10 +11,11 @@ import {
 const router = express.Router();
 
 // Routes
-router.post('/delivery-boys', createDeliveryBoy);        // Create a new delivery boy
-router.get('/delivery-boys', getAllDeliveryBoys);        // Get all delivery boys
-router.get('/delivery-boys/:id', getDeliveryBoyById);    // Get a specific delivery boy by ID
-router.put('/delivery-boys/:id', updateDeliveryBoy);     // Update a specific delivery boy
-router.delete('/delivery-boys/:id', deleteDeliveryBoy);  // Delete a delivery boy by ID
+router.post('/', createDeliveryBoy);          // Create a new delivery boy
+router.post('/login', loginDeliveryBoy);     // Login for delivery boy
+router.get('/', getAllDeliveryBoys);          // Get all delivery boys
+router.get('/:id', getDeliveryBoyById);      // Get a specific delivery boy by ID
+router.put('/:id', updateDeliveryBoy);       // Update a specific delivery boy
+router.delete('/:id', deleteDeliveryBoy);    // Delete a delivery boy by ID
 
 export default router;
