@@ -74,7 +74,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/shoppers', shopperRoutes);
 app.use('/api/delivery', deliveryRoutes);
-app.use('/api/delivery-boy'),deliveryBoyRoutes);
+app.use('/api/deliveryboy', deliveryBoyRoutes );
 app.use('/api/category', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
