@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import bcrypt from 'bcrypt'; // For hashing passwords
-import sequelize from '../config/database.js'; // Ensure Sequelize instance is imported
+import sequelize from '../db/dbConnect.js'; // Ensure Sequelize instance is imported
 
 const Shopper = sequelize.define('Shopper', {
   full_name: {
