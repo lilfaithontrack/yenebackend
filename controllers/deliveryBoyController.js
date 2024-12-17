@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import DeliveryBoy from '../models/DeliveryBoy.js';
-
+import jwt from 'jsonwebtoken';
 // Create a new delivery boy
 export const createDeliveryBoy = async (req, res) => {
   try {
@@ -27,6 +27,44 @@ export const createDeliveryBoy = async (req, res) => {
       location,
       password: hashedPassword,
     });
+    export const loginDeliveryBoy = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    // Find the delivery boy by email
+    const deliveryBoy = await DeliveryBoy.findOne({ where: { email } });
+    if (!deliveryBoy) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    // Compare passwords
+    const isPasswordValid = await bcrypt.compare(password, deliveryBoy.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    // Generate a JWT token
+    const token = jwt.sign(
+      { id: deliveryBoy.id, email: deliveryBoy.email },
+      process.env.JWT_SECRET || 'your_jwt_secret', // Replace with a secure environment variable
+      { expiresIn: '1h' } // Token expiry
+    );
+
+    res.status(200).json({
+      message: 'Login successful.',
+      deliveryBoy: { id: deliveryBoy.id, full_name: deliveryBoy.full_name, email: deliveryBoy.email },
+      token,
+    });
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
 
     res.status(201).json({
       message: 'Delivery boy created successfully.',
