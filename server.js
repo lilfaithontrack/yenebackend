@@ -9,10 +9,10 @@ import { fileURLToPath } from 'url';
 import { connectDB } from './db/dbConnect.js';
 import sequelize from './db/dbConnect.js';
 import catitemRoutes from './routes/catItemRoutes.js';
-// Import routes
+
 import adminRoutes from './routes/adminRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
-
+import deliveryBoyRoutes from './routes/deliveryBoyRoutes.js';
 import sellerRoutes from './routes/sellerRoutes.js';
 import shopperRoutes from './routes/shopperRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -74,6 +74,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/shoppers', shopperRoutes);
 app.use('/api/delivery', deliveryRoutes);
+
 app.use('/api/category', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
