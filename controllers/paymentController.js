@@ -3,6 +3,7 @@ import path from 'path';
 import Payment from '../models/Payment.js';
 import fs from 'fs';
 import Joi from 'joi';
+import QRCode from 'qrcode';
 
 // Ensure the uploads directory exists
 if (!fs.existsSync('uploads/screenshots')) {
@@ -123,6 +124,48 @@ const updatePaymentStatus = async (req, res) => {
   }
 };
 
+// Approve and assign order to shopper/delivery with QR code
+const sendOrderToShopperAndDelivery = async (req, res) => {
+  try {
+    const { payment_id } = req.params;
+    const { shopper_id, delivery_id } = req.body;
+
+    if (!shopper_id || !delivery_id) {
+      return res.status(400).json({ message: 'Shopper ID and Delivery ID are required.' });
+    }
+
+    const payment = await Payment.findByPk(payment_id);
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found.' });
+    }
+
+    if (payment.payment_status !== 'Approved') {
+      return res.status(400).json({ message: 'Order must be approved before assigning.' });
+    }
+
+    const qrData = JSON.stringify({
+      payment_id: payment.id,
+      customer_name: payment.customer_name,
+      total_price: payment.total_price,
+    });
+    const qrCode = await QRCode.toDataURL(qrData);
+
+    payment.shopper_id = shopper_id;
+    payment.delivery_id = delivery_id;
+    payment.qr_code = qrCode;
+    payment.payment_status = 'Pending Delivery';
+    await payment.save();
+
+    return res.status(200).json({
+      message: 'Order sent to shopper and delivery personnel successfully.',
+      payment,
+    });
+  } catch (error) {
+    console.error('Error assigning order:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
 // Fetch order history (by customer_email or guest_id)
 const getOrderHistory = async (req, res) => {
   try {
@@ -132,12 +175,11 @@ const getOrderHistory = async (req, res) => {
       return res.status(400).json({ message: 'Customer email or guest ID is required.' });
     }
 
-    // Fetch orders based on customer_email or guest_id
     const orders = await Payment.findAll({
       where: customer_email
-        ? { customer_email } // For registered users
-        : { guest_id },      // For guest users
-      order: [['createdAt', 'DESC']], // Sort orders by most recent
+        ? { customer_email }
+        : { guest_id },
+      order: [['createdAt', 'DESC']],
     });
 
     if (orders.length === 0) {
@@ -155,7 +197,7 @@ const getOrderHistory = async (req, res) => {
 const getAllOrders = async (req, res) => {
   try {
     const orders = await Payment.findAll({
-      order: [['createdAt', 'DESC']], // Sort orders by most recent
+      order: [['createdAt', 'DESC']],
     });
 
     if (orders.length === 0) {
@@ -169,5 +211,4 @@ const getAllOrders = async (req, res) => {
   }
 };
 
-export { createPayment, updatePaymentStatus, getOrderHistory, getAllOrders };
-
+export { createPayment, updatePaymentStatus, sendOrderToShopperAndDelivery, getOrderHistory, getAllOrders };
