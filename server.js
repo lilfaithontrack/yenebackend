@@ -14,6 +14,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
 
 import sellerRoutes from './routes/sellerRoutes.js';
+import shopperRoutes from './routes/shopperRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import deliveryRoutes from './routes/deliveryRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
@@ -71,6 +72,7 @@ app.use('/api/shop', shopRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/checkout', checkoutRoutes);
+app.use('/api/shoppers', shopperRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/category', categoryRoutes);
 app.use('/api/products', productRoutes);
