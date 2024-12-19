@@ -117,6 +117,8 @@ export const deleteShopper = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
+
+// Shopper Login function
 export const loginShopper = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -141,11 +143,11 @@ export const loginShopper = async (req, res) => {
     }
 
     // If login is successful, return shopper details (excluding password)
-    const { id, full_name, email, location } = shopper;
+    const { id, full_name, email, location_lat, location_lng } = shopper;
 
     res.status(200).json({
       message: 'Login successful.',
-      shopper: { id, full_name, email, location },  // Don't send the password
+      shopper: { id, full_name, email, location_lat, location_lng },  // Don't send the password
     });
   } catch (error) {
     console.error('Error logging in shopper:', error);
