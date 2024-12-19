@@ -117,3 +117,38 @@ export const deleteShopper = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
+export const loginShopper = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    // Check if shopper exists by email
+    const shopper = await Shopper.findOne({ where: { email } });
+
+    if (!shopper) {
+      return res.status(404).json({ message: 'Shopper not found.' });
+    }
+
+    // Compare the entered password with the stored hashed password
+    const isPasswordValid = await shopper.comparePassword(password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid password.' });
+    }
+
+    // If login is successful, return shopper details (excluding password)
+    const { id, full_name, email, location } = shopper;
+
+    res.status(200).json({
+      message: 'Login successful.',
+      shopper: { id, full_name, email, location },  // Don't send the password
+    });
+  } catch (error) {
+    console.error('Error logging in shopper:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
