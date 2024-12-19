@@ -4,10 +4,10 @@ import Shopper from '../models/Shopper.js';
 // Create a new shopper
 export const createShopper = async (req, res) => {
   try {
-    const { full_name, email, location, password } = req.body;
+    const { full_name, email, location_lat, location_lng, password } = req.body;
 
     // Validate input
-    if (!full_name || !email || !location || !password) {
+    if (!full_name || !email || !location_lat || !location_lng || !password) {
       return res.status(400).json({ message: 'All fields are required.' });
     }
 
@@ -24,13 +24,14 @@ export const createShopper = async (req, res) => {
     const newShopper = await Shopper.create({
       full_name,
       email,
-      location,
+      location_lat,
+      location_lng,
       password: hashedPassword,
     });
 
     res.status(201).json({
       message: 'Shopper created successfully.',
-      shopper: { id: newShopper.id, full_name, email, location },
+      shopper: { id: newShopper.id, full_name, email, location_lat, location_lng },
     });
   } catch (error) {
     console.error('Error creating shopper:', error);
@@ -70,7 +71,7 @@ export const getShopperById = async (req, res) => {
 export const updateShopper = async (req, res) => {
   try {
     const { id } = req.params;
-    const { full_name, email, location, password } = req.body;
+    const { full_name, email, location_lat, location_lng, password } = req.body;
 
     const shopper = await Shopper.findByPk(id);
     if (!shopper) {
@@ -87,7 +88,8 @@ export const updateShopper = async (req, res) => {
     await shopper.update({
       full_name: full_name || shopper.full_name,
       email: email || shopper.email,
-      location: location || shopper.location,
+      location_lat: location_lat || shopper.location_lat,
+      location_lng: location_lng || shopper.location_lng,
       password: hashedPassword,
     });
 
