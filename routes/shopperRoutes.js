@@ -5,17 +5,18 @@ import {
   getShopperById,
   updateShopper,
   deleteShopper,
-  loginShopper,  // Import the loginShopper function
+  loginShopper,
+  findNearbyShoppers, // Import the new function
 } from '../controllers/shopperController.js';
 
 const router = express.Router();
 
-// Routes
-router.post('/', createShopper);        // Create a new shopper
-router.get('/', getAllShoppers);        // Get all shoppers
-router.get('/:id', getShopperById);    // Get a specific shopper by ID
-router.put('/:id', updateShopper);     // Update a specific shopper
-router.delete('/:id', deleteShopper);  // Delete a shopper by ID
-router.post('/login', loginShopper);   // Login a shopper
+router.post('/register', createShopper);
+router.get('/', getAllShoppers);
+router.get('/:id', getShopperById);
+router.put('/:id', updateShopper);
+router.delete('/:id', deleteShopper);
+router.post('/login', loginShopper);
+router.get('/nearby', findNearbyShoppers); // New route for finding nearby shoppers
 
 export default router;
