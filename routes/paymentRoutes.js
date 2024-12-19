@@ -1,15 +1,27 @@
-// routes/paymentRoutes.js
 import express from 'express';
-import { createPayment, updatePaymentStatus,getOrderHistory,getAllOrders } from '../controllers/paymentController.js';
+import { 
+  createPayment, 
+  updatePaymentStatus, 
+  sendOrderToShopperAndDelivery, 
+  getOrderHistory, 
+  getAllOrders 
+} from '../controllers/paymentController.js';
 
 const router = express.Router();
 
-// Route to create a payment
+// Base route for payments
 router.post('/create', createPayment);
 
 // Route to update payment status
 router.put('/update-status/:payment_id', updatePaymentStatus);
-router.get('/orders/history', getOrderHistory);
-router.get('/orders', getAllOrders);
-export default router;
 
+// Route to fetch order history by customer_email or guest_id
+router.get('/orders/history', getOrderHistory);
+
+// Route to fetch all orders
+router.get('/orders', getAllOrders);
+
+// Route to send order to shopper and delivery (approve and assign)
+router.put('/:payment_id/send-order', sendOrderToShopperAndDelivery);
+
+export default router;
