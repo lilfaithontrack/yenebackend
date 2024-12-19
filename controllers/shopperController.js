@@ -1,6 +1,21 @@
 import bcrypt from 'bcrypt';
 import Shopper from '../models/Shopper.js';
 
+// Haversine formula to calculate distance between two points (lat/lng)
+const haversine = (lat1, lng1, lat2, lng2) => {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLng = (lng2 - lng1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in km
+  return distance;
+};
+
 // Create a new shopper
 export const createShopper = async (req, res) => {
   try {
@@ -136,21 +151,50 @@ export const loginShopper = async (req, res) => {
     }
 
     // Compare the entered password with the stored hashed password
-    const isPasswordValid = await shopper.comparePassword(password);
+    const isPasswordValid = await bcrypt.compare(password, shopper.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid password.' });
     }
 
     // If login is successful, return shopper details (excluding password)
-    const { id, full_name, location_lat, location_lng } = shopper;  // No need to declare 'email' here
+    const { id, full_name, location_lat, location_lng } = shopper;
 
     res.status(200).json({
       message: 'Login successful.',
-      shopper: { id, full_name, email, location_lat, location_lng },  // Use email here without redeclaration
+      shopper: { id, full_name, email, location_lat, location_lng },
     });
   } catch (error) {
     console.error('Error logging in shopper:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+// Find nearby shoppers within a specified radius (e.g., 10 km)
+export const findNearbyShoppers = async (req, res) => {
+  try {
+    const { latitude, longitude, radius = 10 } = req.query; // default radius is 10 km
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: 'Latitude and longitude are required.' });
+    }
+
+    // Find all shoppers and calculate the distance from the given coordinates
+    const shoppers = await Shopper.findAll();
+
+    const nearbyShoppers = shoppers.filter(shopper => {
+      const distance = haversine(
+        parseFloat(latitude),
+        parseFloat(longitude),
+        parseFloat(shopper.location_lat),
+        parseFloat(shopper.location_lng)
+      );
+      return distance <= radius;
+    });
+
+    res.status(200).json({ message: `${nearbyShoppers.length} nearby shoppers found.`, nearbyShoppers });
+  } catch (error) {
+    console.error('Error finding nearby shoppers:', error);
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
