@@ -143,11 +143,11 @@ export const loginShopper = async (req, res) => {
     }
 
     // If login is successful, return shopper details (excluding password)
-    const { id, full_name, email, location_lat, location_lng } = shopper;
+    const { id, full_name, location_lat, location_lng } = shopper;  // No need to declare 'email' here
 
     res.status(200).json({
       message: 'Login successful.',
-      shopper: { id, full_name, email, location_lat, location_lng },  // Don't send the password
+      shopper: { id, full_name, email, location_lat, location_lng },  // Use email here without redeclaration
     });
   } catch (error) {
     console.error('Error logging in shopper:', error);
