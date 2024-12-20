@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { connectDB } from './db/dbConnect.js';
 import sequelize from './db/dbConnect.js';
 import catitemRoutes from './routes/catItemRoutes.js';
-
+import assignOrderRoutes from './routes/assignOrderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
 import deliveryBoyRoutes from './routes/deliveryBoyRoutes.js';
@@ -81,6 +81,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/prod', addProductRoutes);
+app.use('/api/assign',assignOrderRoutes);
 
 
 // Handle 404 errors (Route not found)
