@@ -1,8 +1,8 @@
-// controllers/assignOrderController.js
 
-import { AssignOrder, Order, Shopper, DeliveryBoy } from '../models'; // Adjust the path to your models
 import sendOrderNotification from '../utils/sendOrderNotification'; // Utility for sending notifications
-
+import AssignOrder from '../models/AssignOrder.js'; 
+import DeliveryBoy from '../models/DeliveryBoy.js'; 
+import  Shopper from '../models/Shopper.js'; 
 // Function to assign an order to a shopper and delivery boy
 export const assignOrderToShopperAndDelivery = async (req, res) => {
   const { order_id } = req.params;  // The order ID from the URL
