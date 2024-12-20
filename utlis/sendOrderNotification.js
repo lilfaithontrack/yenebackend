@@ -1,5 +1,5 @@
 import DeliveryBoy from '../models/DeliveryBoy.js'; 
-import  Shopper from '../models/Shopper.js';/ Adjust model paths if needed
+import  Shopper from '../models/Shopper.js';
 
 // Function to send notifications to both shopper and delivery boy
 export const sendOrderNotification = async (shopper, deliveryBoy, order) => {
