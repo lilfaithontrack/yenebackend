@@ -1,5 +1,4 @@
-
-import sendOrderNotification from '../utils/sendOrderNotification.js'; // Utility for sending notifications
+import sendOrderNotification from '../utils/sendOrderNotification.js'; 
 import AssignOrder from '../models/AssignOrder.js'; 
 import DeliveryBoy from '../models/DeliveryBoy.js'; 
 import  Shopper from '../models/Shopper.js'; 
