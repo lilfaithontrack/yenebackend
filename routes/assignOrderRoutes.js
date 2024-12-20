@@ -1,15 +1,19 @@
 import express from 'express';
-import { assignOrderToShopperAndDelivery, getOrderAssignments, updateAssignmentStatus } from '../controllers/assignOrderController.js';
+import {
+  assignPaymentToShopperAndDelivery,
+  getPaymentAssignments,
+  updateAssignmentStatus,
+} from '../controllers/assignOrderController.js';
 
 const router = express.Router();
 
-// Route to assign an order to a shopper and delivery boy
-router.put('/:order_id/assign', assignOrderToShopperAndDelivery);
+// Route to assign a payment (order) to a shopper and delivery boy
+router.post('/assign/:payment_id', assignPaymentToShopperAndDelivery);
 
-// Route to get the assignments for an order
-router.get('/:order_id/assignments', getOrderAssignments);
+// Route to get all assignments for a specific payment
+router.get('/assignments/:payment_id', getPaymentAssignments);
 
 // Route to update the status of an assignment
-router.put('/assignment/:assignment_id/status', updateAssignmentStatus);
+router.patch('/assignments/:assignment_id/status', updateAssignmentStatus);
 
 export default router;
