@@ -1,17 +1,22 @@
 import sendOrderNotification from '../utlis/sendOrderNotification.js'; 
 import AssignOrder from '../models/AssignOrder.js'; 
 import DeliveryBoy from '../models/DeliveryBoy.js'; 
-import  Shopper from '../models/Shopper.js'; 
+import Shopper from '../models/Shopper.js'; 
+import Payment from '../models/Payment.js'; // Assuming the Payment model holds the order_id
+
 // Function to assign an order to a shopper and delivery boy
 export const assignOrderToShopperAndDelivery = async (req, res) => {
   const { order_id } = req.params;  // The order ID from the URL
   const { shopper_id, delivery_id } = req.body;  // The shopper and delivery boy IDs from the request body
 
   try {
-    // Fetch the order to check if it exists
-    const order = await Order.findByPk(order_id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+    // Fetch the payment related to the order (use order_id from payment)
+    const payment = await Payment.findOne({
+      where: { order_id },  // Check if this order_id exists in the payments table
+    });
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Order not found in payments' });
     }
 
     // Check if shopper and delivery boy exist
@@ -27,13 +32,13 @@ export const assignOrderToShopperAndDelivery = async (req, res) => {
 
     // Create the assignment record
     const assignment = await AssignOrder.create({
-      order_id: order_id,
-      shopper_id: shopper_id,
-      delivery_id: delivery_id,
+      order_id: payment.order_id,  // Use order_id from payment table
+      shopper_id: shopper.id,
+      delivery_id: deliveryBoy.id,
     });
 
     // Send notifications to the shopper and delivery boy
-    await sendOrderNotification(shopper, deliveryBoy, order);
+    await sendOrderNotification(shopper, deliveryBoy, payment);  // Use payment to get order details
 
     // Respond with the assignment data
     res.status(200).json({
