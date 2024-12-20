@@ -1,6 +1,6 @@
 // models/AssignOrder.js
 const { Model, DataTypes } = require('sequelize');
-const sequelize = require('../config/database');  // Adjust the path to your sequelize instance
+import sequelize from '../db/dbConnect.js'; // Adjust the path to your sequelize instance
 
 class AssignOrder extends Model {}
 
