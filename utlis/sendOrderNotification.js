@@ -1,40 +1,25 @@
 import { Shopper, DeliveryBoy } from '../models';  // Adjust model paths if needed
 
-const sendOrderNotification = async (shopper, deliveryBoy, order) => {
+// Function to send notifications to both shopper and delivery boy
+export const sendOrderNotification = async (shopper, deliveryBoy, order) => {
   try {
-    // Log the order assignment notification for debugging purposes
-    console.log(`New Order Assignment: Sending notification to Shopper ${shopper.full_name} and Delivery Boy ${deliveryBoy.full_name}`);
-    
-    // Customize the message to reflect the order assignment
-    const shopperMessage = `
-      Hi ${shopper.full_name},\n\n
-      A new order (ID: ${order.id}) has been assigned to you for processing.\n
-      Please check your dashboard for further details.\n\n
-      Thank you for your service!`;
+    // Notification message for the shopper
+    const shopperMessage = `Dear ${shopper.full_name},\n\nYou have been assigned a new order.\nOrder ID: ${order.id}\nCustomer: ${order.customer_name}\nTotal Price: $${order.total_price.toFixed(
+      2
+    )}\n\nPlease prepare the order for delivery.\n\nThank you,\nYeneisuq Team`;
 
-    const deliveryBoyMessage = `
-      Hi ${deliveryBoy.full_name},\n\n
-      A new order (ID: ${order.id}) has been assigned to you for delivery.\n
-      Please check your dashboard for delivery details.\n\n
-      Thank you for your service!`;
+    // Notification message for the delivery boy
+    const deliveryBoyMessage = `Dear ${deliveryBoy.full_name},\n\nYou have been assigned a new delivery.\nOrder ID: ${order.id}\nCustomer: ${order.customer_name}\nTotal Price: $${order.total_price.toFixed(
+      2
+    )}\n\nPlease coordinate with the shopper for order pickup.\n\nThank you,\nYeneisuq Team`;
 
-    // Log the notification message
-    console.log(`Shopper Message:\n${shopperMessage}`);
-    console.log(`Delivery Boy Message:\n${deliveryBoyMessage}`);
+    // Simulate sending the notification by logging the messages
+    console.log("Shopper Notification:\n", shopperMessage);
+    console.log("Delivery Boy Notification:\n", deliveryBoyMessage);
 
-    // Here, you'd send the email or push notification
-    // Example: You can use an email service like Nodemailer or Firebase Cloud Messaging (FCM)
-
-    // Example logging for the email content (as placeholders):
-    console.log(`Sending email to Shopper: ${shopper.email}`);
-    console.log(`Sending email to DeliveryBoy: ${deliveryBoy.email}`);
-    
-    // Assuming you will implement an actual email or push notification service later
-
+    console.log("Notifications generated successfully.");
   } catch (error) {
-    console.error('Error sending order assignment notifications:', error);
-    throw new Error('Error sending order assignment notifications');
+    console.error("Error generating notifications:", error);
+    throw new Error("Failed to generate notifications");
   }
 };
-
-export default sendOrderNotification;
