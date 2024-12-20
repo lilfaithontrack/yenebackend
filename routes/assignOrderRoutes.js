@@ -1,5 +1,5 @@
 import express from 'express';
-import { assignOrderToShopperAndDelivery, getOrderAssignments, updateAssignmentStatus } from '../controllers/assignOrderController';
+import { assignOrderToShopperAndDelivery, getOrderAssignments, updateAssignmentStatus } from '../controllers/assignOrderController.js';
 
 const router = express.Router();
 
