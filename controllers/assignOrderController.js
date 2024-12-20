@@ -1,4 +1,4 @@
-import sendOrderNotification from '../utils/sendOrderNotification.js'; 
+import sendOrderNotification from '../utlis/sendOrderNotification.js'; 
 import AssignOrder from '../models/AssignOrder.js'; 
 import DeliveryBoy from '../models/DeliveryBoy.js'; 
 import Shopper from '../models/Shopper.js'; 
