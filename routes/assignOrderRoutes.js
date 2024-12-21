@@ -8,10 +8,10 @@ import {
 const router = express.Router();
 
 // Route to assign a payment (order) to a shopper and delivery boy
-router.post('/assign/:payment_id', assignPaymentToShopperAndDelivery);
+router.post('/assign/:order_id', assignPaymentToShopperAndDelivery);
 
 // Route to get all assignments for a specific payment
-router.get('/assignments/:payment_id', getPaymentAssignments);
+router.get('/assignments/:order_id', getPaymentAssignments);
 
 // Route to update the status of an assignment
 router.patch('/assignments/:assignment_id/status', updateAssignmentStatus);
