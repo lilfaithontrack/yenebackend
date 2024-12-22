@@ -32,12 +32,12 @@ const Shopper = sequelize.define(
       allowNull: false,
     },
     created_at: {
-      type: DataTypes.TIMESTAMP,
+      type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
       allowNull: true,
     },
-    updatedAt: {
-      type: DataTypes.TIMESTAMP,
+    updated_at: {
+      type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
       onUpdate: DataTypes.NOW,
       allowNull: true,
