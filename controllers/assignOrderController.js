@@ -1,8 +1,8 @@
-import sendOrderNotification from '../utlis/sendOrderNotification.js'; 
-import AssignOrder from '../models/AssignOrder.js'; 
-import DeliveryBoy from '../models/DeliveryBoy.js'; 
-import Shopper from '../models/Shopper.js'; 
-import Payment from '../models/Payment.js'; 
+import sendOrderNotification from '../utlis/sendOrderNotification.js';
+import AssignOrder from '../models/AssignOrder.js';
+import DeliveryBoy from '../models/DeliveryBoy.js';
+import Shopper from '../models/Shopper.js';
+import Payment from '../models/Payment.js';
 
 // Function to assign a payment (as an order) to a shopper and delivery boy
 export const assignPaymentToShopperAndDelivery = async (req, res) => {
@@ -63,13 +63,26 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
 export const getPaymentAssignments = async (req, res) => {
   const { payment_id } = req.params;
 
+  // Validate payment_id
+  if (!payment_id) {
+    return res.status(400).json({ message: 'Payment ID is required' });
+  }
+
   try {
     // Get the assignments for the specific payment
     const assignments = await AssignOrder.findAll({
       where: { order_id: payment_id }, // Using payment_id as the order ID
       include: [
-        { model: Shopper, attributes: ['id', 'full_name', 'email'] },
-        { model: DeliveryBoy, attributes: ['id', 'full_name', 'email'] },
+        {
+          model: Shopper,
+          as: 'shopper', // Alias from the association
+          attributes: ['id', 'full_name', 'email'], // Adjust as needed
+        },
+        {
+          model: DeliveryBoy,
+          as: 'deliveryBoy', // Alias from the association
+          attributes: ['id', 'full_name', 'email'], // Adjust as needed
+        },
       ],
     });
 
@@ -80,6 +93,7 @@ export const getPaymentAssignments = async (req, res) => {
     res.status(200).json({ assignments });
   } catch (error) {
     console.error('Error fetching assignments:', error);
+    // Log the error to understand better
     res.status(500).json({ message: 'Error fetching assignments', error });
   }
 };
