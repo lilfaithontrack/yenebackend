@@ -20,7 +20,7 @@ const Shopper = sequelize.define('Shopper', {
     },
   },
   locationLat: {
-    type: DataTypes.DECIMAL(10, 8), // 10 digits, 8 after the decimal
+    type: DataTypes.DOUBLE, // Use DOUBLE to match your SQL schema
     allowNull: false,
     validate: {
       isDecimal: { msg: 'Latitude must be a decimal number.' },
@@ -28,7 +28,7 @@ const Shopper = sequelize.define('Shopper', {
     field: 'location_lat', // Map to database column `location_lat`
   },
   locationLng: {
-    type: DataTypes.DECIMAL(11, 8), // 11 digits, 8 after the decimal
+    type: DataTypes.DOUBLE, // Use DOUBLE to match your SQL schema
     allowNull: false,
     validate: {
       isDecimal: { msg: 'Longitude must be a decimal number.' },
@@ -43,9 +43,11 @@ const Shopper = sequelize.define('Shopper', {
     },
   },
 }, {
-  tableName: 'shoppers',
+  tableName: 'shoppers', // Table name for the model
   timestamps: true, // Enable `createdAt` and `updatedAt`
   underscored: true, // Use snake_case for database column names
+  createdAt: 'created_at', // Map `createdAt` to `created_at`
+  updatedAt: 'updated_at', // Map `updatedAt` to `updated_at`
   hooks: {
     beforeCreate: async (shopper) => {
       if (shopper.password) {
