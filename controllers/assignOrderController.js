@@ -60,8 +60,10 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
 };
 
 // Function to get the assignments for a payment
+// Function to get the assignments for a payment, filtered by shopper_id and delivery_id
 export const getPaymentAssignments = async (req, res) => {
-  const { payment_id } = req.params;
+  const { payment_id } = req.params; // Extract payment ID from URL params
+  const { shopper_id, delivery_id } = req.query; // Extract optional filters from query params
 
   // Validate payment_id
   if (!payment_id) {
@@ -69,9 +71,20 @@ export const getPaymentAssignments = async (req, res) => {
   }
 
   try {
-    // Get the assignments for the specific payment
+    // Build the query filter
+    const whereClause = { order_id: payment_id }; // Base filter by payment_id
+
+    if (shopper_id) {
+      whereClause.shopper_id = shopper_id; // Add shopper_id filter if provided
+    }
+
+    if (delivery_id) {
+      whereClause.delivery_id = delivery_id; // Add delivery_id filter if provided
+    }
+
+    // Get the assignments based on filters
     const assignments = await AssignOrder.findAll({
-      where: { order_id: payment_id }, // Using payment_id as the order ID
+      where: whereClause,
       include: [
         {
           model: Shopper,
@@ -87,13 +100,12 @@ export const getPaymentAssignments = async (req, res) => {
     });
 
     if (assignments.length === 0) {
-      return res.status(404).json({ message: 'No assignments found for this payment' });
+      return res.status(404).json({ message: 'No assignments found for the provided criteria' });
     }
 
     res.status(200).json({ assignments });
   } catch (error) {
     console.error('Error fetching assignments:', error);
-    // Log the error to understand better
     res.status(500).json({ message: 'Error fetching assignments', error });
   }
 };
