@@ -1,9 +1,8 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js'; // Adjust the path to your sequelize instance
 
-class Shopper extends Model {}
-
-Shopper.init(
+const Shopper = sequelize.define(
+  'Shopper',
   {
     id: {
       type: DataTypes.BIGINT.UNSIGNED,
