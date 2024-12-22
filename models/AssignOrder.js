@@ -42,6 +42,18 @@ AssignOrder.init(
       defaultValue: DataTypes.NOW, // When the order was assigned
     },
   },
+AssignOrder.associate = (models) => {
+  AssignOrder.belongsTo(models.Shopper, {
+    foreignKey: 'shoppers_id',
+    as: 'shopper',  // Alias to use in include
+  });
+
+  AssignOrder.belongsTo(models.DeliveryBoy, {
+    foreignKey: 'deliveryboy_id',
+    as: 'deliveryBoy',  // Alias to use in include
+  });
+};
+
   {
     sequelize,
     modelName: 'AssignOrder',
