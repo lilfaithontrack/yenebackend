@@ -42,18 +42,6 @@ AssignOrder.init(
       defaultValue: DataTypes.NOW, // When the order was assigned
     },
   },
-AssignOrder.associate = (models) => {
-  AssignOrder.belongsTo(models.Shopper, {
-    foreignKey: 'shoppers_id',
-    as: 'shopper',  // Alias to use in include
-  });
-
-  AssignOrder.belongsTo(models.DeliveryBoy, {
-    foreignKey: 'deliveryboy_id',
-    as: 'deliveryBoy',  // Alias to use in include
-  });
-};
-
   {
     sequelize,
     modelName: 'AssignOrder',
@@ -61,5 +49,18 @@ AssignOrder.associate = (models) => {
     timestamps: true, // Automatically includes createdAt and updatedAt fields
   }
 );
+
+AssignOrder.associate = (models) => {
+  // Corrected foreign keys to match table column names
+  AssignOrder.belongsTo(models.Shopper, {
+    foreignKey: 'shopper_id',  // Correct foreign key name
+    as: 'shopper',  // Alias to use in include
+  });
+
+  AssignOrder.belongsTo(models.DeliveryBoy, {
+    foreignKey: 'delivery_id',  // Correct foreign key name
+    as: 'deliveryBoy',  // Alias to use in include
+  });
+};
 
 export default AssignOrder;
