@@ -1,62 +1,53 @@
-import { DataTypes } from 'sequelize';
+import { Model, DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js'; // Adjust the path to your sequelize instance
 
-const AssignOrder = sequelize.define('AssignOrder', {
-  orderId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'Orders', // Assuming the Orders model exists
-      key: 'id',
-    },
-    onDelete: 'CASCADE',
-  },
-  shopperId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'shoppers', // Correct table name 'shoppers'
-      key: 'id',
-    },
-    onDelete: 'SET NULL',
-  },
-  deliveryId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'deliveryboys', // Correct table name 'deliveryboys'
-      key: 'id',
-    },
-    onDelete: 'SET NULL',
-  },
-  status: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    defaultValue: 'Assigned',
-  },
-  assignedAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-  },
-}, {
-  tableName: 'assign_orders', // Table name for the AssignOrder model
-  timestamps: true, // Enable `createdAt` and `updatedAt`
-  underscored: true, // Use snake_case for database column names
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-});
+class AssignOrder extends Model {}
 
-// Association setup
-AssignOrder.associate = (models) => {
-  AssignOrder.belongsTo(models.shoppers, {
-    foreignKey: 'shopperId', // Foreign key to shoppers
-    as: 'shopper',  // Alias to use in include
-  });
-
-  AssignOrder.belongsTo(models.deliveryboys, {
-    foreignKey: 'deliveryId', // Foreign key to deliveryboys
-    as: 'deliveryBoy',  // Alias to use in include
-  });
-};
+AssignOrder.init(
+  {
+    order_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Orders', // Assuming the Orders model exists
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
+    },
+    shopper_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Shoppers', // Assuming the Shoppers model exists
+        key: 'id',
+      },
+      onDelete: 'SET NULL', // In case the shopper is deleted
+    },
+    delivery_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'DeliveryBoys', // Assuming the DeliveryBoys model exists
+        key: 'id',
+      },
+      onDelete: 'SET NULL', // In case the delivery boy is deleted
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Assigned', // 'Assigned', 'In Progress', 'Completed', etc.
+    },
+    assigned_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW, // When the order was assigned
+    },
+  },
+  {
+    sequelize,
+    modelName: 'AssignOrder',
+    tableName: 'assign_orders', // You can name your table as you prefer
+    timestamps: true, // Automatically includes createdAt and updatedAt fields
+  }
+);
 
 export default AssignOrder;
