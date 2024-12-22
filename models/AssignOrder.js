@@ -18,47 +18,47 @@ AssignOrder.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'Shoppers', // Assuming the Shoppers model exists
+        model: 'shoppers', // Correct table name 'shoppers'
         key: 'id',
       },
-      onDelete: 'SET NULL', // In case the shopper is deleted
+      onDelete: 'SET NULL',
     },
     delivery_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'DeliveryBoys', // Assuming the DeliveryBoys model exists
+        model: 'deliveryboys', // Correct table name 'deliveryboys'
         key: 'id',
       },
-      onDelete: 'SET NULL', // In case the delivery boy is deleted
+      onDelete: 'SET NULL',
     },
     status: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 'Assigned', // 'Assigned', 'In Progress', 'Completed', etc.
+      defaultValue: 'Assigned',
     },
     assigned_at: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW, // When the order was assigned
+      defaultValue: DataTypes.NOW,
     },
   },
   {
     sequelize,
     modelName: 'AssignOrder',
-    tableName: 'assign_orders', // You can name your table as you prefer
-    timestamps: true, // Automatically includes createdAt and updatedAt fields
+    tableName: 'assign_orders', // Table name for the AssignOrder model
+    timestamps: true,
   }
 );
 
+// Association setup
 AssignOrder.associate = (models) => {
-  // Corrected foreign keys to match table column names
-  AssignOrder.belongsTo(models.Shopper, {
-    foreignKey: 'shopper_id',  // Correct foreign key name
+  AssignOrder.belongsTo(models.shoppers, { // Reference correct plural table name
+    foreignKey: 'shopper_id', // Foreign key to shoppers
     as: 'shopper',  // Alias to use in include
   });
 
-  AssignOrder.belongsTo(models.DeliveryBoy, {
-    foreignKey: 'delivery_id',  // Correct foreign key name
+  AssignOrder.belongsTo(models.deliveryboys, { // Reference the correct plural table name 'deliveryboys'
+    foreignKey: 'delivery_id', // Foreign key to deliveryboys
     as: 'deliveryBoy',  // Alias to use in include
   });
 };
