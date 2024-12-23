@@ -61,27 +61,22 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
 
 // Function to get the assignments for a payment
 // Function to get the assignments for a payment, filtered by shopper_id and delivery_id
-export const getPaymentAssignments = async (req, res) => {
-  const { payment_id } = req.params; // Extract payment ID from URL params
+// Function to get all assignments, filtered by shopper_id or delivery_id
+export const getAssignments = async (req, res) => {
   const { shopper_id, delivery_id } = req.query; // Extract optional filters from query params
 
-  // Validate payment_id
-  if (!payment_id) {
-    return res.status(400).json({ message: 'Payment ID is required' });
+  // Build the query filter based on the provided query parameters
+  const whereClause = {};
+
+  if (shopper_id) {
+    whereClause.shopper_id = shopper_id; // Filter by shopper_id if provided
+  }
+
+  if (delivery_id) {
+    whereClause.delivery_id = delivery_id; // Filter by delivery_id if provided
   }
 
   try {
-    // Build the query filter
-    const whereClause = { order_id: payment_id }; // Base filter by payment_id
-
-    if (shopper_id) {
-      whereClause.shopper_id = shopper_id; // Add shopper_id filter if provided
-    }
-
-    if (delivery_id) {
-      whereClause.delivery_id = delivery_id; // Add delivery_id filter if provided
-    }
-
     // Get the assignments based on filters
     const assignments = await AssignOrder.findAll({
       where: whereClause,
@@ -109,6 +104,7 @@ export const getPaymentAssignments = async (req, res) => {
     res.status(500).json({ message: 'Error fetching assignments', error });
   }
 };
+
 
 // Function to update the assignment status (e.g., mark as 'In Progress' or 'Completed')
 export const updateAssignmentStatus = async (req, res) => {
