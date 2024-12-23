@@ -51,7 +51,7 @@ const Shopper = sequelize.define(
   }
 );
 
-Shopper.hasMany(Assignment, { foreignKey: 'shopper_id' });
+Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id' });
 
 
 export default Shopper;
