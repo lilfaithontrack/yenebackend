@@ -35,7 +35,9 @@ import Subcategory from './models/Subcategory.js';
 import Shop from './models/Shop.js';
 import ShopOwner from './models/ShopOwner.js';
 import Payment from './models/Payment.js';
-
+import Shopper from './models/Shopper.js';
+import DeliveryBoy from './models/DeliveryBoy.js';
+import AssignOrder from './models/AssignOrder.js';
 // Define __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
