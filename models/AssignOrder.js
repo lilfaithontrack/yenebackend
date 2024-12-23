@@ -50,7 +50,15 @@ AssignOrder.init(
     timestamps: true, // Automatically includes createdAt and updatedAt fields
   }
 );
-Assignment.belongsTo(Shopper, { foreignKey: 'shopper_id' });
-Assignment.belongsTo(DeliveryBoy, { foreignKey: 'delivery_boy_id' });
+AssignOrder.associate = (models) => {
+  AssignOrder.belongsTo(models.Shopper, {
+    foreignKey: 'shopper_id',
+    as: 'shopper',
+  });
+  AssignOrder.belongsTo(models.DeliveryBoy, {
+    foreignKey: 'delivery_boy_id',
+    as: 'deliveryBoy',
+  });
+};
 
 export default AssignOrder;
