@@ -11,7 +11,7 @@ const router = express.Router();
 router.post('/assign/:payment_id', assignPaymentToShopperAndDelivery);
 
 // Route to get all assignments for a specific payment
-router.get('/assignments', getAssignments);
+router.get('/', getAssignments);
 
 // Route to update the status of an assignment
 router.patch('/assignments/:assignment_id/status', updateAssignmentStatus);
