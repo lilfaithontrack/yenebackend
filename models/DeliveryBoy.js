@@ -39,9 +39,7 @@ const DeliveryBoy = sequelize.define(
     timestamps: true,
   }
 );
-DeliveryBoy.hasMany(models.AssignOrder, {
-  foreignKey: 'delivery_boy_id',
-  as: 'assignments', // If you want to fetch all assignments related to the delivery boy
-});
+
+DeliveryBoy.hasMany(sequelize.models.AssignOrder, { foreignKey: 'delivery_boy_id', as: 'assignments' });
 
 export default DeliveryBoy;
