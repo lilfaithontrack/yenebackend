@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
-import AssignOrder from './AssignOrder.js';
+
 const DeliveryBoy = sequelize.define(
   'DeliveryBoy',
   {
@@ -40,6 +40,6 @@ const DeliveryBoy = sequelize.define(
   }
 );
 
-DeliveryBoy.hasMany(sequelize.models.AssignOrder, { foreignKey: 'delivery_boy_id', as: 'assignments' });
+
 
 export default DeliveryBoy;
