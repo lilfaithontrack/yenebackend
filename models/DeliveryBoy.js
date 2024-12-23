@@ -39,6 +39,6 @@ const DeliveryBoy = sequelize.define(
     timestamps: true,
   }
 );
-DeliveryBoy.hasMany(AssignOrder, { foreignKey: 'delivery_boy_id' });
+DeliveryBoy.hasMany(Assignment, { foreignKey: 'delivery_boy_id' });
 
 export default DeliveryBoy;
