@@ -49,5 +49,7 @@ AssignOrder.init(
     timestamps: true, // Automatically includes createdAt and updatedAt fields
   }
 );
+Assignment.belongsTo(Shopper, { foreignKey: 'shopper_id' });
+Assignment.belongsTo(DeliveryBoy, { foreignKey: 'delivery_boy_id' });
 
 export default AssignOrder;
