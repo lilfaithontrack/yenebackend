@@ -1,6 +1,7 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js'; // Adjust the path to your sequelize instance
-
+import Shopper from './Shopper.js';
+import DeliveryBoy form './DeliveryBoy.js';
 class AssignOrder extends Model {}
 
 AssignOrder.init(
