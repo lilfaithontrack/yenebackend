@@ -1,6 +1,6 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js'; // Adjust the path to your sequelize instance
-import AssignOrder from './AssignOrder.js';
+
 const Shopper = sequelize.define(
   'Shopper',
   {
@@ -51,7 +51,7 @@ const Shopper = sequelize.define(
   }
 );
 
-Shopper.hasMany(sequelize.models.AssignOrder, { foreignKey: 'shopper_id', as: 'assignments' });
+
 
 
 export default Shopper;
