@@ -51,10 +51,7 @@ const Shopper = sequelize.define(
   }
 );
 
-Shopper.hasMany(models.AssignOrder, {
-  foreignKey: 'shopper_id',
-  as: 'assignments', // If you want to fetch all assignments related to the shopper
-});
+Shopper.hasMany(sequelize.models.AssignOrder, { foreignKey: 'shopper_id', as: 'assignments' });
 
 
 export default Shopper;
