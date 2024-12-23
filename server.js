@@ -118,6 +118,7 @@ const startServer = async () => {
         models[modelName].associate(models);
       }
     });
+    
 
     // Sync database models
     await sequelize.sync({ alter: false });
@@ -149,6 +150,12 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id', as: 'assignments' });
+AssignOrder.belongsTo(Shopper, { foreignKey: 'shopper_id' });
+
+DeliveryBoy.hasMany(AssignOrder, { foreignKey: 'delivery_boy_id', as: 'assignments' });
+AssignOrder.belongsTo(DeliveryBoy, { foreignKey: 'delivery_boy_id' });
+
 
 // Start the server
 startServer();
