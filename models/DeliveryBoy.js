@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
-
+import AssignOrder from './AssignOrder.js';
 const DeliveryBoy = sequelize.define(
   'DeliveryBoy',
   {
