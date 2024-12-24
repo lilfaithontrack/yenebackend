@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   assignPaymentToShopperAndDelivery,
-  getPaymentAssignments,
+   getAssignments,
   updateAssignmentStatus,
 } from '../controllers/assignOrderController.js';
 
