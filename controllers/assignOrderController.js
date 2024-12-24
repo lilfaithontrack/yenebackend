@@ -7,19 +7,13 @@ import Payment from '../models/Payment.js';
 // Function to assign a payment (as an order) to a shopper and delivery boy
 export const assignPaymentToShopperAndDelivery = async (req, res) => {
   const { payment_id } = req.params; // The payment ID (used as the order ID) from the URL
-  const { shopper_id, delivery_boy_id } = req.body; // Updated to match association foreign key
+  const { shopper_id, delivery_id } = req.body; // The shopper and delivery boy IDs from the request body
 
   try {
     // Fetch the payment record to verify its existence
     const payment = await Payment.findByPk(payment_id);
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
-    }
-
-    // Check if the payment has already been assigned
-    const existingAssignment = await AssignOrder.findOne({ where: { order_id: payment_id } });
-    if (existingAssignment) {
-      return res.status(400).json({ message: 'Payment has already been assigned' });
     }
 
     // Parse the cart_items from the payment record
@@ -31,7 +25,7 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
       return res.status(404).json({ message: 'Shopper not found' });
     }
 
-    const deliveryBoy = await DeliveryBoy.findByPk(delivery_boy_id);
+    const deliveryBoy = await DeliveryBoy.findByPk(delivery_id);
     if (!deliveryBoy) {
       return res.status(404).json({ message: 'Delivery boy not found' });
     }
@@ -40,7 +34,7 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
     const assignment = await AssignOrder.create({
       order_id: payment_id, // Using payment_id as the order ID
       shopper_id,
-      delivery_boy_id, // Updated to match association foreign key
+      delivery_id,
     });
 
     // Send notifications to the shopper and delivery boy
@@ -64,7 +58,6 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
     res.status(500).json({ message: 'Error assigning payment', error });
   }
 };
-
 
 // Function to get all assignments, filtered by shopper_id or delivery_boy_id
 export const getAssignments = async (req, res) => {
