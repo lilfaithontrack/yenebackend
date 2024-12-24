@@ -7,7 +7,7 @@ import Payment from '../models/Payment.js';
 // Function to assign a payment (as an order) to a shopper and delivery boy
 export const assignPaymentToShopperAndDelivery = async (req, res) => {
   const { payment_id } = req.params; // The payment ID (used as the order ID) from the URL
-  const { shopper_id, delivery_id } = req.body; // The shopper and delivery boy IDs from the request body
+  const { shopper_id, delivery_boy_id } = req.body; // Updated to match association foreign key
 
   try {
     // Fetch the payment record to verify its existence
@@ -25,7 +25,7 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
       return res.status(404).json({ message: 'Shopper not found' });
     }
 
-    const deliveryBoy = await DeliveryBoy.findByPk(delivery_id);
+    const deliveryBoy = await DeliveryBoy.findByPk(delivery_boy_id);
     if (!deliveryBoy) {
       return res.status(404).json({ message: 'Delivery boy not found' });
     }
@@ -34,7 +34,7 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
     const assignment = await AssignOrder.create({
       order_id: payment_id, // Using payment_id as the order ID
       shopper_id,
-      delivery_id,
+      delivery_boy_id, // Updated to match association foreign key
     });
 
     // Send notifications to the shopper and delivery boy
@@ -59,22 +59,14 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
   }
 };
 
-// Function to get the assignments for a payment
-// Function to get the assignments for a payment, filtered by shopper_id and delivery_id
-// Function to get all assignments, filtered by shopper_id or delivery_id
+// Function to get all assignments, filtered by shopper_id or delivery_boy_id
 export const getAssignments = async (req, res) => {
-  const { shopper_id, delivery_id } = req.query; // Extract optional filters from query params
+  const { shopper_id, delivery_boy_id } = req.query; // Updated query parameter names
 
   // Build the query filter based on the provided query parameters
   const whereClause = {};
-
-  if (shopper_id) {
-    whereClause.shopper_id = shopper_id; // Filter by shopper_id if provided
-  }
-
-  if (delivery_id) {
-    whereClause.delivery_id = delivery_id; // Filter by delivery_id if provided
-  }
+  if (shopper_id) whereClause.shopper_id = shopper_id;
+  if (delivery_boy_id) whereClause.delivery_boy_id = delivery_boy_id;
 
   try {
     // Get the assignments based on filters
@@ -83,13 +75,13 @@ export const getAssignments = async (req, res) => {
       include: [
         {
           model: Shopper,
-          as: 'shopper', // Alias from the association
-          attributes: ['id', 'full_name', 'email'], // Adjust as needed
+          as: 'shopper', // Matches the alias in AssignOrder.belongsTo(Shopper)
+          attributes: ['id', 'full_name', 'email'],
         },
         {
           model: DeliveryBoy,
-          as: 'deliveryBoy', // Alias from the association
-          attributes: ['id', 'full_name', 'email'], // Adjust as needed
+          as: 'deliveryBoy', // Matches the alias in AssignOrder.belongsTo(DeliveryBoy)
+          attributes: ['id', 'full_name', 'email'],
         },
       ],
     });
@@ -104,7 +96,6 @@ export const getAssignments = async (req, res) => {
     res.status(500).json({ message: 'Error fetching assignments', error });
   }
 };
-
 
 // Function to update the assignment status (e.g., mark as 'In Progress' or 'Completed')
 export const updateAssignmentStatus = async (req, res) => {
