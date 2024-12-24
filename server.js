@@ -150,11 +150,13 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
-Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id', as: 'assignments' });
-AssignOrder.belongsTo(Shopper, { foreignKey: 'shopper_id' });
 
-DeliveryBoy.hasMany(AssignOrder, { foreignKey: 'delivery_boy_id', as: 'assignments' });
-AssignOrder.belongsTo(DeliveryBoy, { foreignKey: 'delivery_boy_id' });
+Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id', as: 'assignOrders' }); // Alias: assignOrders
+AssignOrder.belongsTo(Shopper, { foreignKey: 'shopper_id', as: 'shopper' }); // Alias: shopper
+
+DeliveryBoy.hasMany(AssignOrder, { foreignKey: 'delivery_boy_id', as: 'assignOrders' }); // Alias: assignOrders
+AssignOrder.belongsTo(DeliveryBoy, { foreignKey: 'delivery_boy_id', as: 'deliveryBoy' }); // Alias: deliveryBoy
+
 
 
 // Start the server
