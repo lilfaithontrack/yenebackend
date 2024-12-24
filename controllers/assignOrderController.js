@@ -16,6 +16,12 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
+    // Check if the payment has already been assigned
+    const existingAssignment = await AssignOrder.findOne({ where: { order_id: payment_id } });
+    if (existingAssignment) {
+      return res.status(400).json({ message: 'Payment has already been assigned' });
+    }
+
     // Parse the cart_items from the payment record
     const orderDetails = JSON.parse(payment.cart_items);
 
@@ -58,6 +64,7 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
     res.status(500).json({ message: 'Error assigning payment', error });
   }
 };
+
 
 // Function to get all assignments, filtered by shopper_id or delivery_boy_id
 export const getAssignments = async (req, res) => {
