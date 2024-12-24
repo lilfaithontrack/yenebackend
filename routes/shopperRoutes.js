@@ -11,7 +11,7 @@ import {
 
 const router = express.Router();
 
-router.post('/register', createShopper);
+router.post('/', createShopper);
 router.get('/', getAllShoppers);
 router.get('/:id', getShopperById);
 router.put('/:id', updateShopper);
