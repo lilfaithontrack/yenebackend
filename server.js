@@ -155,8 +155,10 @@ Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id', as: 'assignOrders' }); 
 AssignOrder.belongsTo(Shopper, { foreignKey: 'shopper_id', as: 'shopper' }); // Alias: shopper
 
 DeliveryBoy.hasMany(AssignOrder, { foreignKey: 'delivery_boy_id', as: 'assignOrders' }); // Alias: assignOrders
-AssignOrder.belongsTo(DeliveryBoy, { foreignKey: 'delivery_boy_id', as: 'deliveryBoy' }); // Alias: deliveryBoy
-
+AssignOrder.belongsTo(DeliveryBoy, {
+  foreignKey: 'delivery_id', // Use 'delivery_id' instead of 'delivery_boy_id'
+  as: 'deliveryBoy',
+});
 
 
 // Start the server
