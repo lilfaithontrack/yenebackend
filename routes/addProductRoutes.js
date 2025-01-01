@@ -1,6 +1,7 @@
 import express from 'express';
 import { 
   getAllProducts, 
+  getProductById,
   createProduct, 
   updateProduct, 
   deleteProduct, 
@@ -11,7 +12,8 @@ const router = express.Router();
 
 // Route to fetch all products
 router.get('/', getAllProducts);
-
+//Route to get the product by id
+router.get('/:id', getProductById); 
 // Route to create a new product (with optional image upload)
 router.post('/add', upload.array('image', 10), createProduct); // Allows uploading up to 10 images
 
