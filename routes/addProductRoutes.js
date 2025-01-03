@@ -18,7 +18,7 @@ router.get('/:id', getProductById);
 router.post('/add', upload.array('image', 10), createProduct); // Allows uploading up to 10 images
 
 // Route to update a product by ID (with optional image upload)
-router.put('/:id', upload.single('image'), updateProduct);
+router.put('/:id', upload.single('image',5), updateProduct);
 
 // Route to delete a product by ID
 router.delete('/:id', deleteProduct);
