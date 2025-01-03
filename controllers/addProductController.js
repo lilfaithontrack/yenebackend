@@ -2,21 +2,27 @@ import AddProduct from '../models/AddProduct.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import sharp from 'sharp';
+import fs from 'fs/promises';
 
 // Define __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Middleware for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../uploads'));
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+const storage = multer.memoryStorage(); // Use memory storage for image optimization
+export const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported file type.'), false);
+    }
   },
 });
-export const upload = multer({ storage });
 
 // Controller functions
 
@@ -58,14 +64,26 @@ export const getProductById = async (req, res) => {
 };
 
 /**
- * Create a new product
+ * Create a new product with optimized images
  */
 export const createProduct = async (req, res) => {
   try {
     const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
 
-    // Map uploaded file paths
-    const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    // Optimize and save images
+    const images = [];
+    if (req.files) {
+      for (const file of req.files) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+
+        await sharp(file.buffer)
+          .resize(800) // Resize to 800px width
+          .webp({ quality: 80 }) // Convert to WebP
+          .toFile(optimizedPath);
+
+        images.push(`/uploads/${path.basename(optimizedPath)}`);
+      }
+    }
 
     const newProduct = await AddProduct.create({
       title,
@@ -89,7 +107,7 @@ export const createProduct = async (req, res) => {
 };
 
 /**
- * Update an existing product
+ * Update an existing product with new images
  */
 export const updateProduct = async (req, res) => {
   try {
@@ -101,8 +119,22 @@ export const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
-    // Map uploaded file paths and merge with existing images
-    const newImages = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    // Optimize and save new images
+    const newImages = [];
+    if (req.files) {
+      for (const file of req.files) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+
+        await sharp(file.buffer)
+          .resize(800) // Resize to 800px width
+          .webp({ quality: 80 }) // Convert to WebP
+          .toFile(optimizedPath);
+
+        newImages.push(`/uploads/${path.basename(optimizedPath)}`);
+      }
+    }
+
+    // Merge new images with existing ones
     const updatedImages = [...product.image, ...newImages];
 
     const updatedData = {
@@ -128,7 +160,7 @@ export const updateProduct = async (req, res) => {
 };
 
 /**
- * Delete a product
+ * Delete a product and its associated images
  */
 export const deleteProduct = async (req, res) => {
   try {
@@ -137,6 +169,16 @@ export const deleteProduct = async (req, res) => {
     const product = await AddProduct.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
+    }
+
+    // Delete associated image files
+    for (const imagePath of product.image) {
+      const filePath = path.join(__dirname, '..', imagePath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.error('Error deleting file:', filePath, err);
+      }
     }
 
     await product.destroy();
