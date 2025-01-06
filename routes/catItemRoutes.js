@@ -1,5 +1,5 @@
 import express from 'express';
-import { upload, createCatItem, getAllCatItems } from '../controllers/CatItemController.js';
+import { upload, createCatItem, getAllCatItems, updateCatItem } from '../controllers/CatItemController.js';
 
 const router = express.Router();
 
@@ -8,5 +8,8 @@ router.post('/create', upload.single('image'), createCatItem);
 
 // Get all CatItems
 router.get('/', getAllCatItems);
+
+// Update an existing CatItem
+router.put('/update/:id', upload.single('image'), updateCatItem);
 
 export default router;
