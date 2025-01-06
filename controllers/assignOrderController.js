@@ -122,3 +122,38 @@ export const updateAssignmentStatus = async (req, res) => {
     res.status(500).json({ message: 'Error updating assignment status', error });
   }
 };
+// Function to get all assigned orders
+export const getAllAssignedOrders = async (req, res) => {
+  try {
+    // Fetch all assignments, including related shopper and delivery boy information
+    const assignments = await AssignOrder.findAll({
+      include: [
+        {
+          model: Shopper,
+          as: 'shopper', // Matches the alias in AssignOrder.belongsTo(Shopper)
+          attributes: ['id', 'full_name', 'email'], // Select only necessary attributes
+        },
+        {
+          model: DeliveryBoy,
+          as: 'deliveryBoy', // Matches the alias in AssignOrder.belongsTo(DeliveryBoy)
+          attributes: ['id', 'full_name', 'email'], // Select only necessary attributes
+        },
+      ],
+    });
+
+    // Check if there are no assignments
+    if (assignments.length === 0) {
+      return res.status(404).json({ message: 'No assigned orders found' });
+    }
+
+    // Respond with the list of assignments
+    res.status(200).json({
+      message: 'Assigned orders retrieved successfully',
+      assignments,
+    });
+  } catch (error) {
+    console.error('Error fetching all assigned orders:', error);
+    res.status(500).json({ message: 'Error fetching all assigned orders', error: error.message });
+  }
+};
+
