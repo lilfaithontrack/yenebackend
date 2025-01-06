@@ -74,5 +74,53 @@ const getAllCatItems = async (req, res) => {
 };
 
 // Other CRUD functions remain mostly similar, updating `setSubcats` for associations
+// Update an existing CatItem with optional name, image, and associated Subcats
+const updateCatItem = async (req, res) => {
+  try {
+    const { id } = req.params; // Get CatItem ID from the request parameters
+    const { name, subcatIds } = req.body; // Get updated fields from the request body
 
-export { upload, createCatItem, getAllCatItems };
+    // Find the existing CatItem by ID
+    const catItem = await CatItem.findByPk(id);
+
+    if (!catItem) {
+      return res.status(404).json({ message: 'CatItem not found' });
+    }
+
+    // Handle image update
+    let imageUrl = catItem.image; // Retain the existing image by default
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`; // Update image if a new one is uploaded
+    }
+
+    // Update name and image (if provided)
+    if (name) {
+      catItem.name = name;
+    }
+    catItem.image = imageUrl;
+
+    // Update associated Subcats if subcatIds are provided
+    if (subcatIds && Array.isArray(subcatIds)) {
+      const subcats = await Subcat.findAll({ where: { id: subcatIds } });
+      await catItem.setSubcats(subcats); // Update Subcat associations
+    }
+
+    // Save the updated CatItem
+    await catItem.save();
+
+    res.status(200).json({
+      message: 'CatItem updated successfully',
+      catItem,
+    });
+  } catch (error) {
+    console.error('Error updating CatItem:', error);
+    res.status(500).json({
+      message: 'Error updating CatItem',
+      error: error.message,
+    });
+  }
+};
+
+export { upload, createCatItem, getAllCatItems, updateCatItem };
+
+
