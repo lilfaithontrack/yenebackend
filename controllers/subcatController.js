@@ -129,6 +129,7 @@ const updateSubcat = async (req, res) => {
   }
 };
 
+
 // Delete a subcategory
 const deleteSubcat = async (req, res) => {
   try {
