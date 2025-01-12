@@ -112,18 +112,21 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, existingImages } = req.body;
 
+    // Find the existing product
     const product = await AddProduct.findByPk(id);
     if (!product) {
-      return res.status(404).json({ message: 'Product not found.' });
+      return res.status(404).json({ message: "Product not found." });
     }
 
-    // Optimize and save new images
+    // Initialize array for new images
     const newImages = [];
+
+    // Optimize and save new images if they exist
     if (req.files) {
       for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+        const optimizedPath = path.join(__dirname, "../uploads", `${Date.now()}-${file.originalname}.webp`);
 
         await sharp(file.buffer)
           .resize(800) // Resize to 800px width
@@ -134,8 +137,8 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Merge new images with existing ones
-    const updatedImages = [...product.image, ...newImages];
+    // If new images are provided, combine them with the old ones
+    const updatedImages = existingImages ? [...existingImages, ...newImages] : newImages;
 
     const updatedData = {
       title,
@@ -148,17 +151,29 @@ export const updateProduct = async (req, res) => {
       catItems,
       subcat,
       seller_email,
-      image: updatedImages,
+      image: updatedImages, // Update the image array with the combined result
     };
 
+    // Update product in the database
     await product.update(updatedData);
-    res.status(200).json({ message: 'Product updated successfully!', product });
+
+    // Optionally: delete old images if they are no longer used (implementation depends on your needs)
+    if (existingImages) {
+      const imagePathsToDelete = existingImages.filter(img => !updatedImages.includes(img));
+      imagePathsToDelete.forEach((imgPath) => {
+        const filePath = path.join(__dirname, "..", imgPath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath); // Delete the old image file
+        }
+      });
+    }
+
+    res.status(200).json({ message: "Product updated successfully!", product });
   } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Failed to update product.' });
+    console.error("Error updating product:", error);
+    res.status(500).json({ message: "Failed to update product." });
   }
 };
-
 /**
  * Delete a product and its associated images
  */
