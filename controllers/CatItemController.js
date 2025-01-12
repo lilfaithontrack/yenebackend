@@ -52,13 +52,14 @@ const createCatItem = async (req, res) => {
 };
 
 // Get all CatItems with their associated Subcats
+// Get all CatItems with their associated Subcats and Subcat images
 const getAllCatItems = async (req, res) => {
   try {
     const catItems = await CatItem.findAll({
       include: {
         model: Subcat,
         as: 'subcats',
-        attributes: ['id', 'name'], // Include specific fields
+        attributes: ['id', 'name', 'image'], // Include the id, name, and image fields for Subcats
         through: { attributes: [] }, // Exclude join table fields
       },
     });
@@ -72,6 +73,7 @@ const getAllCatItems = async (req, res) => {
     });
   }
 };
+
 
 // Other CRUD functions remain mostly similar, updating `setSubcats` for associations
 // Update an existing CatItem with optional name, image, and associated Subcats
