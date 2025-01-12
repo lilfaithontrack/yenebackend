@@ -2,12 +2,16 @@ import Subcat from '../models/Subcat.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Define __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Set up multer storage options
-const __dirname = path.dirname(__filename);
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, './uploads'); // Directory where the images will be stored
+    cb(null, path.join(__dirname, '../uploads')); // Resolve the uploads directory
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`); // Unique filename for each upload
@@ -36,7 +40,7 @@ const createSubcat = async (req, res) => {
       return res.status(400).json({ message: 'Subcategory name is required' });
     }
 
-    // Handle the image upload using multer
+    // Handle the image upload
     let imagePath = null;
     if (req.file) {
       imagePath = path.join('uploads', req.file.filename); // Save the relative path to the database
@@ -129,7 +133,6 @@ const updateSubcat = async (req, res) => {
     });
   }
 };
-
 
 // Delete a subcategory
 const deleteSubcat = async (req, res) => {
