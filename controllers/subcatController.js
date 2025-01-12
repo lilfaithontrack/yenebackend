@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 
 // Set up multer storage options
+const __dirname = path.dirname(__filename);
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, './uploads'); // Directory where the images will be stored
