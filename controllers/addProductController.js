@@ -106,10 +106,7 @@ export const createProduct = async (req, res) => {
   }
 };
 
-/**
- * Update an existing product with new images
- */
-export const updateProduct = async (req, res) => {
+ export const updateProduct = async (req, res) => {
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
     
