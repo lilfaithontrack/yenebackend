@@ -63,10 +63,13 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
+    // Ensure product.image is an array
+    const images = Array.isArray(product.image) ? product.image : [product.image];
+
     // Construct full image URL
     const productWithImageUrl = {
       ...product.toJSON(),
-      image: product.image.map(img => `https://backend.yeniesuq.com${img}`)
+      image: images.map(img => `https://backend.yeniesuq.com${img}`)
     };
 
     res.status(200).json(productWithImageUrl);
