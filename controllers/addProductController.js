@@ -112,12 +112,14 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
+    
     let imageArray = [];
 
-    // Parse the existingImages if provided
+    // Handle existing images passed from the frontend
     if (existingImages) {
       try {
-        imageArray = JSON.parse(existingImages); // Parse the stringified array of existing images
+        // Parse the stringified array of existing images (if provided)
+        imageArray = JSON.parse(existingImages); // Example: ["'/uploads/image1.jpg'", "'/uploads/image2.jpg'"]
       } catch (error) {
         console.warn("Error parsing existingImages:", error);
       }
@@ -126,8 +128,10 @@ export const updateProduct = async (req, res) => {
     // Handle new images
     if (req.files && req.files.length > 0) {
       const uploadedImages = req.files;
+      
+      // Add new images to the existing image array
       uploadedImages.forEach((image) => {
-        const imagePath = `/uploads/${image.filename}`; // Get image path from multer
+        const imagePath = `/uploads/${image.filename}`; // Use image path from multer storage
         imageArray.push(imagePath); // Add new images to the array
       });
     }
