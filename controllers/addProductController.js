@@ -26,7 +26,9 @@ export const upload = multer({
 
 // Controller functions
 
-// Fetch all products, with optional filtering by subcategory (subcat)
+/**
+ * Fetch all products, with optional filtering by subcategory (subcat)
+ */
 export const getAllProducts = async (req, res) => {
   try {
     const { subcat } = req.query;
@@ -35,25 +37,16 @@ export const getAllProducts = async (req, res) => {
     const query = subcat ? { where: { subcat } } : {};
     const products = await AddProduct.findAll(query);
 
-    // Construct full image URL
-    const productsWithImageUrl = products.map(product => {
-      // Ensure product.image is an array
-      const images = Array.isArray(product.image) ? product.image : [product.image];
-      return {
-        ...product.toJSON(),
-        image: images.map(img => `https://backend.yeniesuq.com${img}`)
-      };
-    });
-
-    res.status(200).json(productsWithImageUrl);
+    res.status(200).json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ message: 'Failed to fetch products.' });
   }
 };
 
-
-// Fetch product by ID
+/**
+ * Fetch product by ID
+ */
 export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -63,23 +56,16 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
-    // Ensure product.image is an array
-    const images = Array.isArray(product.image) ? product.image : [product.image];
-
-    // Construct full image URL
-    const productWithImageUrl = {
-      ...product.toJSON(),
-      image: images.map(img => `https://backend.yeniesuq.com${img}`)
-    };
-
-    res.status(200).json(productWithImageUrl);
+    res.status(200).json(product);
   } catch (error) {
     console.error('Error fetching product by ID:', error);
     res.status(500).json({ message: 'Failed to fetch product by ID.' });
   }
 };
 
-// Create a new product with optimized images
+/**
+ * Create a new product with optimized images
+ */
 export const createProduct = async (req, res) => {
   try {
     const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
@@ -88,14 +74,14 @@ export const createProduct = async (req, res) => {
     const images = [];
     if (req.files) {
       for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+        const optimizedPath = path.join(__dirname, '../uploads', ${Date.now()}-${file.originalname}.webp);
 
         await sharp(file.buffer)
           .resize(800) // Resize to 800px width
           .webp({ quality: 80 }) // Convert to WebP
           .toFile(optimizedPath);
 
-        images.push(`/uploads/${path.basename(optimizedPath)}`);
+        images.push(/uploads/${path.basename(optimizedPath)});
       }
     }
 
@@ -120,7 +106,9 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// Update an existing product with new images
+/**
+ * Update an existing product with new images
+ */
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -141,14 +129,14 @@ export const updateProduct = async (req, res) => {
     // Optimize and save new images if they exist
     if (req.files) {
       for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, "../uploads", `${Date.now()}-${file.originalname}.webp`);
+        const optimizedPath = path.join(__dirname, "../uploads", ${Date.now()}-${file.originalname}.webp);
 
         await sharp(file.buffer)
           .resize(800) // Resize to 800px width
           .webp({ quality: 80 }) // Convert to WebP
           .toFile(optimizedPath);
 
-        newImages.push(`/uploads/${path.basename(optimizedPath)}`);
+        newImages.push(/uploads/${path.basename(optimizedPath)});
       }
     }
 
@@ -179,7 +167,6 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// Delete product and its associated images
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
