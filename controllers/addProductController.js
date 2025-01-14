@@ -110,32 +110,30 @@ export const createProduct = async (req, res) => {
  * Update an existing product with new images
  */
 export const updateProduct = async (req, res) => {
+  console.log(req.files);  // Log the uploaded files for debugging
+
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
     let imageArray = [];
 
-    // Parse existingImages if it exists and is in JSON format
     if (existingImages) {
-      imageArray = JSON.parse(existingImages);  // Parse the stringified array
+      imageArray = JSON.parse(existingImages);
     }
 
     // Handle new image uploads
     if (req.files && req.files.image) {
-      // Process new images (save them to disk with optimization)
+      // Process new images (resize and save)
       for (const file of req.files.image) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-
-        // Use Sharp to resize and convert image
         await sharp(file.buffer)
-          .resize(800) // Resize to 800px width
-          .webp({ quality: 80 }) // Convert to WebP
+          .resize(800)  // Resize image
+          .webp({ quality: 80 })  // Convert to WebP
           .toFile(optimizedPath);
 
-        imageArray.push(`/uploads/${path.basename(optimizedPath)}`); // Push the path of the new image
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
-    // Proceed with updating the product in the database
     const updatedProduct = await AddProduct.update(
       {
         title,
@@ -148,12 +146,12 @@ export const updateProduct = async (req, res) => {
         seller_email,
         catItems,
         subcat,
-        image: JSON.stringify(imageArray)  // Save image paths as JSON string
+        image: JSON.stringify(imageArray),
       },
-      { where: { id: req.params.id } }  // Update the product by ID
+      { where: { id: req.params.id } }
     );
 
-    if (!updatedProduct[0]) {  // Check if the update was successful (number of rows affected)
+    if (!updatedProduct[0]) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
