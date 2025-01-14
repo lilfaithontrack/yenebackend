@@ -136,7 +136,14 @@ export const updateProduct = async (req, res) => {
           .webp({ quality: 80 }) // Convert to WebP
           .toFile(optimizedPath);
 
-        newImages.push(`/uploads/${path.basename(optimizedPath)}`);
+        const newImagePath = `/uploads/${path.basename(optimizedPath)}`;
+
+        // Check if the new image already has the base URL
+        if (!newImagePath.startsWith('https://backend.yeniesuq.com')) {
+          newImages.push(`https://backend.yeniesuq.com${newImagePath}`);
+        } else {
+          newImages.push(newImagePath);
+        }
       }
     }
 
@@ -166,6 +173,7 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: "Failed to update product." });
   }
 };
+
 
 export const deleteProduct = async (req, res) => {
   try {
