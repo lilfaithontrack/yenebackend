@@ -116,13 +116,13 @@ export const updateProduct = async (req, res) => {
     if (existingImages) {
       try {
         // Parse the stringified array of existing images (if provided)
-        imageArray = JSON.parse(existingImages); // Example: ["/uploads/image1.jpg", "/uploads/image2.jpg"]
+        imageArray = JSON.parse(existingImages); // Example: ["'/uploads/image1.jpg'", "'/uploads/image2.jpg'"]
       } catch (error) {
         console.warn("Error parsing existingImages:", error);
       }
     }
 
-    // Handle new images
+    // Handle new images if provided
     if (req.files && req.files.length > 0) {
       const uploadedImages = req.files;
       
@@ -154,7 +154,7 @@ export const updateProduct = async (req, res) => {
         seller_email,
         catItems,
         subcat,
-        image: imageArray  // Save the updated array of images directly, no need to stringify
+        image: JSON.stringify(imageArray)  // Save the updated array of images as a JSON string
       },
       {
         where: { id: req.params.id }, // Update the product by ID
@@ -171,6 +171,7 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product' });
   }
 };
+
 
 
 
