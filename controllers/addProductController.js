@@ -110,10 +110,16 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
-    
-    let imageArray = [];
+    const productId = req.params.id;
 
-    // Handle existing images passed from the frontend
+    // Fetch the existing product
+    const existingProduct = await AddProduct.findByPk(productId);
+    if (!existingProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Parse the existing images
+    let imageArray = existingProduct.image || []; // Get the existing images
     if (existingImages) {
       if (typeof existingImages === 'string') {
         try {
@@ -143,28 +149,28 @@ export const updateProduct = async (req, res) => {
     // Update the product
     const updatedProduct = await AddProduct.update(
       {
-        title,
-        price,
-        description,
-        brand,
-        size,
-        sku,
-        color,
-        seller_email,
-        catItems,
-        subcat,
-        image: imageArray, // Save as an array, not a string
+        title: title || existingProduct.title,
+        price: price || existingProduct.price,
+        description: description || existingProduct.description,
+        brand: brand || existingProduct.brand,
+        size: size || existingProduct.size,
+        sku: sku || existingProduct.sku,
+        color: color || existingProduct.color,
+        seller_email: seller_email || existingProduct.seller_email,
+        catItems: catItems || existingProduct.catItems,
+        subcat: subcat || existingProduct.subcat,
+        image: imageArray, // Retain the merged images
       },
       {
-        where: { id: req.params.id },
+        where: { id: productId },
       }
     );
 
     if (updatedProduct[0] === 0) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ message: 'Failed to update product' });
     }
 
-    res.status(200).json({ message: 'Product updated successfully' });
+    res.status(200).json({ message: 'Product updated successfully', updatedProduct });
   } catch (error) {
     console.error('Error updating product:', error);
     res.status(500).json({ message: 'Failed to update product' });
