@@ -115,34 +115,32 @@ export const updateProduct = async (req, res) => {
 
     // Handle existing images passed from the frontend
     if (existingImages) {
-      try {
-        // Parse the stringified array of existing images (if provided)
-        imageArray = JSON.parse(existingImages);  // Example: ["'/uploads/image1.jpg'", "'/uploads/image2.jpg'"]
-      } catch (error) {
-        console.warn("Error parsing existingImages:", error);
+      if (typeof existingImages === 'string') {
+        try {
+          imageArray = JSON.parse(existingImages);
+        } catch (error) {
+          console.warn('Error parsing existingImages:', error);
+        }
+      } else if (Array.isArray(existingImages)) {
+        imageArray = existingImages;
       }
     }
 
     // Handle new images
     if (req.files && req.files.length > 0) {
       const uploadedImages = req.files;
-      
-      // Add new images to the existing image array
       for (const file of uploadedImages) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-
-        // Optimize and save the image
         await sharp(file.buffer)
           .resize(800)
           .webp({ quality: 80 })
-          .toFile(optimizedPath); // Save image to the disk
+          .toFile(optimizedPath);
 
-        // Add optimized image path to the array
         imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
-    // Now update the product with all the necessary data
+    // Update the product
     const updatedProduct = await AddProduct.update(
       {
         title,
@@ -155,24 +153,23 @@ export const updateProduct = async (req, res) => {
         seller_email,
         catItems,
         subcat,
-        image: JSON.stringify(imageArray)  // Save the updated array of images as a JSON string
+        image: imageArray, // Save as an array, not a string
       },
       {
-        where: { id: req.params.id }, // Update the product by ID
+        where: { id: req.params.id },
       }
     );
 
-    if (updatedProduct[0] === 0) { // If no rows were updated, the product ID might be incorrect
+    if (updatedProduct[0] === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
     res.status(200).json({ message: 'Product updated successfully' });
   } catch (error) {
-    console.error("Error updating product:", error);
+    console.error('Error updating product:', error);
     res.status(500).json({ message: 'Failed to update product' });
   }
 };
-
 
 
 export const deleteProduct = async (req, res) => {
