@@ -111,7 +111,6 @@ export const createProduct = async (req, res) => {
  */
 export const updateProduct = async (req, res) => {
   try {
-    // Extract form data
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
     let imageArray = [];
 
@@ -122,16 +121,22 @@ export const updateProduct = async (req, res) => {
 
     // Handle new image uploads
     if (req.files && req.files.image) {
-      const uploadedImages = req.files.image;
-      // Process new images (save them to disk or cloud storage)
-      uploadedImages.forEach((image) => {
-        imageArray.push(image.path); // Add new image paths to imageArray
-      });
+      // Process new images (save them to disk with optimization)
+      for (const file of req.files.image) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+
+        // Use Sharp to resize and convert image
+        await sharp(file.buffer)
+          .resize(800) // Resize to 800px width
+          .webp({ quality: 80 }) // Convert to WebP
+          .toFile(optimizedPath);
+
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`); // Push the path of the new image
+      }
     }
 
-    // Now you have the image array (existing + new images)
     // Proceed with updating the product in the database
-    const updatedProduct = await Product.update(
+    const updatedProduct = await AddProduct.update(
       {
         title,
         price,
@@ -148,7 +153,7 @@ export const updateProduct = async (req, res) => {
       { where: { id: req.params.id } }  // Update the product by ID
     );
 
-    if (!updatedProduct) {
+    if (!updatedProduct[0]) {  // Check if the update was successful (number of rows affected)
       return res.status(404).json({ message: 'Product not found' });
     }
 
@@ -158,7 +163,6 @@ export const updateProduct = async (req, res) => {
     return res.status(500).json({ message: 'Failed to update product' });
   }
 };
-
 
 export const deleteProduct = async (req, res) => {
   try {
