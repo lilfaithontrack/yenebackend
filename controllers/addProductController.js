@@ -110,30 +110,29 @@ export const createProduct = async (req, res) => {
  * Update an existing product with new images
  */
 export const updateProduct = async (req, res) => {
-  console.log(req.files);  // Log the uploaded files for debugging
-
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
     let imageArray = [];
 
+    // Parse the existingImages if provided
     if (existingImages) {
-      imageArray = JSON.parse(existingImages);
-    }
-
-    // Handle new image uploads
-    if (req.files && req.files.image) {
-      // Process new images (resize and save)
-      for (const file of req.files.image) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-        await sharp(file.buffer)
-          .resize(800)  // Resize image
-          .webp({ quality: 80 })  // Convert to WebP
-          .toFile(optimizedPath);
-
-        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
+      try {
+        imageArray = JSON.parse(existingImages); // Parse the stringified array of existing images
+      } catch (error) {
+        console.warn("Error parsing existingImages:", error);
       }
     }
 
+    // Handle new images
+    if (req.files && req.files.length > 0) {
+      const uploadedImages = req.files;
+      uploadedImages.forEach((image) => {
+        const imagePath = `/uploads/${image.filename}`; // Get image path from multer
+        imageArray.push(imagePath); // Add new images to the array
+      });
+    }
+
+    // Now update the product with all the necessary data
     const updatedProduct = await AddProduct.update(
       {
         title,
@@ -146,19 +145,21 @@ export const updateProduct = async (req, res) => {
         seller_email,
         catItems,
         subcat,
-        image: JSON.stringify(imageArray),
+        image: JSON.stringify(imageArray)  // Save the updated array of images as a JSON string
       },
-      { where: { id: req.params.id } }
+      {
+        where: { id: req.params.id }, // Update the product by ID
+      }
     );
 
-    if (!updatedProduct[0]) {
+    if (updatedProduct[0] === 0) { // If no rows were updated, the product ID might be incorrect
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    return res.status(200).json({ message: 'Product updated successfully' });
+    res.status(200).json({ message: 'Product updated successfully' });
   } catch (error) {
     console.error("Error updating product:", error);
-    return res.status(500).json({ message: 'Failed to update product' });
+    res.status(500).json({ message: 'Failed to update product' });
   }
 };
 
