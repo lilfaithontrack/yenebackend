@@ -111,7 +111,7 @@ export const createProduct = async (req, res) => {
  */
 // Inside your updateProduct controller
 
-const updateProduct = async (req, res) => {
+export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
