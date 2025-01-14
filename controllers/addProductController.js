@@ -106,31 +106,24 @@ export const createProduct = async (req, res) => {
   }
 };
 
+// Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
-
-    // Start with the existing images (if any)
+    
     let imageArray = [];
 
-    // Ensure existingImages is parsed correctly and cleaned
+    // Handle existing images passed from the frontend
     if (existingImages) {
       try {
-        // Remove any extra quotes or escape characters if present
-        const cleanedExistingImages = existingImages.replace(/^"|"$/g, ''); // Remove extra quotes
-        imageArray = JSON.parse(cleanedExistingImages); // Now parse the cleaned string into an array
-        
-        // Ensure it's an array and has the correct format
-        if (!Array.isArray(imageArray)) {
-          throw new Error("Existing images must be an array");
-        }
+        // Parse the stringified array of existing images (if provided)
+        imageArray = JSON.parse(existingImages);  // Example: ["'/uploads/image1.jpg'", "'/uploads/image2.jpg'"]
       } catch (error) {
         console.warn("Error parsing existingImages:", error);
-        imageArray = []; // If parsing fails, start with an empty array
       }
     }
 
-    // Handle new images if provided
+    // Handle new images
     if (req.files && req.files.length > 0) {
       const uploadedImages = req.files;
       
@@ -149,7 +142,7 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Save the image array as a JSON string in the database
+    // Now update the product with all the necessary data
     const updatedProduct = await AddProduct.update(
       {
         title,
