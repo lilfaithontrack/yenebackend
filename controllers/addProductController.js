@@ -110,32 +110,16 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
-    const productId = req.params.id;
-
-    // Fetch the existing product
-    const existingProduct = await AddProduct.findByPk(productId);
-    if (!existingProduct) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    // Ensure existingProduct.image is an array
+    
     let imageArray = [];
-    if (existingProduct.image) {
-      try {
-        imageArray = JSON.parse(existingProduct.image); // Parse JSON string
-      } catch (error) {
-        console.warn('Error parsing existing images from database:', error);
-        imageArray = []; // Default to empty array if parsing fails
-      }
-    }
 
-    // Handle existing images from request
+    // Handle existing images passed from the frontend
     if (existingImages) {
       if (typeof existingImages === 'string') {
         try {
           imageArray = JSON.parse(existingImages);
         } catch (error) {
-          console.warn('Error parsing existingImages from request:', error);
+          console.warn('Error parsing existingImages:', error);
         }
       } else if (Array.isArray(existingImages)) {
         imageArray = existingImages;
@@ -144,7 +128,8 @@ export const updateProduct = async (req, res) => {
 
     // Handle new images
     if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
+      const uploadedImages = req.files;
+      for (const file of uploadedImages) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
         await sharp(file.buffer)
           .resize(800)
@@ -158,28 +143,28 @@ export const updateProduct = async (req, res) => {
     // Update the product
     const updatedProduct = await AddProduct.update(
       {
-        title: title || existingProduct.title,
-        price: price || existingProduct.price,
-        description: description || existingProduct.description,
-        brand: brand || existingProduct.brand,
-        size: size || existingProduct.size,
-        sku: sku || existingProduct.sku,
-        color: color || existingProduct.color,
-        seller_email: seller_email || existingProduct.seller_email,
-        catItems: catItems || existingProduct.catItems,
-        subcat: subcat || existingProduct.subcat,
-        image: JSON.stringify(imageArray), // Convert back to JSON string for storage
+        title,
+        price,
+        description,
+        brand,
+        size,
+        sku,
+        color,
+        seller_email,
+        catItems,
+        subcat,
+        image: imageArray, // Save as an array, not a string
       },
       {
-        where: { id: productId },
+        where: { id: req.params.id },
       }
     );
 
     if (updatedProduct[0] === 0) {
-      return res.status(404).json({ message: 'Failed to update product' });
+      return res.status(404).json({ message: 'Product not found' });
     }
 
-    res.status(200).json({ message: 'Product updated successfully', updatedProduct });
+    res.status(200).json({ message: 'Product updated successfully' });
   } catch (error) {
     console.error('Error updating product:', error);
     res.status(500).json({ message: 'Failed to update product' });
