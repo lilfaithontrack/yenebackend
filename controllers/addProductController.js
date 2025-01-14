@@ -106,7 +106,7 @@ export const createProduct = async (req, res) => {
   }
 };
 
- export const updateProduct = async (req, res) => {
+export const updateProduct = async (req, res) => {
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
     
@@ -127,10 +127,18 @@ export const createProduct = async (req, res) => {
       const uploadedImages = req.files;
       
       // Add new images to the existing image array
-      uploadedImages.forEach((image) => {
-        const imagePath = `/uploads/${image.filename}`; // Use image path from multer storage
-        imageArray.push(imagePath); // Add new images to the array
-      });
+      for (const file of uploadedImages) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+
+        // Optimize and save the image
+        await sharp(file.buffer)
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(optimizedPath); // Save image to the disk
+
+        // Add optimized image path to the array
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
+      }
     }
 
     // Now update the product with all the necessary data
