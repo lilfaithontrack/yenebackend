@@ -109,15 +109,19 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
-    
+
+    // Start with the existing images (if any)
     let imageArray = [];
 
-    // Handle existing images passed from the frontend
+    // Ensure existingImages is parsed correctly
     if (existingImages) {
       try {
         // Parse the stringified array of existing images (if provided)
-        // Ensure we correctly parse the string to an array
         imageArray = JSON.parse(existingImages);
+        // Ensure all items are in the correct format
+        if (!Array.isArray(imageArray)) {
+          throw new Error("Existing images must be an array");
+        }
       } catch (error) {
         console.warn("Error parsing existingImages:", error);
         imageArray = []; // If parsing fails, start with an empty array
@@ -143,7 +147,8 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Now update the product with all the necessary data
+    // Ensure the image array format is correct (should be an array of image paths)
+    // Save the image array as a JSON string in the database
     const updatedProduct = await AddProduct.update(
       {
         title,
@@ -173,6 +178,7 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product' });
   }
 };
+
 
 
 
