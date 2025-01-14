@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 // Middleware for file uploads
 const storage = multer.memoryStorage(); // Use memory storage for image optimization
-export const upload = multer({ 
+export const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
   fileFilter: (req, file, cb) => {
@@ -74,14 +74,14 @@ export const createProduct = async (req, res) => {
     const images = [];
     if (req.files) {
       for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', ${Date.now()}-${file.originalname}.webp);
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
 
         await sharp(file.buffer)
           .resize(800) // Resize to 800px width
           .webp({ quality: 80 }) // Convert to WebP
           .toFile(optimizedPath);
 
-        images.push(/uploads/${path.basename(optimizedPath)});
+        images.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
@@ -129,14 +129,14 @@ export const updateProduct = async (req, res) => {
     // Optimize and save new images if they exist
     if (req.files) {
       for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, "../uploads", ${Date.now()}-${file.originalname}.webp);
+        const optimizedPath = path.join(__dirname, "../uploads", `${Date.now()}-${file.originalname}.webp`);
 
         await sharp(file.buffer)
           .resize(800) // Resize to 800px width
           .webp({ quality: 80 }) // Convert to WebP
           .toFile(optimizedPath);
 
-        newImages.push(/uploads/${path.basename(optimizedPath)});
+        newImages.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
