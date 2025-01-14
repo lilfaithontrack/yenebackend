@@ -118,14 +118,24 @@ export const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Parse the existing images
-    let imageArray = existingProduct.image || []; // Get the existing images
+    // Ensure existingProduct.image is an array
+    let imageArray = [];
+    if (existingProduct.image) {
+      try {
+        imageArray = JSON.parse(existingProduct.image); // Parse JSON string
+      } catch (error) {
+        console.warn('Error parsing existing images from database:', error);
+        imageArray = []; // Default to empty array if parsing fails
+      }
+    }
+
+    // Handle existing images from request
     if (existingImages) {
       if (typeof existingImages === 'string') {
         try {
           imageArray = JSON.parse(existingImages);
         } catch (error) {
-          console.warn('Error parsing existingImages:', error);
+          console.warn('Error parsing existingImages from request:', error);
         }
       } else if (Array.isArray(existingImages)) {
         imageArray = existingImages;
@@ -134,8 +144,7 @@ export const updateProduct = async (req, res) => {
 
     // Handle new images
     if (req.files && req.files.length > 0) {
-      const uploadedImages = req.files;
-      for (const file of uploadedImages) {
+      for (const file of req.files) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
         await sharp(file.buffer)
           .resize(800)
@@ -159,7 +168,7 @@ export const updateProduct = async (req, res) => {
         seller_email: seller_email || existingProduct.seller_email,
         catItems: catItems || existingProduct.catItems,
         subcat: subcat || existingProduct.subcat,
-        image: imageArray, // Retain the merged images
+        image: JSON.stringify(imageArray), // Convert back to JSON string for storage
       },
       {
         where: { id: productId },
@@ -176,7 +185,6 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product' });
   }
 };
-
 
 export const deleteProduct = async (req, res) => {
   try {
