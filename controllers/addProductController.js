@@ -36,10 +36,14 @@ export const getAllProducts = async (req, res) => {
     const products = await AddProduct.findAll(query);
 
     // Construct full image URL
-    const productsWithImageUrl = products.map(product => ({
-      ...product.toJSON(),
-      image: product.image.map(img => `https://backend.yeniesuq.com${img}`)
-    }));
+    const productsWithImageUrl = products.map(product => {
+      // Ensure product.image is an array
+      const images = Array.isArray(product.image) ? product.image : [product.image];
+      return {
+        ...product.toJSON(),
+        image: images.map(img => `https://backend.yeniesuq.com${img}`)
+      };
+    });
 
     res.status(200).json(productsWithImageUrl);
   } catch (error) {
@@ -47,6 +51,7 @@ export const getAllProducts = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch products.' });
   }
 };
+
 
 // Fetch product by ID
 export const getProductById = async (req, res) => {
