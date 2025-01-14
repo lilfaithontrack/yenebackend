@@ -112,7 +112,10 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, existingImages } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+
+    // Parse existing images from request body or initialize an empty array
+    const existingImages = req.body.existingImages ? JSON.parse(req.body.existingImages) : [];
 
     // Find the existing product
     const product = await AddProduct.findByPk(id);
@@ -137,8 +140,8 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // If new images are provided, combine them with the old ones
-    const updatedImages = existingImages ? [...existingImages, ...newImages] : newImages;
+    // Combine new images with existing ones (preserve old images if no new ones are added)
+    const updatedImages = [...existingImages, ...newImages];
 
     const updatedData = {
       title,
@@ -157,26 +160,13 @@ export const updateProduct = async (req, res) => {
     // Update product in the database
     await product.update(updatedData);
 
-    // Optionally: delete old images if they are no longer used (implementation depends on your needs)
-    if (existingImages) {
-      const imagePathsToDelete = existingImages.filter(img => !updatedImages.includes(img));
-      imagePathsToDelete.forEach((imgPath) => {
-        const filePath = path.join(__dirname, "..", imgPath);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath); // Delete the old image file
-        }
-      });
-    }
-
     res.status(200).json({ message: "Product updated successfully!", product });
   } catch (error) {
     console.error("Error updating product:", error);
     res.status(500).json({ message: "Failed to update product." });
   }
 };
-/**
- * Delete a product and its associated images
- */
+
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
