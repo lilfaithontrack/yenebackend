@@ -113,12 +113,14 @@ export const updateProduct = async (req, res) => {
     // Start with the existing images (if any)
     let imageArray = [];
 
-    // Ensure existingImages is parsed correctly
+    // Ensure existingImages is parsed correctly and cleaned
     if (existingImages) {
       try {
-        // Parse the stringified array of existing images (if provided)
-        imageArray = JSON.parse(existingImages);
-        // Ensure all items are in the correct format
+        // Remove any extra quotes or escape characters if present
+        const cleanedExistingImages = existingImages.replace(/^"|"$/g, ''); // Remove extra quotes
+        imageArray = JSON.parse(cleanedExistingImages); // Now parse the cleaned string into an array
+        
+        // Ensure it's an array and has the correct format
         if (!Array.isArray(imageArray)) {
           throw new Error("Existing images must be an array");
         }
@@ -147,7 +149,6 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Ensure the image array format is correct (should be an array of image paths)
     // Save the image array as a JSON string in the database
     const updatedProduct = await AddProduct.update(
       {
@@ -178,7 +179,6 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product' });
   }
 };
-
 
 
 
