@@ -113,18 +113,16 @@ export const updateProduct = async (req, res) => {
     
     let imageArray = [];
 
-    // Handle existing images passed from the frontend
+    // Handle existing images passed from the frontend (only store relative paths)
     if (existingImages) {
-      // Ensure it's a valid string and parse it into an array
       if (typeof existingImages === 'string') {
         try {
-          imageArray = JSON.parse(existingImages); // Parsing the string into an array
+          imageArray = JSON.parse(existingImages); // Parse if passed as a string
         } catch (error) {
           console.warn('Error parsing existingImages:', error);
-          imageArray = []; // Fallback to an empty array if parsing fails
         }
       } else if (Array.isArray(existingImages)) {
-        imageArray = existingImages; // If it's already an array, use it as is
+        imageArray = existingImages; // Already an array, so use it
       }
     }
 
@@ -138,11 +136,11 @@ export const updateProduct = async (req, res) => {
           .webp({ quality: 80 }) // Convert to WebP
           .toFile(optimizedPath);
 
-        imageArray.push(`/uploads/${path.basename(optimizedPath)}`); // Add the new image URL to the array
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`); // Store only relative path
       }
     }
 
-    // Update the product with the new images array
+    // Update the product
     const updatedProduct = await AddProduct.update(
       {
         title,
@@ -155,7 +153,7 @@ export const updateProduct = async (req, res) => {
         seller_email,
         catItems,
         subcat,
-        image: imageArray, // Ensure images are saved as an array
+        image: imageArray, // Save as an array of relative paths
       },
       {
         where: { id: req.params.id },
@@ -172,6 +170,7 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product' });
   }
 };
+
 
 export const deleteProduct = async (req, res) => {
   try {
