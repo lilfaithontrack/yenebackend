@@ -26,9 +26,7 @@ export const upload = multer({
 
 // Controller functions
 
-/**
- * Fetch all products, with optional filtering by subcategory (subcat)
- */
+// Fetch all products, with optional filtering by subcategory (subcat)
 export const getAllProducts = async (req, res) => {
   try {
     const { subcat } = req.query;
@@ -37,16 +35,20 @@ export const getAllProducts = async (req, res) => {
     const query = subcat ? { where: { subcat } } : {};
     const products = await AddProduct.findAll(query);
 
-    res.status(200).json(products);
+    // Construct full image URL
+    const productsWithImageUrl = products.map(product => ({
+      ...product.toJSON(),
+      image: product.image.map(img => `https://backend.yeniesuq.com${img}`)
+    }));
+
+    res.status(200).json(productsWithImageUrl);
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ message: 'Failed to fetch products.' });
   }
 };
 
-/**
- * Fetch product by ID
- */
+// Fetch product by ID
 export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -56,16 +58,20 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
-    res.status(200).json(product);
+    // Construct full image URL
+    const productWithImageUrl = {
+      ...product.toJSON(),
+      image: product.image.map(img => `https://backend.yeniesuq.com${img}`)
+    };
+
+    res.status(200).json(productWithImageUrl);
   } catch (error) {
     console.error('Error fetching product by ID:', error);
     res.status(500).json({ message: 'Failed to fetch product by ID.' });
   }
 };
 
-/**
- * Create a new product with optimized images
- */
+// Create a new product with optimized images
 export const createProduct = async (req, res) => {
   try {
     const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
@@ -106,11 +112,7 @@ export const createProduct = async (req, res) => {
   }
 };
 
-/**
- * Update an existing product with new images
- */
-// Inside your updateProduct controller
-
+// Update an existing product with new images
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -169,6 +171,7 @@ export const updateProduct = async (req, res) => {
   }
 };
 
+// Delete product and its associated images
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
