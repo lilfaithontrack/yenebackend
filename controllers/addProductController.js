@@ -115,14 +115,16 @@ export const updateProduct = async (req, res) => {
 
     // Handle existing images passed from the frontend
     if (existingImages) {
+      // Ensure it's a valid string and parse it into an array
       if (typeof existingImages === 'string') {
         try {
-          imageArray = JSON.parse(existingImages);
+          imageArray = JSON.parse(existingImages); // Parsing the string into an array
         } catch (error) {
           console.warn('Error parsing existingImages:', error);
+          imageArray = []; // Fallback to an empty array if parsing fails
         }
       } else if (Array.isArray(existingImages)) {
-        imageArray = existingImages;
+        imageArray = existingImages; // If it's already an array, use it as is
       }
     }
 
@@ -132,15 +134,15 @@ export const updateProduct = async (req, res) => {
       for (const file of uploadedImages) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
         await sharp(file.buffer)
-          .resize(800)
-          .webp({ quality: 80 })
+          .resize(800) // Resize to 800px width
+          .webp({ quality: 80 }) // Convert to WebP
           .toFile(optimizedPath);
 
-        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`); // Add the new image URL to the array
       }
     }
 
-    // Update the product
+    // Update the product with the new images array
     const updatedProduct = await AddProduct.update(
       {
         title,
@@ -153,7 +155,7 @@ export const updateProduct = async (req, res) => {
         seller_email,
         catItems,
         subcat,
-        image: imageArray, // Save as an array, not a string
+        image: imageArray, // Ensure images are saved as an array
       },
       {
         where: { id: req.params.id },
