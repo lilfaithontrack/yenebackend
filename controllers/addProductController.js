@@ -111,66 +111,51 @@ export const createProduct = async (req, res) => {
  */
 export const updateProduct = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+    // Extract form data
+    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
+    let imageArray = [];
 
-    // Parse existing images from request body or initialize an empty array
-    const existingImages = req.body.existingImages ? JSON.parse(req.body.existingImages) : [];
-
-    // Find the existing product
-    const product = await AddProduct.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found." });
+    // Parse existingImages if it exists and is in JSON format
+    if (existingImages) {
+      imageArray = JSON.parse(existingImages);  // Parse the stringified array
     }
 
-    // Initialize array for new images
-    const newImages = [];
-
-    // Optimize and save new images if they exist
-    if (req.files) {
-      for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, "../uploads", `${Date.now()}-${file.originalname}.webp`);
-
-        await sharp(file.buffer)
-          .resize(800) // Resize to 800px width
-          .webp({ quality: 80 }) // Convert to WebP
-          .toFile(optimizedPath);
-
-        const newImagePath = `/uploads/${path.basename(optimizedPath)}`;
-
-        // Check if the new image already has the base URL
-        if (!newImagePath.startsWith('https://backend.yeniesuq.com')) {
-          newImages.push(`https://backend.yeniesuq.com${newImagePath}`);
-        } else {
-          newImages.push(newImagePath);
-        }
-      }
+    // Handle new image uploads
+    if (req.files && req.files.image) {
+      const uploadedImages = req.files.image;
+      // Process new images (save them to disk or cloud storage)
+      uploadedImages.forEach((image) => {
+        imageArray.push(image.path); // Add new image paths to imageArray
+      });
     }
 
-    // Combine new images with existing ones (preserve old images if no new ones are added)
-    const updatedImages = [...existingImages, ...newImages];
+    // Now you have the image array (existing + new images)
+    // Proceed with updating the product in the database
+    const updatedProduct = await Product.update(
+      {
+        title,
+        price,
+        description,
+        brand,
+        size,
+        sku,
+        color,
+        seller_email,
+        catItems,
+        subcat,
+        image: JSON.stringify(imageArray)  // Save image paths as JSON string
+      },
+      { where: { id: req.params.id } }  // Update the product by ID
+    );
 
-    const updatedData = {
-      title,
-      sku,
-      color,
-      size,
-      brand,
-      price,
-      description,
-      catItems,
-      subcat,
-      seller_email,
-      image: updatedImages, // Update the image array with the combined result
-    };
+    if (!updatedProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
 
-    // Update product in the database
-    await product.update(updatedData);
-
-    res.status(200).json({ message: "Product updated successfully!", product });
+    return res.status(200).json({ message: 'Product updated successfully' });
   } catch (error) {
     console.error("Error updating product:", error);
-    res.status(500).json({ message: "Failed to update product." });
+    return res.status(500).json({ message: 'Failed to update product' });
   }
 };
 
