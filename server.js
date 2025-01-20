@@ -27,6 +27,7 @@ import receiptRoutes from './routes/receiptRoutes.js';
 import CatItem from './models/CatItem.js';
 import SubCat from './models/Subcat.js';
 import AddProduct from './models/AddProduct.js';
+import notificationRoutes from './routes/notificationRoutes.js'; 
 import addProductRoutes from './routes/addProductRoutes.js';
 import subcatRoutes from './routes/subCatRoutes.js';
 // Import models (for potential associations)
@@ -67,6 +68,7 @@ console.log('Serving static files from:', path.join(__dirname, 'uploads'));
 
 // Routes
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/subcat', subcatRoutes);
 app.use('/api/catitem', catitemRoutes);
 app.use('/api/receipt', receiptRoutes);
