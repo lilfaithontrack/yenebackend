@@ -2,9 +2,9 @@ import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
 // Import your role-specific models
-import { Admin } from '../models/Admin.js'; 
-import { Shopper } from '../models/Shopper.js';
-import { Delivery } from '../models/Delivery.js';
+import Admin  from '../models/Admin.js'; 
+import Shopper from '../models/Shopper.js';
+import Delivery from '../models/Delivery.js';
 
 dotenv.config(); // Load environment variables
 
