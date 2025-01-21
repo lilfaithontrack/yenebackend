@@ -1,4 +1,6 @@
 import Chat from '../models/Chat.js';
+import Shopper from '../models/Shopper.js';
+import Delivery from '../models/Delivery.js';
 
 // Send a message
 export const sendMessage = async (req, res) => {
