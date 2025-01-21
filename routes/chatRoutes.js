@@ -5,7 +5,7 @@ import {
   markAsRead,
   getUnreadMessageCount,
 } from "../controllers/chatController.js";
-import authenticateUser from "../middleware/authenticateUser.js";
+import authenticateUser from "../middlewares/authenticateUser.js";
 
 const router = express.Router();
 
