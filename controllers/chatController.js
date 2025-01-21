@@ -1,6 +1,7 @@
 import Shopper from '../models/Shopper.js';
 import Delivery from '../models/Delivery.js';
 import Chat from "../models/Chat.js";
+import Admin from '../models/Admin.js';
 import sequelize from "../db/dbConnect.js";
 
 // Send a message
