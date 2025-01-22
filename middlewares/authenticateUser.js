@@ -1,37 +1,40 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-
-// Import role-specific models
 import Admin from '../models/Admin.js';
 import Shopper from '../models/Shopper.js';
 import Delivery from '../models/Delivery.js';
 
 dotenv.config(); // Load environment variables
 
-// Middleware to authenticate users based on role
 const authenticateUser = (roles = []) => {
+  // Define roles directly within the middleware
+  const ROLES = {
+    ADMIN: 'admin',
+    SHOPPER: 'shopper',
+    DELIVERY: 'delivery',
+  };
+
   return async (req, res, next) => {
-    // Extract token from Authorization header
-    const token = req.headers.authorization?.split(' ')[1]; // Bearer <token>
+    const token = req.headers.authorization?.split(' ')[1]; // Extract token from Authorization header
 
     if (!token) {
       return res.status(401).json({ message: 'No token provided. Unauthorized.' });
     }
-  
+
     try {
       // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log(decoded.role);
+
       // Dynamically choose the model based on the user's role
       let user;
       switch (decoded.role) {
-        case 'admin':
+        case ROLES.ADMIN:
           user = await Admin.findOne({ where: { id: decoded.id } });
           break;
-        case 'shopper':
+        case ROLES.SHOPPER:
           user = await Shopper.findOne({ where: { id: decoded.id } });
           break;
-        case 'delivery':
+        case ROLES.DELIVERY:
           user = await Delivery.findOne({ where: { id: decoded.id } });
           break;
         default:
