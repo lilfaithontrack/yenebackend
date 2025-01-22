@@ -17,11 +17,11 @@ const authenticateUser = (roles = []) => {
     if (!token) {
       return res.status(401).json({ message: 'No token provided. Unauthorized.' });
     }
-
+  
     try {
       // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
+      console.log(decoded);
       // Dynamically choose the model based on the user's role
       let user;
       switch (decoded.role) {
