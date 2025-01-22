@@ -21,7 +21,7 @@ const authenticateUser = (roles = []) => {
     try {
       // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log(decoded);
+      console.log(decoded.role);
       // Dynamically choose the model based on the user's role
       let user;
       switch (decoded.role) {
