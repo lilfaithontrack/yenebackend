@@ -8,6 +8,8 @@ import sequelize from "../db/dbConnect.js";
 export const sendMessage = async (req, res) => {
   try {
     const { sender_id, receiver_id, sender_role, receiver_role, message } = req.body;
+    
+    console.log("Received data:", req.body); // Add this log
 
     // Validate required fields
     if (!sender_id || !receiver_id || !sender_role || !receiver_role || !message) {
@@ -22,6 +24,8 @@ export const sendMessage = async (req, res) => {
       receiver_role,
       message,
     });
+
+    console.log("Created chat:", chat); // Add this log to check if it's created
 
     res.status(201).json({ message: "Message sent successfully.", chat });
   } catch (error) {
