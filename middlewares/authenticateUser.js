@@ -1,28 +1,29 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
-// Import your role-specific models
-import Admin  from '../models/Admin.js'; 
+// Import role-specific models
+import Admin from '../models/Admin.js';
 import Shopper from '../models/Shopper.js';
 import Delivery from '../models/Delivery.js';
 
 dotenv.config(); // Load environment variables
 
+// Middleware to authenticate users based on role
 const authenticateUser = (roles = []) => {
   return async (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1]; // Extract token from the header
+    // Extract token from Authorization header
+    const token = req.headers.authorization?.split(' ')[1]; // Bearer <token>
 
     if (!token) {
       return res.status(401).json({ message: 'No token provided. Unauthorized.' });
     }
 
     try {
-      // Verify the token
+      // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Determine the model to query based on the user's role
+      // Dynamically choose the model based on the user's role
       let user;
-
       switch (decoded.role) {
         case 'admin':
           user = await Admin.findOne({ where: { id: decoded.id } });
@@ -37,22 +38,30 @@ const authenticateUser = (roles = []) => {
           return res.status(403).json({ message: 'Access denied. Forbidden.' });
       }
 
+      // If the user is not found for the given role
       if (!user) {
         return res.status(404).json({ message: 'User not found.' });
       }
 
-      // If roles array is provided, check if the user's role is allowed to access the resource
+      // Check if the user's role matches the required roles
       if (roles.length && !roles.includes(decoded.role)) {
         return res.status(403).json({ message: 'Access denied. Forbidden.' });
       }
 
-      req.user = decoded; // Attach decoded user info to the request object
-      next(); // Proceed to the next middleware or route handler
+      // Attach user information to the request object
+      req.user = decoded;
+
+      // Proceed to the next middleware or route handler
+      next();
     } catch (error) {
       console.error('Authentication error:', error);
+
       if (error instanceof jwt.JsonWebTokenError) {
         return res.status(401).json({ message: 'Invalid token. Unauthorized.' });
+      } else if (error instanceof jwt.TokenExpiredError) {
+        return res.status(401).json({ message: 'Token expired. Please log in again.' });
       }
+
       return res.status(500).json({ message: 'Internal server error.' });
     }
   };
