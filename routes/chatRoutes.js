@@ -13,12 +13,12 @@ const router = express.Router();
 router.post("/",  sendMessage);
 
 // Get chat history between two users
-router.get("/:senderId/:receiverId", authenticateUser(["admin", "delivery", "shopper"]), getChatHistory);
+router.get("/:senderId/:receiverId", getChatHistory);
 
 // Mark messages as read
-router.patch("/read", authenticateUser(["admin", "delivery", "shopper"]), markAsRead);
+router.patch("/read",  markAsRead);
 
 // Get unread message count for a user
-router.get("/unread/:userId/:role", authenticateUser(["admin", "delivery", "shopper"]), getUnreadMessageCount);
+router.get("/unread/:userId/:role", getUnreadMessageCount);
 
 export default router;
