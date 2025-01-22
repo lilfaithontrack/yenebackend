@@ -65,6 +65,7 @@ export const getChatHistory = async (req, res) => {
   }
 };
 
+
 // Mark messages as read
 export const markAsRead = async (req, res) => {
   try {
