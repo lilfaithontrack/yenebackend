@@ -10,7 +10,7 @@ import authenticateUser from "../middlewares/authenticateUser.js";
 const router = express.Router();
 
 // Send a message
-router.post("/", authenticateUser(["admin", "delivery", "shopper"]), sendMessage);
+router.post("/",  sendMessage);
 
 // Get chat history between two users
 router.get("/:senderId/:receiverId", authenticateUser(["admin", "delivery", "shopper"]), getChatHistory);
