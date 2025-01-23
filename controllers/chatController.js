@@ -2,7 +2,7 @@ import Shopper from '../models/Shopper.js';
 import Delivery from '../models/Delivery.js';
 import Admin from '../models/Admin.js';
 import Chat from '../models/Chat.js'; // Import the Chat model
-
+import { Op } from "sequelize";
 // Send a new message
 export const sendMessage = async (req, res) => {
   try {
