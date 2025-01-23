@@ -1,24 +1,27 @@
-import express from "express";
+import express from 'express';
 import {
   sendMessage,
   getChatHistory,
   markAsRead,
-  getUnreadMessageCount,
-} from "../controllers/chatController.js";
-import authenticateUser from "../middlewares/authenticateUser.js";
+  deleteMessage,
+  getUnreadMessages,
+} from '../controllers/chatController.js'; // Import the controller methods
 
 const router = express.Router();
 
-// Send a message
-router.post("/",  sendMessage);
+// Send a new message
+router.post('/send', sendMessage);
 
-// Get chat history between two users
-router.get("/:senderId/:receiverId", getChatHistory);
+// Fetch chat history between two users
+router.get('/history/:sender_id/:receiver_id', getChatHistory);
 
-// Mark messages as read
-router.patch("/read",  markAsRead);
+// Mark a message as read
+router.put('/mark-as-read/:message_id', markAsRead);
 
-// Get unread message count for a user
-router.get("/unread/:userId/:role", getUnreadMessageCount);
+// Delete a message
+router.delete('/delete/:message_id', deleteMessage);
+
+// Fetch unread messages for a user
+router.get('/unread/:user_id', getUnreadMessages);
 
 export default router;
