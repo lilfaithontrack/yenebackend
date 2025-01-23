@@ -1,4 +1,3 @@
-
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
 
@@ -6,34 +5,64 @@ const Chat = sequelize.define(
   'Chat',
   {
     sender_id: {
-      type: DataTypes.STRING, // ID of the sender (admin, shopper, or delivery personnel)
+      type: DataTypes.STRING,
       allowNull: false,
+      validate: {
+        notEmpty: true,
+      },
     },
     receiver_id: {
-      type: DataTypes.STRING, // ID of the receiver
+      type: DataTypes.STRING,
       allowNull: false,
+      validate: {
+        notEmpty: true,
+      },
     },
     sender_role: {
-      type: DataTypes.ENUM('admin', 'shopper', 'delivery'), // Role of the sender
+      type: DataTypes.ENUM('admin', 'shopper', 'delivery'),
       allowNull: false,
     },
     receiver_role: {
-      type: DataTypes.ENUM('admin', 'shopper', 'delivery'), // Role of the receiver
+      type: DataTypes.ENUM('admin', 'shopper', 'delivery'),
       allowNull: false,
     },
     message: {
-      type: DataTypes.TEXT, // The message content
+      type: DataTypes.TEXT,
       allowNull: false,
+      validate: {
+        notEmpty: true,
+      },
     },
     is_read: {
-      type: DataTypes.BOOLEAN, // Indicates if the message has been read
+      type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
   },
   {
-    tableName: 'Chats', // Name of the table
-    timestamps: true, // Automatically add createdAt and updatedAt
+    tableName: 'Chats',
+    timestamps: true,
+    paranoid: true, // Enables soft deletion
+    indexes: [
+      {
+        fields: ['sender_id'],
+      },
+      {
+        fields: ['receiver_id'],
+      },
+      {
+        fields: ['is_read'],
+      },
+    ],
+    hooks: {
+      afterCreate: (chat, options) => {
+        console.log(`New message sent from ${chat.sender_id} to ${chat.receiver_id}`);
+      },
+    },
   }
 );
+
+// Define associations (if you have User, Admin, or DeliveryPerson models)
+// Chat.belongsTo(User, { foreignKey: 'sender_id', as: 'Sender' });
+// Chat.belongsTo(User, { foreignKey: 'receiver_id', as: 'Receiver' });
 
 export default Chat;
