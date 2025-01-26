@@ -9,10 +9,13 @@ import {
 } from '../controllers/assignOrderController.js';
 
 const router = express.Router();
+
 router.post('/assign/:payment_id', assignPaymentToShopperAndDelivery);
 router.get('/assignments', getAssignments);
 router.put('/assignments/:assignment_id', updateAssignmentStatus);
-router.get('/assigned-orders', getAllAssignedOrders);
+
+// Updated route to match the desired URL
+router.get('/assign/all-assignments', getAllAssignedOrders);
 
 // New routes
 router.get('/shopper-orders/:shopper_id', getOrdersForShopper);
