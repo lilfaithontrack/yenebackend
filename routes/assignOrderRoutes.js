@@ -15,7 +15,7 @@ router.get('/assignments', getAssignments);
 router.put('/assignments/:assignment_id', updateAssignmentStatus);
 
 // Updated route to match the desired URL
-router.get('/assign/all-assignments', getAllAssignedOrders);
+router.get('/all-assignments', getAllAssignedOrders);
 
 // New routes
 router.get('/shopper-orders/:shopper_id', getOrdersForShopper);
