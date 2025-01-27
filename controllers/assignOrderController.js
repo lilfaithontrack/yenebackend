@@ -81,7 +81,7 @@ export const getAssignments = async (req, res) => {
   const { shopper_id, delivery_boy_id } = req.query;
   const whereClause = {};
   if (shopper_id) whereClause.shopper_id = shopper_id;
-  if (delivery_boy_id) whereClause.delivery_boy_id = delivery_boy_id;
+  if (delivery_id) whereClause.delivery_id = delivery_id;
 
   try {
     const assignments = await getAssignmentsWithDetails(whereClause);
@@ -156,10 +156,10 @@ export const getOrdersForShopper = async (req, res) => {
 
 // Get orders for a specific delivery boy
 export const getOrdersForDeliveryBoy = async (req, res) => {
-  const { delivery_boy_id } = req.params;
+  const { delivery_id } = req.params;
 
   try {
-    const assignments = await getAssignmentsWithDetails({ delivery_boy_id });
+    const assignments = await getAssignmentsWithDetails({ delivery_id });
     if (assignments.length === 0) {
       return res.status(404).json({ message: 'No orders found for this delivery boy' });
     }
