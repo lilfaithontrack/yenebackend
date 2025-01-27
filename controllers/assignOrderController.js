@@ -164,9 +164,15 @@ export const getOrdersForShopper = async (req, res) => {
   }
 };
 
+
 // Get orders for a specific delivery boy
 export const getOrdersForDeliveryBoy = async (req, res) => {
-  const { delivery_id } = req.params;
+  const { delivery_id } = req.params; // Extract delivery_id from req.params
+
+  // Validate delivery_id
+  if (!delivery_id) {
+    return res.status(400).json({ message: 'delivery_id is required' });
+  }
 
   try {
     const assignments = await getAssignmentsWithDetails({ delivery_id });
