@@ -2,6 +2,7 @@ import { Model, DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js'; // Adjust the path to your sequelize instance
 import Shopper from './Shopper.js';
 import DeliveryBoy from './DeliveryBoy.js';
+
 class AssignOrder extends Model {}
 
 AssignOrder.init(
@@ -50,13 +51,14 @@ AssignOrder.init(
     timestamps: true, // Automatically includes createdAt and updatedAt fields
   }
 );
+
 AssignOrder.associate = (models) => {
   AssignOrder.belongsTo(models.Shopper, {
     foreignKey: 'shopper_id',
     as: 'shopper',
   });
   AssignOrder.belongsTo(models.DeliveryBoy, {
-    foreignKey: 'delivery_boy_id',
+    foreignKey: 'delivery_id', // Updated to match the column name
     as: 'deliveryBoy',
   });
 };
