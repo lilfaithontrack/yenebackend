@@ -5,7 +5,7 @@ import Shopper from '../models/Shopper.js';
 import Payment from '../models/Payment.js';
 
 // Reusable function to fetch assignments with details
-const getAssignmentsWithDetails = async (whereClause = {}) => {
+export const getAssignmentsWithDetails = async (whereClause = {}) => {
   return await AssignOrder.findAll({
     where: whereClause,
     include: [
@@ -28,11 +28,13 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
   const { payment_id } = req.params;
   const { shopper_id, delivery_id } = req.body;
 
+  // Input validation
   if (!shopper_id || !delivery_id) {
     return res.status(400).json({ message: 'shopper_id and delivery_id are required' });
   }
 
   try {
+    // Fetch payment details
     const payment = await Payment.findByPk(payment_id, {
       attributes: ['id', 'cart_items', 'total_price', 'shipping_address', 'customer_name', 'customer_email', 'customer_phone'],
     });
@@ -40,6 +42,7 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
+    // Validate shopper and delivery boy
     const shopper = await Shopper.findByPk(shopper_id);
     if (!shopper) {
       return res.status(404).json({ message: 'Shopper not found' });
@@ -50,12 +53,14 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
       return res.status(404).json({ message: 'Delivery boy not found' });
     }
 
+    // Create assignment
     const assignment = await AssignOrder.create({
       order_id: payment_id,
       shopper_id,
       delivery_id,
     });
 
+    // Send notification
     await sendOrderNotification(shopper, deliveryBoy, {
       id: payment_id,
       orderDetails: JSON.parse(payment.cart_items),
@@ -66,20 +71,23 @@ export const assignPaymentToShopperAndDelivery = async (req, res) => {
       customer_phone: payment.customer_phone,
     });
 
+    // Success response
     res.status(200).json({
       message: 'Order assigned successfully',
       assignment,
     });
   } catch (error) {
     console.error('Error assigning payment:', error);
-    res.status(500).json({ message: 'Error assigning payment', error });
+    res.status(500).json({ message: 'Error assigning payment', error: error.message });
   }
 };
 
-// Get all assignments (filtered by shopper_id or delivery_boy_id)
+// Get all assignments (filtered by shopper_id or delivery_id)
 export const getAssignments = async (req, res) => {
-  const { shopper_id, delivery_boy_id } = req.query;
+  const { shopper_id, delivery_id } = req.query;
   const whereClause = {};
+
+  // Build where clause dynamically
   if (shopper_id) whereClause.shopper_id = shopper_id;
   if (delivery_id) whereClause.delivery_id = delivery_id;
 
@@ -91,7 +99,7 @@ export const getAssignments = async (req, res) => {
     res.status(200).json({ assignments });
   } catch (error) {
     console.error('Error fetching assignments:', error);
-    res.status(500).json({ message: 'Error fetching assignments', error });
+    res.status(500).json({ message: 'Error fetching assignments', error: error.message });
   }
 };
 
@@ -100,6 +108,7 @@ export const updateAssignmentStatus = async (req, res) => {
   const { assignment_id } = req.params;
   const { status } = req.body;
 
+  // Validate status
   const allowedStatuses = ['Assigned', 'In Progress', 'Completed'];
   if (!allowedStatuses.includes(status)) {
     return res.status(400).json({ message: 'Invalid status value' });
@@ -111,6 +120,7 @@ export const updateAssignmentStatus = async (req, res) => {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
+    // Update status
     assignment.status = status;
     await assignment.save();
 
@@ -120,7 +130,7 @@ export const updateAssignmentStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating assignment status:', error);
-    res.status(500).json({ message: 'Error updating assignment status', error });
+    res.status(500).json({ message: 'Error updating assignment status', error: error.message });
   }
 };
 
@@ -150,7 +160,7 @@ export const getOrdersForShopper = async (req, res) => {
     res.status(200).json({ assignments });
   } catch (error) {
     console.error('Error fetching orders for shopper:', error);
-    res.status(500).json({ message: 'Error fetching orders for shopper', error });
+    res.status(500).json({ message: 'Error fetching orders for shopper', error: error.message });
   }
 };
 
@@ -166,6 +176,6 @@ export const getOrdersForDeliveryBoy = async (req, res) => {
     res.status(200).json({ assignments });
   } catch (error) {
     console.error('Error fetching orders for delivery boy:', error);
-    res.status(500).json({ message: 'Error fetching orders for delivery boy', error });
+    res.status(500).json({ message: 'Error fetching orders for delivery boy', error: error.message });
   }
 };
