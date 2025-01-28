@@ -169,23 +169,23 @@ export const getOrdersForShopper = async (req, res) => {
 // Controller to fetch orders assigned to a delivery boy
 export const getOrdersForDeliveryBoy = async (req, res) => {
   try {
-    const { delivery_boy_id } = req.params; // Changed from id to delivery_boy_id
+    const { delivery_boy_id } = req.params; // Ensure this matches the param you pass in the URL
     if (!delivery_boy_id) {
       return res.status(400).json({ message: 'Delivery boy ID is required' });
     }
 
-    // Use correct model name (AssignOrder instead of Assignment)
+    // Use the correct model name (AssignOrder instead of Assignment)
     const assignments = await AssignOrder.findAll({
-      where: { delivery_id: delivery_boy_id }, // Match your model's field name
+      where: { delivery_id: delivery_boy_id }, // Match the field in the AssignOrder model
       include: [
         {
           model: Payment,
-          as: 'payment',
+          as: 'payment',  // Ensure this alias matches the alias defined in the AssignOrder model
           attributes: ['cart_items', 'total_price', 'shipping_address']
         },
         {
           model: Shopper,
-          as: 'shopper',
+          as: 'shopper',  // Ensure this alias matches the alias defined in the AssignOrder model
           attributes: ['full_name']
         }
       ]
