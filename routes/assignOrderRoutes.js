@@ -1,24 +1,23 @@
 import express from 'express';
 import {
-  assignPaymentToShopperAndDelivery,
-  getAssignments,
-  updateAssignmentStatus,
   getAllAssignedOrders,
-  getOrdersForShopper,
-  getOrdersForDeliveryBoy,
-} from '../controllers/assignOrderController.js';
+  assignOrder,
+  getAssignedOrderByPaymentId,
+  deleteAssignedOrder,
+  getAssignedOrdersForShopper,
+  getAssignedOrdersForDeliveryBoy,
+} from '../controllers/AssignOrderController.js';
 
 const router = express.Router();
 
-router.post('/assign/:payment_id', assignPaymentToShopperAndDelivery);
-router.get('/assignments', getAssignments);
-router.put('/assignments/:assignment_id', updateAssignmentStatus);
+// General routes
+router.get('/assigned-orders', getAllAssignedOrders); // Get all assigned orders
+router.post('/assign', assignOrder); // Assign order to shopper and delivery boy
+router.get('/assigned-orders/:payment_id', getAssignedOrderByPaymentId); // Get order by payment_id
+router.delete('/assigned-orders/:payment_id', deleteAssignedOrder); // Delete assignment by payment_id
 
-// Updated route to match the desired URL
-router.get('/all-assignments', getAllAssignedOrders);
-
-// New routes
-router.get('/shopper-orders/:shopper_id', getOrdersForShopper);
-router.get('/delivery-boy-orders/:delivery_boy_id', getOrdersForDeliveryBoy);
+// Routes specific to shoppers and delivery boys
+router.get('/assigned-orders/shopper/:shopper_id', getAssignedOrdersForShopper); // Get orders for a specific shopper
+router.get('/assigned-orders/deliveryboy/:delivery_id', getAssignedOrdersForDeliveryBoy); // Get orders for a specific delivery boy
 
 export default router;
