@@ -158,6 +158,9 @@ process.on('unhandledRejection', (reason, promise) => {
 Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id', as: 'assignOrders' }); // Alias: assignOrders
 AssignOrder.belongsTo(Shopper, { foreignKey: 'shopper_id', as: 'shopper' }); // Alias: shopper
 
+Payment.hasOne(AssignOrder, { foreignKey: 'payment_id' });
+AssignOrder.belongsTo(Payment, { foreignKey: 'payment_id' });
+
 DeliveryBoy.hasMany(AssignOrder, { foreignKey: 'delivery_id', as: 'assignOrders' }); // Alias: assignOrders
 AssignOrder.belongsTo(DeliveryBoy, {
   foreignKey: 'delivery_id', // Use 'delivery_id' instead of 'delivery_boy_id'
