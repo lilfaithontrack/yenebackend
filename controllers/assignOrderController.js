@@ -1,211 +1,136 @@
-import sendOrderNotification from '../utlis/sendOrderNotification.js';
 import AssignOrder from '../models/AssignOrder.js';
-import DeliveryBoy from '../models/DeliveryBoy.js';
 import Shopper from '../models/Shopper.js';
+import DeliveryBoy from '../models/DeliveryBoy.js';
 import Payment from '../models/Payment.js';
-
-// Reusable function to fetch assignments with details
-export const getAssignmentsWithDetails = async (whereClause = {}) => {
-  return await AssignOrder.findAll({
-    where: whereClause,
-    include: [
-      {
-        model: Shopper,
-        as: 'shopper',
-        attributes: ['id', 'full_name', 'email'],
-      },
-      {
-        model: DeliveryBoy,
-        as: 'deliveryBoy',
-        attributes: ['id', 'full_name', 'email'],
-      },
-    ],
-  });
-};
-
-// Assign payment to shopper and delivery boy
-export const assignPaymentToShopperAndDelivery = async (req, res) => {
-  const { payment_id } = req.params;
-  const { shopper_id, delivery_id } = req.body;
-
-  // Input validation
-  if (!shopper_id || !delivery_id) {
-    return res.status(400).json({ message: 'shopper_id and delivery_id are required' });
-  }
-
-  try {
-    // Fetch payment details
-    const payment = await Payment.findByPk(payment_id, {
-      attributes: ['id', 'cart_items', 'total_price', 'shipping_address', 'customer_name', 'customer_email', 'customer_phone'],
-    });
-    if (!payment) {
-      return res.status(404).json({ message: 'Payment not found' });
-    }
-
-    // Validate shopper and delivery boy
-    const shopper = await Shopper.findByPk(shopper_id);
-    if (!shopper) {
-      return res.status(404).json({ message: 'Shopper not found' });
-    }
-
-    const deliveryBoy = await DeliveryBoy.findByPk(delivery_id);
-    if (!deliveryBoy) {
-      return res.status(404).json({ message: 'Delivery boy not found' });
-    }
-
-    // Create assignment
-    const assignment = await AssignOrder.create({
-      order_id: payment_id,
-      shopper_id,
-      delivery_id,
-    });
-
-    // Send notification
-    await sendOrderNotification(shopper, deliveryBoy, {
-      id: payment_id,
-      orderDetails: JSON.parse(payment.cart_items),
-      total_price: payment.total_price,
-      shipping_address: payment.shipping_address,
-      customer_name: payment.customer_name,
-      customer_email: payment.customer_email,
-      customer_phone: payment.customer_phone,
-    });
-
-    // Success response
-    res.status(200).json({
-      message: 'Order assigned successfully',
-      assignment,
-    });
-  } catch (error) {
-    console.error('Error assigning payment:', error);
-    res.status(500).json({ message: 'Error assigning payment', error: error.message });
-  }
-};
-
-// Get all assignments (filtered by shopper_id or delivery_id)
-export const getAssignments = async (req, res) => {
-  const { shopper_id, delivery_id } = req.query;
-  const whereClause = {};
-
-  // Build where clause dynamically
-  if (shopper_id) whereClause.shopper_id = shopper_id;
-  if (delivery_id) whereClause.delivery_id = delivery_id;
-
-  try {
-    const assignments = await getAssignmentsWithDetails(whereClause);
-    if (assignments.length === 0) {
-      return res.status(404).json({ message: 'No assignments found for the provided criteria' });
-    }
-    res.status(200).json({ assignments });
-  } catch (error) {
-    console.error('Error fetching assignments:', error);
-    res.status(500).json({ message: 'Error fetching assignments', error: error.message });
-  }
-};
-
-// Update assignment status
-export const updateAssignmentStatus = async (req, res) => {
-  const { assignment_id } = req.params;
-  const { status } = req.body;
-
-  // Validate status
-  const allowedStatuses = ['Assigned', 'In Progress', 'Completed'];
-  if (!allowedStatuses.includes(status)) {
-    return res.status(400).json({ message: 'Invalid status value' });
-  }
-
-  try {
-    const assignment = await AssignOrder.findByPk(assignment_id);
-    if (!assignment) {
-      return res.status(404).json({ message: 'Assignment not found' });
-    }
-
-    // Update status
-    assignment.status = status;
-    await assignment.save();
-
-    res.status(200).json({
-      message: 'Assignment status updated successfully',
-      assignment,
-    });
-  } catch (error) {
-    console.error('Error updating assignment status:', error);
-    res.status(500).json({ message: 'Error updating assignment status', error: error.message });
-  }
-};
 
 // Get all assigned orders
 export const getAllAssignedOrders = async (req, res) => {
   try {
-    const assignments = await getAssignmentsWithDetails();
-    if (assignments.length === 0) {
-      return res.status(404).json({ message: 'No assigned orders found' });
-    }
-    res.status(200).json({ message: 'Assigned orders retrieved successfully', assignments });
-  } catch (error) {
-    console.error('Error fetching all assigned orders:', error);
-    res.status(500).json({ message: 'Error fetching all assigned orders', error: error.message });
-  }
-};
-
-// Get orders for a specific shopper
-export const getOrdersForShopper = async (req, res) => {
-  const { shopper_id } = req.params;
-
-  try {
-    const assignments = await getAssignmentsWithDetails({ shopper_id });
-    if (assignments.length === 0) {
-      return res.status(404).json({ message: 'No orders found for this shopper' });
-    }
-    res.status(200).json({ assignments });
-  } catch (error) {
-    console.error('Error fetching orders for shopper:', error);
-    res.status(500).json({ message: 'Error fetching orders for shopper', error: error.message });
-  }
-};
-
-
-// Get orders for a specific delivery boy
-export const getOrdersForDeliveryBoy = async (req, res) => {
-  try {
-    const { delivery_boy_id } = req.params; // Accessing the delivery_boy_id parameter from the route
-    if (!delivery_boy_id) {
-      return res.status(400).json({ message: 'Delivery boy ID is required' });
-    }
-
-    // Log the delivery_boy_id to ensure it's being passed correctly
-    console.log('Looking for assignments with delivery_boy_id:', delivery_boy_id);
-
-    // Query the AssignOrder model with the delivery_boy_id
-    const assignments = await AssignOrder.findAll({
-      where: { delivery_id: delivery_boy_id }, // Filtering by the delivery_boy_id
+    const assignedOrders = await AssignOrder.findAll({
       include: [
-        {
-          model: Payment,
-          as: 'payment',
-          required: false, // Make this association optional in case there's no associated payment
-          attributes: ['cart_items', 'total_price', 'shipping_address'],
-        },
-        {
-          model: Shopper,
-          as: 'shopper',
-          attributes: ['full_name'],
-        },
+        { model: Shopper, as: 'shopper', attributes: ['id', 'full_name'] },
+        { model: DeliveryBoy, as: 'deliveryBoy', attributes: ['id', 'full_name'] },
+        { model: Payment, attributes: ['id', 'payment_status', 'total_price'] },
       ],
-      logging: console.log, // Log the SQL query to the console
     });
 
-    // Check if there are any assignments found
-    if (!assignments.length) {
-      console.log('No assignments found for delivery_boy_id:', delivery_boy_id);
-      return res.status(404).json({ message: 'No assignments found' });
-    }
-
-    // Send the assignments as a response
-    res.status(200).json({ assignments });
+    res.status(200).json({
+      success: true,
+      data: assignedOrders,
+    });
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error fetching assigned orders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch assigned orders.',
+    });
   }
 };
 
+// Assign a shopper and delivery boy to an order
+export const assignOrder = async (req, res) => {
+  const { payment_id, shopper_id, delivery_id } = req.body;
+
+  // Validation
+  if (!payment_id || !shopper_id || !delivery_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required fields: payment_id, shopper_id, or delivery_id.',
+    });
+  }
+
+  try {
+    // Ensure the payment exists
+    const payment = await Payment.findOne({ where: { id: payment_id } });
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found.',
+      });
+    }
+
+    // Create or update assignment
+    const [assignOrder, created] = await AssignOrder.upsert({
+      payment_id,
+      shopper_id,
+      delivery_id,
+      status: 'Assigned',
+      assigned_at: new Date(),
+    });
+
+    res.status(200).json({
+      success: true,
+      message: created
+        ? 'Order assigned successfully.'
+        : 'Order assignment updated successfully.',
+      data: assignOrder,
+    });
+  } catch (error) {
+    console.error('Error assigning order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to assign order.',
+    });
+  }
+};
+
+// Get a single assigned order by payment_id
+export const getAssignedOrderByPaymentId = async (req, res) => {
+  const { payment_id } = req.params;
+
+  try {
+    const assignedOrder = await AssignOrder.findOne({
+      where: { payment_id },
+      include: [
+        { model: Shopper, as: 'shopper', attributes: ['id', 'full_name'] },
+        { model: DeliveryBoy, as: 'deliveryBoy', attributes: ['id', 'full_name'] },
+        { model: Payment, attributes: ['id', 'payment_status', 'total_price'] },
+      ],
+    });
+
+    if (!assignedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assigned order not found.',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: assignedOrder,
+    });
+  } catch (error) {
+    console.error('Error fetching assigned order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch assigned order.',
+    });
+  }
+};
+
+// Delete an assignment by payment_id
+export const deleteAssignedOrder = async (req, res) => {
+  const { payment_id } = req.params;
+
+  try {
+    const deleted = await AssignOrder.destroy({ where: { payment_id } });
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assigned order not found.',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Assigned order deleted successfully.',
+    });
+  } catch (error) {
+    console.error('Error deleting assigned order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete assigned order.',
+    });
+  }
+};
