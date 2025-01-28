@@ -1,64 +1,54 @@
 import { Model, DataTypes } from 'sequelize';
-import sequelize from '../db/dbConnect.js'; 
+import sequelize from '../db/dbConnect.js'; // Import your Sequelize instance
 import Shopper from './Shopper.js';
 import DeliveryBoy from './DeliveryBoy.js';
-
 
 class AssignOrder extends Model {}
 
 AssignOrder.init(
   {
-    order_id: {
+    payment_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'Orders',
-        key: 'id',
+        model: 'Payments', // References the Payments table
+        key: 'id', // Payment ID in the Payments table
       },
-      onDelete: 'CASCADE',
+      onDelete: 'CASCADE', // If a Payment is deleted, remove related assignments
     },
     shopper_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'Shoppers',
-        key: 'id',
+        model: 'Shoppers', // References the Shoppers table
+        key: 'id', // Shopper ID in the Shoppers table
       },
-      onDelete: 'SET NULL',
+      onDelete: 'SET NULL', // Set to NULL if the Shopper is deleted
     },
     delivery_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'DeliveryBoys',
-        key: 'id',
+        model: 'DeliveryBoys', // References the DeliveryBoys table
+        key: 'id', // Delivery Boy ID in the DeliveryBoys table
       },
-      onDelete: 'SET NULL',
-    },
-    payment_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'Payments',
-        key: 'id',
-      },
-      onDelete: 'CASCADE',
+      onDelete: 'SET NULL', // Set to NULL if the Delivery Boy is deleted
     },
     status: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 'Assigned',
+      defaultValue: 'Assigned', // Default status is "Assigned"
     },
     assigned_at: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
+      defaultValue: DataTypes.NOW, // Automatically set to the current timestamp
     },
   },
   {
-    sequelize,
-    modelName: 'AssignOrder',
-    tableName: 'assign_orders',
-    timestamps: true,
+    sequelize, // Pass your Sequelize instance
+    modelName: 'AssignOrder', // Model name
+    tableName: 'assign_orders', // Table name in the database
+    timestamps: true, // Enable createdAt and updatedAt fields
   }
 );
 
@@ -73,8 +63,6 @@ AssignOrder.associate = (models) => {
     foreignKey: 'delivery_id',
     as: 'deliveryBoy',
   });
-
-
 };
 
 export default AssignOrder;
