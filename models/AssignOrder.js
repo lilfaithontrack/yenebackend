@@ -2,7 +2,7 @@ import { Model, DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js'; 
 import Shopper from './Shopper.js';
 import DeliveryBoy from './DeliveryBoy.js';
-import Payment from './Payment.js';
+
 
 class AssignOrder extends Model {}
 
@@ -74,10 +74,7 @@ AssignOrder.associate = (models) => {
     as: 'deliveryBoy',
   });
 
-  AssignOrder.belongsTo(models.Payment, {
-    foreignKey: 'payment_id',
-    as: 'payment',
-  });
+
 };
 
 export default AssignOrder;
