@@ -1,6 +1,7 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
 import AssignOrder from './AssignOrder.js';
+
 const Payment = sequelize.define(
   'Payment',
   {
@@ -52,7 +53,10 @@ const Payment = sequelize.define(
     timestamps: true, // Automatically handles createdAt and updatedAt fields
   }
 );
-Payment.hasOne(AssignOrder, { foreignKey: 'payment_id' });
+
+// Define associations in a separate function to avoid circular dependencies
+Payment.associate = (models) => {
+  Payment.hasOne(models.AssignOrder, { foreignKey: 'payment_id' });
+};
 
 export default Payment;
-
