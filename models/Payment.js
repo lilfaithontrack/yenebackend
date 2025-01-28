@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
-import AssignOrder from './AssignOrder.js'; // Import AssignOrder first
+ // Import AssignOrder first
 
 const Payment = sequelize.define(
   'Payment',
@@ -55,6 +55,6 @@ const Payment = sequelize.define(
 );
 
 // Make sure the AssignOrder model is imported first before calling associations
-Payment.hasOne(AssignOrder, { foreignKey: 'payment_id' }); // Correct method name
+
 
 export default Payment;
