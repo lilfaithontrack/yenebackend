@@ -62,5 +62,5 @@ AssignOrder.associate = (models) => {
     as: 'deliveryBoy',
   });
 };
-
+AssignOrder.belongsTo(Payment, { foreignKey: 'payment_id' });
 export default AssignOrder;
