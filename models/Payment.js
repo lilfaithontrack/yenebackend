@@ -52,6 +52,7 @@ const Payment = sequelize.define(
     timestamps: true, // Automatically handles createdAt and updatedAt fields
   }
 );
+Payment.hasOne(AssignOrder, { foreignKey: 'payment_id' });
 
 export default Payment;
 
