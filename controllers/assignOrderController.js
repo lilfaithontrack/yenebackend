@@ -166,22 +166,33 @@ export const getOrdersForShopper = async (req, res) => {
 
 
 // Get orders for a specific delivery boy
+// Controller to fetch orders assigned to a delivery boy
 export const getOrdersForDeliveryBoy = async (req, res) => {
-  const { delivery_id } = req.params; // Extract delivery_id from req.params
-
-  // Validate delivery_id
-  if (!delivery_id) {
-    return res.status(400).json({ message: 'delivery_id is required' });
-  }
-
   try {
-    const assignments = await getAssignmentsWithDetails({ delivery_id });
-    if (assignments.length === 0) {
-      return res.status(404).json({ message: 'No orders found for this delivery boy' });
+    const { id } = req.params; // Get the ID from the route parameter
+    
+    if (!id) {
+      return res.status(400).json({ message: 'Delivery boy ID is required' });
     }
+
+    // Fetch the delivery boy to check if the ID is valid
+    const deliveryBoy = await DeliveryBoy.findByPk(id);
+    if (!deliveryBoy) {
+      return res.status(404).json({ message: 'Delivery boy not found' });
+    }
+
+    // Fetch the assigned orders for the delivery boy
+    const assignments = await Assignment.findAll({
+      where: { delivery_boy_id: id },
+    });
+
+    if (!assignments.length) {
+      return res.status(404).json({ message: 'No assignments found for this delivery boy' });
+    }
+
     res.status(200).json({ assignments });
   } catch (error) {
-    console.error('Error fetching orders for delivery boy:', error);
-    res.status(500).json({ message: 'Error fetching orders for delivery boy', error: error.message });
+    console.error('Error fetching delivery boy assignments:', error);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 };
