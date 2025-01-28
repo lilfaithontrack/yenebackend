@@ -27,6 +27,72 @@ export const getAllAssignedOrders = async (req, res) => {
   }
 };
 
+// Get assigned orders for a specific shopper
+export const getAssignedOrdersForShopper = async (req, res) => {
+  const { shopper_id } = req.params;
+
+  try {
+    const assignedOrders = await AssignOrder.findAll({
+      where: { shopper_id },
+      include: [
+        { model: Payment, attributes: ['id', 'payment_status', 'total_price'] },
+        { model: DeliveryBoy, as: 'deliveryBoy', attributes: ['id', 'full_name'] },
+      ],
+    });
+
+    if (!assignedOrders.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No assigned orders found for this shopper.',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: assignedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching orders for shopper:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch orders for the shopper.',
+    });
+  }
+};
+
+// Get assigned orders for a specific delivery boy
+export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
+  const { delivery_id } = req.params;
+
+  try {
+    const assignedOrders = await AssignOrder.findAll({
+      where: { delivery_id },
+      include: [
+        { model: Payment, attributes: ['id', 'payment_status', 'total_price'] },
+        { model: Shopper, as: 'shopper', attributes: ['id', 'full_name'] },
+      ],
+    });
+
+    if (!assignedOrders.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No assigned orders found for this delivery boy.',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: assignedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching orders for delivery boy:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch orders for the delivery boy.',
+    });
+  }
+};
+
 // Assign a shopper and delivery boy to an order
 export const assignOrder = async (req, res) => {
   const { payment_id, shopper_id, delivery_id } = req.body;
