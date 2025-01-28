@@ -166,38 +166,46 @@ export const getOrdersForShopper = async (req, res) => {
 
 
 // Get orders for a specific delivery boy
-// Controller to fetch orders assigned to a delivery boy
 export const getOrdersForDeliveryBoy = async (req, res) => {
   try {
-    const { delivery_boy_id } = req.params; // Ensure this matches the param you pass in the URL
+    const { delivery_boy_id } = req.params; // Accessing the delivery_boy_id parameter from the route
     if (!delivery_boy_id) {
       return res.status(400).json({ message: 'Delivery boy ID is required' });
     }
 
-    // Use the correct model name (AssignOrder instead of Assignment)
+    // Log the delivery_boy_id to ensure it's being passed correctly
+    console.log('Looking for assignments with delivery_boy_id:', delivery_boy_id);
+
+    // Query the AssignOrder model with the delivery_boy_id
     const assignments = await AssignOrder.findAll({
-      where: { delivery_id: delivery_boy_id }, // Match the field in the AssignOrder model
+      where: { delivery_id: delivery_boy_id }, // Filtering by the delivery_boy_id
       include: [
         {
           model: Payment,
-          as: 'payment',  // Ensure this alias matches the alias defined in the AssignOrder model
-          attributes: ['cart_items', 'total_price', 'shipping_address']
+          as: 'payment',
+          required: false, // Make this association optional in case there's no associated payment
+          attributes: ['cart_items', 'total_price', 'shipping_address'],
         },
         {
           model: Shopper,
-          as: 'shopper',  // Ensure this alias matches the alias defined in the AssignOrder model
-          attributes: ['full_name']
-        }
-      ]
+          as: 'shopper',
+          attributes: ['full_name'],
+        },
+      ],
+      logging: console.log, // Log the SQL query to the console
     });
 
+    // Check if there are any assignments found
     if (!assignments.length) {
+      console.log('No assignments found for delivery_boy_id:', delivery_boy_id);
       return res.status(404).json({ message: 'No assignments found' });
     }
 
+    // Send the assignments as a response
     res.status(200).json({ assignments });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
