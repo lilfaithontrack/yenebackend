@@ -6,17 +6,38 @@ import Payment from '../models/Payment.js';
 // Get all assigned orders
 export const getAllAssignedOrders = async (req, res) => {
   try {
+    // Fetch all assigned orders with necessary associations
     const assignedOrders = await AssignOrder.findAll({
       include: [
-        { model: Shopper, as: 'shopper', attributes: ['id', 'full_name'] },
-        { model: DeliveryBoy, as: 'deliveryBoy', attributes: ['id', 'full_name'] },
-        { model: Payment, attributes: ['id', 'payment_status', 'total_price'] },
-      ],
+        {
+          model: Shopper, 
+          as: 'shopper', 
+          attributes: ['id', 'full_name', 'email'] // Ensure that 'email' exists in the Shopper model
+        },
+        {
+          model: DeliveryBoy, 
+          as: 'deliveryBoy', 
+          attributes: ['id', 'full_name', 'email'] // Ensure that 'email' exists in the DeliveryBoy model
+        },
+        {
+          model: Payment, 
+          attributes: ['id', 'payment_status', 'total_price']
+        }
+      ]
     });
 
+    // Check if there are assigned orders
+    if (!assignedOrders || assignedOrders.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No assigned orders found.'
+      });
+    }
+
+    // Return the list of assigned orders
     res.status(200).json({
       success: true,
-      data: assignedOrders,
+      data: assignedOrders // Send the fetched orders data as JSON
     });
   } catch (error) {
     console.error('Error fetching assigned orders:', error);
@@ -26,7 +47,6 @@ export const getAllAssignedOrders = async (req, res) => {
     });
   }
 };
-
 // Get assigned orders for a specific shopper
 export const getAssignedOrdersForShopper = async (req, res) => {
   const { shopper_id } = req.params;
