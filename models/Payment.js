@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
-import AssignOrder from './AssignOrder.js';
+import AssignOrder from './AssignOrder.js'; // Import AssignOrder model first
 
 const Payment = sequelize.define(
   'Payment',
@@ -8,55 +8,53 @@ const Payment = sequelize.define(
     payment_method: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 'banktransfer', // Default payment method set to 'banktransfer'
+      defaultValue: 'banktransfer',
     },
     payment_screenshot: {
-      type: DataTypes.STRING, // URL or path to the uploaded screenshot
+      type: DataTypes.STRING,
       allowNull: false,
     },
     payment_status: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 'Pending', // Default payment status
+      defaultValue: 'Pending',
     },
     cart_items: {
-      type: DataTypes.JSONB, // Store cart items as JSON
+      type: DataTypes.JSONB,
       allowNull: false,
     },
     total_price: {
-      type: DataTypes.FLOAT, // Store the total price
+      type: DataTypes.FLOAT,
       allowNull: false,
     },
     shipping_address: {
-      type: DataTypes.STRING, // Store shipping address
+      type: DataTypes.STRING,
       allowNull: false,
     },
     customer_name: {
-      type: DataTypes.STRING, // Store the customer's name
+      type: DataTypes.STRING,
       allowNull: false,
     },
     customer_email: {
-      type: DataTypes.STRING, // Store the customer's email
+      type: DataTypes.STRING,
       allowNull: false,
     },
     customer_phone: {
-      type: DataTypes.STRING, // Store the customer's phone number
+      type: DataTypes.STRING,
       allowNull: false,
     },
     guest_id: {
-      type: DataTypes.STRING, // Optionally store guest ID (can be null for registered users)
-      allowNull: true, // Nullable if no guest ID is provided
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
-    tableName: 'Payments', // Ensures the table name is 'Payments'
-    timestamps: true, // Automatically handles createdAt and updatedAt fields
+    tableName: 'Payments',
+    timestamps: true,
   }
 );
 
-// Define associations in a separate function to avoid circular dependencies
-Payment.associate = (models) => {
-  Payment.hasOne(models.AssignOrder, { foreignKey: 'payment_id' });
-};
+// Ensure the AssignOrder model is properly linked
+Payment.hasOne(AssignOrder, { foreignKey: 'payment_id' });
 
 export default Payment;
