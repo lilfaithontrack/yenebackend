@@ -6,7 +6,7 @@ import {
   deleteAssignedOrder,
   getAssignedOrdersForShopper,
   getAssignedOrdersForDeliveryBoy,
-} from '../controllers/AssignOrderController.js';
+} from '../controllers/assignOrderController.js';
 
 const router = express.Router();
 
