@@ -169,30 +169,35 @@ export const getOrdersForShopper = async (req, res) => {
 // Controller to fetch orders assigned to a delivery boy
 export const getOrdersForDeliveryBoy = async (req, res) => {
   try {
-    const { id } = req.params; // Get the ID from the route parameter
-    
-    if (!id) {
+    const { delivery_boy_id } = req.params; // Changed from id to delivery_boy_id
+    if (!delivery_boy_id) {
       return res.status(400).json({ message: 'Delivery boy ID is required' });
     }
 
-    // Fetch the delivery boy to check if the ID is valid
-    const deliveryBoy = await DeliveryBoy.findByPk(id);
-    if (!deliveryBoy) {
-      return res.status(404).json({ message: 'Delivery boy not found' });
-    }
-
-    // Fetch the assigned orders for the delivery boy
-    const assignments = await Assignment.findAll({
-      where: { delivery_boy_id: id },
+    // Use correct model name (AssignOrder instead of Assignment)
+    const assignments = await AssignOrder.findAll({
+      where: { delivery_id: delivery_boy_id }, // Match your model's field name
+      include: [
+        {
+          model: Payment,
+          as: 'payment',
+          attributes: ['cart_items', 'total_price', 'shipping_address']
+        },
+        {
+          model: Shopper,
+          as: 'shopper',
+          attributes: ['full_name']
+        }
+      ]
     });
 
     if (!assignments.length) {
-      return res.status(404).json({ message: 'No assignments found for this delivery boy' });
+      return res.status(404).json({ message: 'No assignments found' });
     }
 
     res.status(200).json({ assignments });
   } catch (error) {
-    console.error('Error fetching delivery boy assignments:', error);
-    res.status(500).json({ message: 'Internal server error.' });
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
