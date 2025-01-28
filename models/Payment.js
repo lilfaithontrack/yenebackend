@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
-import AssignOrder './AssignOrder.js';
+
 const Payment = sequelize.define(
   'Payment',
   {
