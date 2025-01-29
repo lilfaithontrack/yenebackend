@@ -117,6 +117,7 @@ export const getAssignedOrdersForShopper = async (req, res) => {
   }
 };
 // Get assigned orders for a specific delivery boy
+
 export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
   const { delivery_id } = req.params;
 
@@ -126,8 +127,16 @@ export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
     const assignedOrders = await AssignOrder.findAll({
       where: { delivery_id },
       include: [
-        { model: Payment, attributes: ['id', 'payment_status', 'total_price'] },
-        { model: Shopper, as: 'shopper', attributes: ['id', 'full_name'] },
+        {
+          model: Payment,
+          as: 'payment', // Ensure alias matches the association
+          attributes: ['id', 'payment_status', 'total_price']
+        },
+        {
+          model: Shopper,
+          as: 'shopper',
+          attributes: ['id', 'full_name', 'email']
+        },
       ],
     });
 
@@ -139,10 +148,32 @@ export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
       });
     }
 
+    // Map the orders to the required format
+    const formattedOrders = assignedOrders.map(order => ({
+      id: order.id,
+      order_id: order.order_id || 'N/A',
+      status: order.status || 'Pending',
+      shopper: order.shopper ? {
+        id: order.shopper.id,
+        full_name: order.shopper.full_name,
+        email: order.shopper.email
+      } : null,
+      deliveryBoy: order.deliveryBoy ? {
+        id: order.deliveryBoy.id,
+        full_name: order.deliveryBoy.full_name,
+        email: order.deliveryBoy.email
+      } : null,
+      payment: order.payment ? {
+        id: order.payment.id,
+        payment_status: order.payment.payment_status,
+        total_price: order.payment.total_price
+      } : null
+    }));
+
     return res.status(200).json({
       success: true,
       count: assignedOrders.length,
-      data: assignedOrders,
+      data: formattedOrders,
     });
 
   } catch (error) {
@@ -154,6 +185,7 @@ export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
     });
   }
 };
+
 // Assign a shopper and delivery boy to an order
 export const assignOrder = async (req, res) => {
   const { payment_id, shopper_id, delivery_id } = req.body;
