@@ -90,56 +90,6 @@ export const getAllAssignedOrders = async (req, res) => {
   }
 };
 
-
-    // Transform response to ensure clean and structured output
-    const formattedOrders = assignedOrders.map(order => ({
-      id: order.id,
-      order_id: order.order_id || 'N/A',
-      status: order.status || 'Pending',
-      shopper: order.shopper ? {
-        id: order.shopper.id,
-        full_name: order.shopper.full_name,
-        email: order.shopper.email
-      } : null,
-      deliveryBoy: order.deliveryBoy ? {
-        id: order.deliveryBoy.id,
-        full_name: order.deliveryBoy.full_name,
-        email: order.deliveryBoy.email
-      } : null,
-      payment: order.Payment ? {
-        id: order.Payment.id,
-        payment_status: order.Payment.payment_status,
-        total_price: order.Payment.total_price
-      } : null
-    }));
-
-    // Return the formatted assigned orders
-    return res.status(200).json({
-      success: true,
-      count: assignedOrders.length,
-      data: formattedOrders
-    });
-
-  } catch (error) {
-    console.error('❌ Error fetching assigned orders:', error);
-
-    // Handle specific errors
-    if (error.name === 'SequelizeDatabaseError') {
-      return res.status(500).json({
-        success: false,
-        message: 'Database error occurred while fetching assigned orders.',
-        error: error.message
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: 'An unexpected error occurred while fetching assigned orders.',
-      error: error.message
-    });
-  }
-};
-
 // Get assigned orders for a specific shopper
 export const getAssignedOrdersForShopper = async (req, res) => {
   const { shopper_id } = req.params;
