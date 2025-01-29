@@ -8,30 +8,28 @@ export const getAllAssignedOrders = async (req, res) => {
   try {
     console.log('📢 Fetching all assigned orders...');
 
-    // Fetch assigned orders with proper associations
     const assignedOrders = await AssignOrder.findAll({
       include: [
         {
           model: Shopper,
-          as: 'shopper',
+          as: 'shopper', // Ensure this matches the association in your models
           attributes: ['id', 'full_name', 'email']
         },
         {
           model: DeliveryBoy,
-          as: 'deliveryBoy',
+          as: 'deliveryBoy', // Ensure this matches the association in your models
           attributes: ['id', 'full_name', 'email']
         },
         {
           model: Payment,
+          as: 'payment', // Add the correct alias for Payment
           attributes: ['id', 'payment_status', 'total_price']
         }
       ]
     });
 
-    // Log the number of fetched orders
     console.log(`✅ Fetched ${assignedOrders.length} assigned orders.`);
 
-    // Check if there are assigned orders
     if (!assignedOrders || assignedOrders.length === 0) {
       console.warn('⚠️ No assigned orders found.');
       return res.status(404).json({
@@ -41,7 +39,7 @@ export const getAllAssignedOrders = async (req, res) => {
       });
     }
 
-    // Transform response to ensure clean and structured output
+    // Format response
     const formattedOrders = assignedOrders.map(order => ({
       id: order.id,
       order_id: order.order_id || 'N/A',
@@ -56,14 +54,13 @@ export const getAllAssignedOrders = async (req, res) => {
         full_name: order.deliveryBoy.full_name,
         email: order.deliveryBoy.email
       } : null,
-      payment: order.Payment ? {
-        id: order.Payment.id,
-        payment_status: order.Payment.payment_status,
-        total_price: order.Payment.total_price
+      payment: order.payment ? { // Ensure alias matches Sequelize model association
+        id: order.payment.id,
+        payment_status: order.payment.payment_status,
+        total_price: order.payment.total_price
       } : null
     }));
 
-    // Return the formatted assigned orders
     return res.status(200).json({
       success: true,
       count: assignedOrders.length,
@@ -72,15 +69,6 @@ export const getAllAssignedOrders = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error fetching assigned orders:', error);
-
-    // Handle specific errors
-    if (error.name === 'SequelizeDatabaseError') {
-      return res.status(500).json({
-        success: false,
-        message: 'Database error occurred while fetching assigned orders.',
-        error: error.message
-      });
-    }
 
     return res.status(500).json({
       success: false,
