@@ -83,6 +83,8 @@ export const getAssignedOrdersForShopper = async (req, res) => {
   const { shopper_id } = req.params;
 
   try {
+    console.log(`📢 Fetching assigned orders for shopper with ID: ${shopper_id}`);
+
     const assignedOrders = await AssignOrder.findAll({
       where: { shopper_id },
       include: [
@@ -92,30 +94,35 @@ export const getAssignedOrdersForShopper = async (req, res) => {
     });
 
     if (!assignedOrders.length) {
+      console.warn('⚠️ No assigned orders found for this shopper.');
       return res.status(404).json({
         success: false,
         message: 'No assigned orders found for this shopper.',
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
+      count: assignedOrders.length,
       data: assignedOrders,
     });
+
   } catch (error) {
-    console.error('Error fetching orders for shopper:', error);
+    console.error('❌ Error fetching orders for shopper:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch orders for the shopper.',
+      error: error.message,
     });
   }
 };
-
 // Get assigned orders for a specific delivery boy
 export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
   const { delivery_id } = req.params;
 
   try {
+    console.log(`📢 Fetching assigned orders for delivery boy with ID: ${delivery_id}`);
+
     const assignedOrders = await AssignOrder.findAll({
       where: { delivery_id },
       include: [
@@ -125,25 +132,28 @@ export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
     });
 
     if (!assignedOrders.length) {
+      console.warn('⚠️ No assigned orders found for this delivery boy.');
       return res.status(404).json({
         success: false,
         message: 'No assigned orders found for this delivery boy.',
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
+      count: assignedOrders.length,
       data: assignedOrders,
     });
+
   } catch (error) {
-    console.error('Error fetching orders for delivery boy:', error);
+    console.error('❌ Error fetching orders for delivery boy:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch orders for the delivery boy.',
+      error: error.message,
     });
   }
 };
-
 // Assign a shopper and delivery boy to an order
 export const assignOrder = async (req, res) => {
   const { payment_id, shopper_id, delivery_id } = req.body;
