@@ -26,10 +26,10 @@ router.post('/login', loginAdmin);
 router.post('/', adminAuth, createAdmin);
 
 // Get all admins (Protected, only accessible by authenticated admins)
-router.get('/', adminAuth, getAllAdmins);
+router.get('/', getAllAdmins);
 
 // Get an admin by ID (Protected, only accessible by authenticated admins)
-router.get('/:id', adminAuth, getAdminById);
+router.get('/:id' , getAdminById);
 
 // Update an admin's details (Protected, only accessible by authenticated admins)
 router.put('/:id', adminAuth, updateAdmin);
