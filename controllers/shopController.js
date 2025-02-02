@@ -171,3 +171,29 @@ export const findNearbyShops = async (req, res) => {
     return res.status(500).json({ error: 'Failed to find nearby shops.', details: error.message });
   }
 };
+export const loginShopper = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check if the shop exists
+    const shop = await Shop.findOne({ where: { email } });
+
+    if (!shop) {
+      return res.status(404).json({ error: 'Shop not found.' });
+    }
+
+    // Verify password
+    const isMatch = await bcrypt.compare(password, shop.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ id: shop.id, email: shop.email }, 'your_jwt_secret', { expiresIn: '7d' });
+
+    return res.status(200).json({ message: 'Login successful.', token, shop });
+  } catch (error) {
+    return res.status(500).json({ error: 'Login failed.', details: error.message });
+  }
+};
