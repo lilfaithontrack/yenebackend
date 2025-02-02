@@ -88,8 +88,8 @@ export const getAssignedOrdersForShopper = async (req, res) => {
     const assignedOrders = await AssignOrder.findAll({
       where: { shopper_id },
       include: [
-        { model: Payment, attributes: ['id', 'payment_status', 'total_price'] },
-        { model: DeliveryBoy, as: 'deliveryBoy', attributes: ['id', 'full_name'] },
+        { model: Payment, as: 'payment', attributes: ['id', 'payment_status', 'total_price'] }, // Use correct alias 'payment'
+        { model: DeliveryBoy, as: 'deliveryBoy', attributes: ['id', 'full_name'] }, // Use correct alias 'deliveryBoy'
       ],
     });
 
@@ -116,6 +116,7 @@ export const getAssignedOrdersForShopper = async (req, res) => {
     });
   }
 };
+
 // Get assigned orders for a specific delivery boy
 
 export const getAssignedOrdersForDeliveryBoy = async (req, res) => {
