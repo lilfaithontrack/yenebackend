@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import Shopper from '../models/Shopper.js';
+import jwt from 'jsonwebtoken';
 
 // Haversine formula to calculate distance between two points (lat/lng)
 const haversine = (lat1, lng1, lat2, lng2) => {
@@ -157,11 +158,14 @@ export const loginShopper = async (req, res) => {
       return res.status(401).json({ message: 'Invalid password.' });
     }
 
-    // If login is successful, return shopper details (excluding password)
+    // If login is successful, create a JWT token
     const { id, full_name, location_lat, location_lng } = shopper;
+    const token = jwt.sign({ id, email }, 'your_jwt_secret', { expiresIn: '1h' });  // Customize the expiry time
 
+    // Return the shopper details along with the token
     res.status(200).json({
       message: 'Login successful.',
+      token,  // Include the token
       shopper: { id, full_name, email, location_lat, location_lng },
     });
   } catch (error) {
