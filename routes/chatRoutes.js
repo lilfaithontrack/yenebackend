@@ -13,7 +13,8 @@ const router = express.Router();
 router.post('/send', sendMessage);
 
 // Fetch chat history between two users
-router.get('/history/:sender_id/:receiver_id', getChatHistory);
+router.get('/history/:sender_id/:sender_role/:receiver_id/:receiver_role', getChatHistory);
+
 
 // Mark a message as read
 router.put('/mark-as-read/:message_id', markAsRead);
