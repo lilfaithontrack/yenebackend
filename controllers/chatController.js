@@ -32,19 +32,19 @@ export const sendMessage = async (req, res) => {
 // Fetch chat history between two users
 export const getChatHistory = async (req, res) => {
   try {
-    const { sender_id, receiver_id } = req.params;
+    const { sender_id, sender_role, receiver_id, receiver_role } = req.params;
 
     // Validate required fields
-    if (!sender_id || !receiver_id) {
-      return res.status(400).json({ message: 'Sender ID and Receiver ID are required' });
+    if (!sender_id || !sender_role || !receiver_id || !receiver_role) {
+      return res.status(400).json({ message: 'Sender ID, Sender Role, Receiver ID, and Receiver Role are required' });
     }
 
-    // Fetch chat history
+    // Fetch chat history, ensuring role matching
     const chatHistory = await Chat.findAll({
       where: {
         [Op.or]: [
-          { sender_id, receiver_id },
-          { sender_id: receiver_id, receiver_id: sender_id },
+          { sender_id, sender_role, receiver_id, receiver_role },
+          { sender_id: receiver_id, sender_role: receiver_role, receiver_id: sender_id, receiver_role: sender_role },
         ],
       },
       order: [['createdAt', 'ASC']], // Order by creation time (oldest first)
@@ -56,6 +56,7 @@ export const getChatHistory = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch chat history', error: error.message });
   }
 };
+
 
 // Mark a message as read
 export const markAsRead = async (req, res) => {
