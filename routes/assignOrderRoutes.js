@@ -6,11 +6,13 @@ import {
   deleteAssignedOrder,
   getAssignedOrdersForShopper,
   getAssignedOrdersForDeliveryBoy,
+  updateOrderStatus
 } from '../controllers/assignOrderController.js';
 
 const router = express.Router();
 
 // General routes
+router.put('/assigned-orders/:payment_id/status', updateOrderStatus);
 router.get('/assigned-orders', getAllAssignedOrders); // Get all assigned orders
 router.post('/assign', assignOrder); // Assign order to shopper and delivery boy
 router.get('/assigned-orders/:payment_id', getAssignedOrderByPaymentId); // Get order by payment_id
