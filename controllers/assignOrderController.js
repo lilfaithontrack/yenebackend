@@ -300,7 +300,7 @@ export const updateOrderStatus = async (req, res) => {
   const { status } = req.body;
 
   // List of allowed statuses
-  const allowedStatuses = ['Assigned', 'In Transit', 'Delivered', 'Cancelled'];
+  const allowedStatuses = ['Assigned', 'In Transit', 'Delivered', 'Cancelled', 'Picked Up'];
 
   // Validate the status
   if (!status || !allowedStatuses.includes(status)) {
