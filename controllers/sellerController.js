@@ -2,8 +2,8 @@ import Seller from '../models/Seller.js'; // Ensure the path is correct
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken'; // Import JWT for token generation
 
-// Seller registration
-// Seller registration
+
+// Seller registration for now 
 export const registerSeller = async (req, res) => {
   try {
     const { name, lname, email, phone, password, address, region, sub_city, woreda, liyu_name, liyu_sign, home_phone, tin_num, bank_name, account_number, national_id, commerce1, commerce2, tin_doc } = req.body;
