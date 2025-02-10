@@ -1,6 +1,6 @@
 import express from 'express';
 import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword } from '../controllers/sellerController.js';
-import { upload } from '../controllers/sellerController.js'; // Import multer upload instance
+import  upload  from '../controllers/sellerController.js'; // Import multer upload instance
 
 const router = express.Router();
 
