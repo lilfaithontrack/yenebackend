@@ -28,6 +28,10 @@ const Seller = sequelize.define('Seller', {
     type: DataTypes.TEXT,
     allowNull: true, // Make it optional
   },
+  license_file: {
+    type: DataTypes.TEXT,
+    allowNull: true, // Make license file optional
+  },
 }, {
   tableName: 'seller',
   timestamps: false, // Disable automatic timestamps
