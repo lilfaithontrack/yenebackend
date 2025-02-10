@@ -1,21 +1,22 @@
 import express from 'express';
-import {
-  loginSeller,
-  registerSeller,
-  getAllSellers,
-  getSellerById,
-  updateSeller,
-  deleteSeller,
-} from '../controllers/sellerController.js';
-import { authenticateSeller } from '../middlewares/sellerMiddleware.js'; // Ensure this matches your middleware file path
+import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller } from '../controllers/sellerController.js';
+import { upload } from '../controllers/sellerController.js'; // Import multer upload instance
 
 const router = express.Router();
 
-router.post('/register', registerSeller);
+// Seller registration (with file upload support)
+router.post('/register', upload.single('image'), registerSeller); // Supports image file upload
+
+// Seller login
 router.post('/login', loginSeller);
-router.get('/', authenticateSeller, getAllSellers); // Protect this route with authentication middleware
-router.get('/:id', authenticateSeller, getSellerById); // Protect this route with authentication middleware
-router.put('/:id', authenticateSeller, updateSeller); // Protect this route with authentication middleware
-router.delete('/:id', authenticateSeller, deleteSeller); // Protect this route with authentication middleware
+
+// Update seller details (with file upload support)
+router.put('/update/:id', upload.single('image'), updateSeller); // Supports image or license file update
+
+// Get seller by ID
+router.get('/:id', getSellerById);
+
+// Delete a seller
+router.delete('/:id', deleteSeller);
 
 export default router;
