@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller } from '../controllers/sellerController.js';
+import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword } from '../controllers/sellerController.js';
 import { upload } from '../controllers/sellerController.js'; // Import multer upload instance
 
 const router = express.Router();
@@ -18,5 +18,9 @@ router.get('/:id', getSellerById);
 
 // Delete a seller
 router.delete('/:id', deleteSeller);
+// reset password and  forgot pass word
+router.post('/forgot-password', forgotPassword);
 
+// Reset password
+router.post('/reset-password', resetPassword);
 export default router;
