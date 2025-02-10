@@ -1,7 +1,20 @@
-import Seller from '../models/Seller.js'; // Ensure the path is correct
+import Seller from '../models/Seller.js';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken'; // Import JWT for token generation
+import jwt from 'jsonwebtoken';
+import multer from 'multer'; // Import multer for file uploads
+import path from 'path';
 
+// Set up multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Save files to the 'uploads' folder
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // Append timestamp to avoid name conflicts
+  },
+});
+
+const upload = multer({ storage });
 
 // Seller registration
 export const registerSeller = async (req, res) => {
@@ -25,7 +38,8 @@ export const registerSeller = async (req, res) => {
       email,
       phone,
       password: hashedPassword, // Store hashed password
-      image: req.body.image || null, // Optional image
+      image: req.file ? req.file.filename : null, // Handle image upload
+      license_file: req.file ? req.file.filename : null, // Handle license file upload
     });
 
     res.status(201).json({
@@ -65,58 +79,20 @@ export const loginSeller = async (req, res) => {
 
     // Generate JWT token with 1 year expiration
     const token = jwt.sign({ id: seller.id }, process.env.JWT_SECRET, {
-      expiresIn: '1y', // Token expiration time
+      expiresIn: '1y',
     });
 
     res.status(200).json({
       success: true,
-      token, // Send token in response
+      token,
       data: {
         id: seller.id,
         name: seller.name,
         email: seller.email,
         phone: seller.phone,
         image: seller.image,
+        license_file: seller.license_file,
       },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// Get all sellers
-export const getAllSellers = async (req, res) => {
-  try {
-    const sellers = await Seller.findAll();
-    res.status(200).json({
-      success: true,
-      data: sellers,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// Get a seller by ID
-export const getSellerById = async (req, res) => {
-  try {
-    const seller = await Seller.findByPk(req.params.id);
-    if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: 'Seller not found',
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: seller,
     });
   } catch (error) {
     res.status(500).json({
@@ -131,7 +107,6 @@ export const updateSeller = async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
 
-    // Find seller by ID
     const seller = await Seller.findByPk(req.params.id);
     if (!seller) {
       return res.status(404).json({
@@ -140,18 +115,42 @@ export const updateSeller = async (req, res) => {
       });
     }
 
-    // Update seller details, only hash password if a new one is provided
+    // Update seller details, hash password if a new one is provided
     const updatedSeller = await seller.update({
       name: name || seller.name,
       email: email || seller.email,
       phone: phone || seller.phone,
-      password: password ? await bcrypt.hash(password, 10) : seller.password, // Hash if new password provided
-      image: req.body.image || seller.image, // Optional image update
+      password: password ? await bcrypt.hash(password, 10) : seller.password,
+      image: req.file ? req.file.filename : seller.image, // Update image if new file provided
+      license_file: req.file ? req.file.filename : seller.license_file, // Update license file if new file provided
     });
 
     res.status(200).json({
       success: true,
       data: updatedSeller,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get seller by ID
+export const getSellerById = async (req, res) => {
+  try {
+    const seller = await Seller.findByPk(req.params.id);
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Seller not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: seller,
     });
   } catch (error) {
     res.status(500).json({
