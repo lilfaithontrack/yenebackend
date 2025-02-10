@@ -3,10 +3,10 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken'; // Import JWT for token generation
 
 
-// Seller registration for now 
+// Seller registration
 export const registerSeller = async (req, res) => {
   try {
-    const { name, lname, email, phone, password, address, region, sub_city, woreda, liyu_name, liyu_sign, home_phone, tin_num, bank_name, account_number, national_id, commerce1, commerce2, tin_doc } = req.body;
+    const { name, email, phone, password } = req.body;
 
     // Check if the seller already exists
     const existingSeller = await Seller.findOne({ where: { email } });
@@ -17,28 +17,15 @@ export const registerSeller = async (req, res) => {
       });
     }
 
+    // Hash the password before saving
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const seller = await Seller.create({
       name,
-      lname,
       email,
       phone,
-      password, // Save the password in plaintext for testing (not recommended)
-      address,
-      region,
-      sub_city,
-      woreda,
-      liyu_name,
-      liyu_sign,
-      home_phone,
-      tin_num,
-      bank_name,
-      account_number,
-      national_id,
-      verification: 0,
-      image: req.body.image || 'admin1.jpg',
-      commerce1,
-      commerce2,
-      tin_doc,
+      password: hashedPassword, // Store hashed password
+      image: req.body.image || null, // Optional image
     });
 
     res.status(201).json({
@@ -54,7 +41,6 @@ export const registerSeller = async (req, res) => {
 };
 
 // Seller login
-// Seller login
 export const loginSeller = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -68,9 +54,9 @@ export const loginSeller = async (req, res) => {
       });
     }
 
-    // Compare passwords directly (note: this should be a plain-text comparison)
-    // Replace the hashed password logic with a direct comparison for testing
-    if (seller.password !== password) {
+    // Compare the provided password with the hashed password in the database
+    const isPasswordValid = await bcrypt.compare(password, seller.password);
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password.',
@@ -88,7 +74,6 @@ export const loginSeller = async (req, res) => {
       data: {
         id: seller.id,
         name: seller.name,
-        lname: seller.lname,
         email: seller.email,
         phone: seller.phone,
         image: seller.image,
@@ -101,7 +86,6 @@ export const loginSeller = async (req, res) => {
     });
   }
 };
-
 
 // Get all sellers
 export const getAllSellers = async (req, res) => {
@@ -145,7 +129,7 @@ export const getSellerById = async (req, res) => {
 // Update seller details
 export const updateSeller = async (req, res) => {
   try {
-    const { name, lname, email, phone, password, address, region, sub_city, woreda, liyu_name, liyu_sign, home_phone, tin_num, bank_name, account_number, national_id, commerce1, commerce2, tin_doc } = req.body;
+    const { name, email, phone, password } = req.body;
 
     // Find seller by ID
     const seller = await Seller.findByPk(req.params.id);
@@ -159,24 +143,10 @@ export const updateSeller = async (req, res) => {
     // Update seller details, only hash password if a new one is provided
     const updatedSeller = await seller.update({
       name: name || seller.name,
-      lname: lname || seller.lname,
       email: email || seller.email,
       phone: phone || seller.phone,
       password: password ? await bcrypt.hash(password, 10) : seller.password, // Hash if new password provided
-      address: address || seller.address,
-      region: region || seller.region,
-      sub_city: sub_city || seller.sub_city,
-      woreda: woreda || seller.woreda,
-      liyu_name: liyu_name || seller.liyu_name,
-      liyu_sign: liyu_sign || seller.liyu_sign,
-      home_phone: home_phone || seller.home_phone,
-      tin_num: tin_num || seller.tin_num,
-      bank_name: bank_name || seller.bank_name,
-      account_number: account_number || seller.account_number,
-      national_id: national_id || seller.national_id,
-      commerce1: commerce1 || seller.commerce1,
-      commerce2: commerce2 || seller.commerce2,
-      tin_doc: tin_doc || seller.tin_doc,
+      image: req.body.image || seller.image, // Optional image update
     });
 
     res.status(200).json({
