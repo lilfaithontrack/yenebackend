@@ -1,6 +1,8 @@
 import Seller from '../models/Seller.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 import multer from 'multer'; // Import multer for file uploads
 import path from 'path';
 
@@ -175,6 +177,103 @@ export const deleteSeller = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Seller deleted successfully',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER, // Your email user
+    pass: process.env.EMAIL_PASS, // Your email password or app password
+  },
+});
+
+// Generate a reset password token and send it to the user
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  
+  try {
+    // Find seller by email
+    const seller = await Seller.findOne({ where: { email } });
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Seller not found with that email.',
+      });
+    }
+
+    // Generate a reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    
+    // Save the reset token and its expiration time (1 hour validity)
+    seller.reset_token = resetToken;
+    seller.reset_token_expiry = Date.now() + 3600000; // Token expires in 1 hour
+    await seller.save();
+
+    // Construct the reset password URL (adjust according to your front-end routing)
+    const resetUrl = `http://yourdomain.com/reset-password/${resetToken}`;
+
+    // Send the reset password email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: seller.email,
+      subject: 'Password Reset Request',
+      html: `<p>To reset your password, click on the following link:</p>
+             <a href="${resetUrl}">Reset Password</a>
+             <p>If you didn't request this, please ignore this email.</p>`,
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to send email.',
+        });
+      }
+      res.status(200).json({
+        success: true,
+        message: 'Password reset email sent successfully.',
+      });
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Reset password using the token
+export const resetPassword = async (req, res) => {
+  const { resetToken, newPassword } = req.body;
+
+  try {
+    // Find the seller by reset token
+    const seller = await Seller.findOne({ where: { reset_token: resetToken } });
+    if (!seller || seller.reset_token_expiry < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token.',
+      });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the seller's password and clear reset token fields
+    seller.password = hashedPassword;
+    seller.reset_token = null;
+    seller.reset_token_expiry = null;
+    await seller.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully.',
     });
   } catch (error) {
     res.status(500).json({
