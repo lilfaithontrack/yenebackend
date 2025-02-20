@@ -9,52 +9,83 @@ import path from 'path';
 // Set up multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Save files to the 'uploads' folder
+    cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Append timestamp to avoid name conflicts
+    cb(null, Date.now() + path.extname(file.originalname));
   },
 });
 
 export const upload = multer({ storage });
 
-// Seller registration
-export const registerSeller = async (req, res) => {
-  try {
-    const { name, email, phone, password } = req.body;
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
-    // Check if the seller already exists
+// Store OTPs temporarily (You can use Redis or DB in production)
+const otpStorage = new Map();
+
+// Send OTP
+export const sendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  try {
     const existingSeller = await Seller.findOne({ where: { email } });
     if (existingSeller) {
-      return res.status(400).json({
-        success: false,
-        message: 'Seller already exists with this email.',
-      });
+      return res.status(400).json({ success: false, message: 'Seller already exists with this email.' });
     }
 
-    // Hash the password before saving
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStorage.set(email, { otp, expiresAt: Date.now() + 300000 }); // Expires in 5 minutes
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Your OTP for Registration',
+      text: `Your OTP is: ${otp}. It is valid for 5 minutes.`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ success: true, message: 'OTP sent to email.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Register Seller
+export const registerSeller = async (req, res) => {
+  const { name, email, phone, password, otp } = req.body;
+
+  try {
+    const storedOtp = otpStorage.get(email);
+    if (!storedOtp || storedOtp.otp !== otp || storedOtp.expiresAt < Date.now()) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const seller = await Seller.create({
       name,
       email,
       phone,
-      password: hashedPassword, // Store hashed password
-      image: req.file ? req.file.filename : null, // Handle image upload
-      license_file: req.file ? req.file.filename : null, // Handle license file upload
+      password: hashedPassword,
+      image: req.file ? req.file.filename : null,
+      license_file: req.file ? req.file.filename : null,
     });
 
-    res.status(201).json({
-      success: true,
-      data: seller,
-    });
+    otpStorage.delete(email);
+
+    res.status(201).json({ success: true, data: seller });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // Seller login
 export const loginSeller = async (req, res) => {
