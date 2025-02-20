@@ -1,26 +1,30 @@
 import express from 'express';
-import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword } from '../controllers/sellerController.js';
-import { upload } from '../controllers/sellerController.js';
+import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword, sendOtp, upload } from '../controllers/sellerController.js';
 
 const router = express.Router();
 
-// Seller registration (with file upload support)
-router.post('/register', upload.single('image'), registerSeller); // Supports image file upload
+// Send OTP to email
+router.post('/send-otp', sendOtp);
+
+// Seller registration (with file upload support and OTP verification)
+router.post('/register', upload.fields([{ name: 'image' }, { name: 'license_file' }]), registerSeller);
 
 // Seller login
 router.post('/login', loginSeller);
 
 // Update seller details (with file upload support)
-router.put('/update/:id', upload.single('image'), updateSeller); // Supports image or license file update
+router.put('/update/:id', upload.single('image'), updateSeller);
 
 // Get seller by ID
 router.get('/:id', getSellerById);
 
 // Delete a seller
 router.delete('/:id', deleteSeller);
-// reset password and  forgot pass word
+
+// Reset password and forgot password
 router.post('/forgot-password', forgotPassword);
 
 // Reset password
 router.post('/reset-password', resetPassword);
+
 export default router;
