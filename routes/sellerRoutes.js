@@ -1,10 +1,14 @@
 import express from 'express';
-import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword, sendOtp, upload } from '../controllers/sellerController.js';
+import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword, sendOtp, upload, verifyOtp } from '../controllers/sellerController.js';
 
 const router = express.Router();
 
 // Send OTP to email
 router.post('/send-otp', sendOtp);
+
+//Verify OTP from Email 
+
+router.post('/verify-otp',verifyOtp);
 
 // Seller registration (with file upload support and OTP verification)
 router.post('/register', upload.fields([{ name: 'image' }, { name: 'license_file' }]), registerSeller);
