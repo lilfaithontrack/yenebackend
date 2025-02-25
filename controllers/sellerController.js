@@ -57,7 +57,54 @@ export const sendOtp = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-// register 
+
+// verify otp
+// Verify OTP for registration
+export const verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    // Check if OTP exists for the given email
+    const otpEntry = otpStorage.get(email);
+    if (!otpEntry) {
+      return res.status(400).json({
+        success: false,
+        message: 'No OTP sent for this email.',
+      });
+    }
+
+    // Check if the OTP matches and is still valid
+    if (otpEntry.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP.',
+      });
+    }
+
+    if (otpEntry.expiresAt < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired.',
+      });
+    }
+
+    // OTP is valid
+    res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully.',
+    });
+    
+    // Optionally clear the OTP from storage after successful verification
+    otpStorage.delete(email);
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 
 // Register a new seller
 export const registerSeller = async (req, res) => {
