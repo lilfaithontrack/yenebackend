@@ -22,8 +22,8 @@ export const upload = multer({ storage });
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'kasahunkefyalew42@gmail.com', // Your email
-    pass: 'rhyr iqev kpzk rwig', // Your email password (Highly insecure)
+    user: process.env.EMAIL_USER, // Your email user
+    pass: process.env.EMAIL_PASS, // Your email password or app password
   },
 });
 
@@ -44,7 +44,7 @@ export const sendOtp = async (req, res) => {
     otpStorage.set(email, { otp, expiresAt: Date.now() + 300000 }); // Expires in 5 minutes
 
     const mailOptions = {
-      from: 'kasahunkefyalew42@gmail.com',
+      from: process.env.EMAIL_USER, // Use environment variable for email
       to: email,
       subject: 'Your OTP for Registration',
       text: `Your OTP is: ${otp}. It is valid for 5 minutes.`,
@@ -57,6 +57,7 @@ export const sendOtp = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 // Seller login
 export const loginSeller = async (req, res) => {
   try {
@@ -186,18 +187,11 @@ export const deleteSeller = async (req, res) => {
     });
   }
 };
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER, // Your email user
-    pass: process.env.EMAIL_PASS, // Your email password or app password
-  },
-});
 
 // Generate a reset password token and send it to the user
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
-  
+
   try {
     // Find seller by email
     const seller = await Seller.findOne({ where: { email } });
@@ -210,7 +204,7 @@ export const forgotPassword = async (req, res) => {
 
     // Generate a reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    
+
     // Save the reset token and its expiration time (1 hour validity)
     seller.reset_token = resetToken;
     seller.reset_token_expiry = Date.now() + 3600000; // Token expires in 1 hour
