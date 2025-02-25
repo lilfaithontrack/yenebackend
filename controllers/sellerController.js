@@ -18,15 +18,16 @@ const storage = multer.diskStorage({
 
 export const upload = multer({ storage });
 
+// **Hardcoded Email Credentials (Not Recommended)**
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: 'kasahunkefyalew42@gmail.com', // Your email
+    pass: 'rhyr iqev kpzk rwig', // Your email password (Highly insecure)
   },
 });
 
-// Store OTPs temporarily (You can use Redis or DB in production)
+// Store OTPs temporarily
 const otpStorage = new Map();
 
 // Send OTP
@@ -43,7 +44,7 @@ export const sendOtp = async (req, res) => {
     otpStorage.set(email, { otp, expiresAt: Date.now() + 300000 }); // Expires in 5 minutes
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: 'kasahunkefyalew42@gmail.com',
       to: email,
       subject: 'Your OTP for Registration',
       text: `Your OTP is: ${otp}. It is valid for 5 minutes.`,
@@ -56,37 +57,6 @@ export const sendOtp = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// Register Seller
-export const registerSeller = async (req, res) => {
-  const { name, email, phone, password, otp } = req.body;
-
-  try {
-    const storedOtp = otpStorage.get(email);
-    if (!storedOtp || storedOtp.otp !== otp || storedOtp.expiresAt < Date.now()) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const seller = await Seller.create({
-      name,
-      email,
-      phone,
-      password: hashedPassword,
-      image: req.file ? req.file.filename : null,
-      license_file: req.file ? req.file.filename : null,
-    });
-
-    otpStorage.delete(email);
-
-    res.status(201).json({ success: true, data: seller });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-
 // Seller login
 export const loginSeller = async (req, res) => {
   try {
