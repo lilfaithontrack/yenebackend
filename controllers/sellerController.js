@@ -87,7 +87,12 @@ export const verifyOtp = async (req, res) => {
 
 // Register a new seller
 export const registerSeller = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, name } = req.body;
+
+  // Check if name, email, and password are provided
+  if (!name || !email || !password) {
+    return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
+  }
 
   try {
     // Check if the seller already exists
@@ -100,7 +105,7 @@ export const registerSeller = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new seller
-    const newSeller = await Seller.create({ email, password: hashedPassword });
+    const newSeller = await Seller.create({ email, password: hashedPassword, name });
 
     // Generate JWT token with 1 year expiration
     const token = jwt.sign({ id: newSeller.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
@@ -111,12 +116,14 @@ export const registerSeller = async (req, res) => {
       data: {
         id: newSeller.id,
         email: newSeller.email,
+        name: newSeller.name,
       },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // Seller login
 export const loginSeller = async (req, res) => {
