@@ -47,14 +47,14 @@ const AddProduct = sequelize.define('AddProduct', {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      notEmpty: true,  // Ensure categoryId is an integer
+      notEmpty: true,  // Ensure category is not empty
     },
   },
   subcat: {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      notEmpty: true,  // Ensure subcategoryId is an integer
+      notEmpty: true,  // Ensure subcategory is not empty
     },
   },
   seller_email: {
@@ -85,6 +85,11 @@ const AddProduct = sequelize.define('AddProduct', {
     validate: {
       min: 0,  // Ensure stock is not negative
     },
+  },
+  status: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    allowNull: false,
+    defaultValue: 'pending',  // All products start as 'pending'
   },
 }, {
   tableName: 'products',
