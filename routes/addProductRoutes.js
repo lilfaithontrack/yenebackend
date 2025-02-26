@@ -1,14 +1,14 @@
 import express from 'express';
 import { 
   getAllProducts, 
-  getApprovedProducts,
   getProductById,
   createProduct, 
- createProductForSeller,  // New seller upload function
-  approveProduct,       // New admin approval function
+  createProductForSeller,
   updateProduct, 
-  updateSellerProduct,  // New seller update function
+  updateProductForSeller,
   deleteProduct, 
+  approveProduct,
+  getApprovedProducts,
   upload 
 } from '../controllers/addProductController.js';
 
@@ -17,27 +17,26 @@ const router = express.Router();
 // Route to fetch all products
 router.get('/', getAllProducts);
 
-// Route to get a product by ID
-router.get('/:id', getProductById);
-
-//Route to get a Approved Products
-
+// Route to fetch approved products
 router.get('/approved', getApprovedProducts);
 
-// Route for admin to create a product (goes live immediately)
-router.post('/add', upload.array('image', 10), createProduct); 
+// Route to fetch a product by ID
+router.get('/:id', getProductById); 
 
-// Route for seller to upload a product (requires approval)
+// Route to create a product (admin)
+router.post('/add', upload.array('image', 10), createProduct);
+
+// Route to create a product (seller, requires approval)
 router.post('/seller/add', upload.array('image', 10), createProductForSeller);
 
-// Route for admin to approve/reject a product
-router.put('/approve/:id', approveProduct);
-
-// Route for admin to update a product
+// Route to update a product (admin)
 router.put('/:id', upload.array('image', 10), updateProduct);
 
-// Route for seller to update their own product (can't change status)
-router.put('/seller/:id', upload.array('image', 10), updateSellerProduct);
+// Route to update a product (seller, sets status to pending)
+router.put('/seller/:id', upload.array('image', 10), updateProductForSeller);
+
+// Route to approve a product
+router.put('/approve/:id', approveProduct);
 
 // Route to delete a product by ID
 router.delete('/:id', deleteProduct);
