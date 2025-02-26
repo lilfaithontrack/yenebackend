@@ -198,3 +198,50 @@ export const deleteProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete product.' });
   }
 };
+
+
+// create product for the seller
+export const createProductForSeller = async (req, res) => {
+  try {
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+
+    // Set status to 'pending' for seller uploads
+    const status = 'pending';
+
+    // Optimize and save images
+    const images = [];
+    if (req.files) {
+      for (const file of req.files) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+
+        await sharp(file.buffer)
+          .resize(800) // Resize to 800px width
+          .webp({ quality: 80 }) // Convert to WebP
+          .toFile(optimizedPath);
+
+        images.push(`/uploads/${path.basename(optimizedPath)}`);
+      }
+    }
+
+    const newProduct = await AddProduct.create({
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      status,  // Set status as 'pending'
+      image: images,
+    });
+
+    res.status(201).json({ message: 'Product uploaded successfully, waiting for approval.', product: newProduct });
+  } catch (error) {
+    console.error('Error uploading product for approval:', error);
+    res.status(500).json({ message: 'Failed to upload product for approval', error });
+  }
+};
+
