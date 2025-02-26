@@ -75,6 +75,17 @@ const AddProduct = sequelize.define('AddProduct', {
       this.setDataValue('image', JSON.stringify(value));  // Store the value as a JSON string
     },
   },
+  unit_of_measurement: {
+    type: DataTypes.STRING,
+    allowNull: true,  // Make it optional
+  },
+  stock: {
+    type: DataTypes.INTEGER,
+    allowNull: true,  // Make it optional
+    validate: {
+      min: 0,  // Ensure stock is not negative
+    },
+  },
 }, {
   tableName: 'products',
   timestamps: true,  // Enable timestamps for createdAt and updatedAt fields
