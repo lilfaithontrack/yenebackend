@@ -51,7 +51,14 @@ const app = express();
 
 // Middleware
 app.use(express.json()); // Parse JSON
-app.use(compression());
+app.use(compression({ 
+  level: 6, // Moderate compression (faster than max level 9)
+  threshold: 1024, // Compress responses larger than 1KB
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
 app.use(cors({
   origin: ['http://localhost:3000','https://mobapp.piazdelivery.com','https://piazdelivery.com','https://mobadmin.piazdelivery.com','https://deliveryapp.piazdelivery.com','https://shopper.piazdelivery.com'], // Update to match your frontend URLs
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
