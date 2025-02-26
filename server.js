@@ -1,5 +1,6 @@
 import https from 'https';
 import fs from 'fs';
+import compression from 'compression';
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -50,6 +51,7 @@ const app = express();
 
 // Middleware
 app.use(express.json()); // Parse JSON
+app.use(compression());
 app.use(cors({
   origin: ['http://localhost:3000','https://mobapp.piazdelivery.com','https://piazdelivery.com','https://mobadmin.piazdelivery.com','https://deliveryapp.piazdelivery.com','https://shopper.piazdelivery.com'], // Update to match your frontend URLs
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
