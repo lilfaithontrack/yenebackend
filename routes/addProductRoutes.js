@@ -1,6 +1,7 @@
 import express from 'express';
 import { 
   getAllProducts, 
+  getApprovedProducts,
   getProductById,
   createProduct, 
   sellerUploadProduct,  // New seller upload function
@@ -18,6 +19,10 @@ router.get('/', getAllProducts);
 
 // Route to get a product by ID
 router.get('/:id', getProductById);
+
+//Route to get a Approved Products
+
+router.get('/approved', getApprovedProducts);
 
 // Route for admin to create a product (goes live immediately)
 router.post('/add', upload.array('image', 10), createProduct); 
