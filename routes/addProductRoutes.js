@@ -4,7 +4,7 @@ import {
   getApprovedProducts,
   getProductById,
   createProduct, 
-  sellerUploadProduct,  // New seller upload function
+ createProductForSeller,  // New seller upload function
   approveProduct,       // New admin approval function
   updateProduct, 
   updateSellerProduct,  // New seller update function
@@ -28,7 +28,7 @@ router.get('/approved', getApprovedProducts);
 router.post('/add', upload.array('image', 10), createProduct); 
 
 // Route for seller to upload a product (requires approval)
-router.post('/seller/add', upload.array('image', 10), sellerUploadProduct);
+router.post('/seller/add', upload.array('image', 10), createProductForSeller);
 
 // Route for admin to approve/reject a product
 router.put('/approve/:id', approveProduct);
