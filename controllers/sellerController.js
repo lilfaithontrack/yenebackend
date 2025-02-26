@@ -107,60 +107,7 @@ export const verifyOtp = async (req, res) => {
 
 
 // Register a new seller
-export const registerSeller = async (req, res) => {
-  const { email, password, otp } = req.body;
 
-  try {
-    // Check if OTP exists and is valid
-    const otpEntry = otpStorage.get(email);
-    if (!otpEntry || otpEntry.otp !== otp || otpEntry.expiresAt < Date.now()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired OTP.',
-      });
-    }
-
-    // Check if the seller already exists
-    const existingSeller = await Seller.findOne({ where: { email } });
-    if (existingSeller) {
-      return res.status(400).json({
-        success: false,
-        message: 'Seller already exists with this email.',
-      });
-    }
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create new seller
-    const newSeller = await Seller.create({
-      email,
-      password: hashedPassword,
-    });
-
-    // Clear the OTP from storage as it's used
-    otpStorage.delete(email);
-
-    // Generate JWT token with 1 year expiration
-    const token = jwt.sign({ id: newSeller.id }, process.env.JWT_SECRET, {
-      expiresIn: '1y',
-    });
-
-    res.status(200).json({
-      success: true,
-      token,
-      data: {
-        id: newSeller.id,
-        email: newSeller.email,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
 
 // Seller login
 export const loginSeller = async (req, res) => {
@@ -189,7 +136,48 @@ export const loginSeller = async (req, res) => {
     const token = jwt.sign({ id: seller.id }, process.env.JWT_SECRET, {
       expiresIn: '1y',
     });
+export const registerSeller = async (req, res) => {
+  const { email, password } = req.body;
 
+  try {
+    // Check if the seller already exists
+    const existingSeller = await Seller.findOne({ where: { email } });
+    if (existingSeller) {
+      return res.status(400).json({
+        success: false,
+        message: 'Seller already exists with this email.',
+      });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new seller
+    const newSeller = await Seller.create({
+      email,
+      password: hashedPassword,
+    });
+
+    // Generate JWT token with 1 year expiration
+    const token = jwt.sign({ id: newSeller.id }, process.env.JWT_SECRET, {
+      expiresIn: '1y',
+    });
+
+    res.status(200).json({
+      success: true,
+      token,
+      data: {
+        id: newSeller.id,
+        email: newSeller.email,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
     res.status(200).json({
       success: true,
       token,
