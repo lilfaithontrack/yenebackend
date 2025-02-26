@@ -343,3 +343,17 @@ export const approveProduct = async (req, res) => {
   }
 };
 
+//get approved product 
+
+export const getApprovedProducts = async (req, res) => {
+  try {
+    const products = await AddProduct.findAll({
+      where: { status: 'approved' } // Fetch only approved products
+    });
+
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching approved products:', error);
+    res.status(500).json({ message: 'Failed to fetch approved products' });
+  }
+};
