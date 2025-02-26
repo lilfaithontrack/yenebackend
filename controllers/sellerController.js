@@ -164,12 +164,18 @@ export const loginSeller = async (req, res) => {
 export const updateSeller = async (req, res) => {
   const { name, email, phone, password } = req.body;
 
+  // Ensure that the name is provided for update
+  if (!name) {
+    return res.status(400).json({ success: false, message: 'Name is required.' });
+  }
+
   try {
     const seller = await Seller.findByPk(req.params.id);
     if (!seller) {
       return res.status(404).json({ success: false, message: 'Seller not found' });
     }
 
+    // Update seller data
     const updatedSeller = await seller.update({
       name: name || seller.name,
       email: email || seller.email,
@@ -184,6 +190,7 @@ export const updateSeller = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // Get seller by ID
 export const getSellerById = async (req, res) => {
