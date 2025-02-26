@@ -70,6 +70,9 @@ export const createProduct = async (req, res) => {
   try {
     const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
 
+    // Set status to 'approved' for admin uploads
+    const status = 'approved';
+
     // Optimize and save images
     const images = [];
     if (req.files) {
@@ -96,6 +99,7 @@ export const createProduct = async (req, res) => {
       catItems,
       subcat,
       seller_email,
+      status,  // Set status as 'approved'
       image: images,
     });
 
@@ -106,41 +110,41 @@ export const createProduct = async (req, res) => {
   }
 };
 
+
 // Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
-    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, existingImages } = req.body;
-    
+    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, existingImages } = req.body;
+
     let imageArray = [];
 
-    // Handle existing images passed from the frontend (only store relative paths)
+    // Handle existing images (parse from string if needed)
     if (existingImages) {
       if (typeof existingImages === 'string') {
         try {
-          imageArray = JSON.parse(existingImages); // Parse if passed as a string
+          imageArray = JSON.parse(existingImages);
         } catch (error) {
           console.warn('Error parsing existingImages:', error);
         }
       } else if (Array.isArray(existingImages)) {
-        imageArray = existingImages; // Already an array, so use it
+        imageArray = existingImages;
       }
     }
 
     // Handle new images
     if (req.files && req.files.length > 0) {
-      const uploadedImages = req.files;
-      for (const file of uploadedImages) {
+      for (const file of req.files) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
         await sharp(file.buffer)
-          .resize(800) // Resize to 800px width
-          .webp({ quality: 80 }) // Convert to WebP
+          .resize(800)
+          .webp({ quality: 80 })
           .toFile(optimizedPath);
 
-        imageArray.push(`/uploads/${path.basename(optimizedPath)}`); // Store only relative path
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
-    // Update the product
+    // Update product
     const updatedProduct = await AddProduct.update(
       {
         title,
@@ -153,7 +157,8 @@ export const updateProduct = async (req, res) => {
         seller_email,
         catItems,
         subcat,
-        image: imageArray, // Save as an array of relative paths
+        status, // Admin can update status directly
+        image: imageArray,
       },
       {
         where: { id: req.params.id },
@@ -170,6 +175,72 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product' });
   }
 };
+
+// update for the seller producct 
+
+export const updateProductForSeller = async (req, res) => {
+  try {
+    const { title, price, description, brand, size, sku, color, catItems, subcat, existingImages } = req.body;
+    
+    let imageArray = [];
+
+    // Handle existing images (parse from string if needed)
+    if (existingImages) {
+      if (typeof existingImages === 'string') {
+        try {
+          imageArray = JSON.parse(existingImages);
+        } catch (error) {
+          console.warn('Error parsing existingImages:', error);
+        }
+      } else if (Array.isArray(existingImages)) {
+        imageArray = existingImages;
+      }
+    }
+
+    // Handle new images
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+        await sharp(file.buffer)
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(optimizedPath);
+
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
+      }
+    }
+
+    // Update the product with status set to 'pending' (requires re-approval)
+    const updatedProduct = await AddProduct.update(
+      {
+        title,
+        price,
+        description,
+        brand,
+        size,
+        sku,
+        color,
+        catItems,
+        subcat,
+        status: 'pending', // Seller updates require re-approval
+        image: imageArray,
+      },
+      {
+        where: { id: req.params.id },
+      }
+    );
+
+    if (updatedProduct[0] === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.status(200).json({ message: 'Product updated successfully, awaiting admin approval.' });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ message: 'Failed to update product' });
+  }
+};
+
 
 
 export const deleteProduct = async (req, res) => {
@@ -242,6 +313,33 @@ export const createProductForSeller = async (req, res) => {
   } catch (error) {
     console.error('Error uploading product for approval:', error);
     res.status(500).json({ message: 'Failed to upload product for approval', error });
+  }
+};
+// approval for the seller created product
+
+export const approveProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the product by ID
+    const product = await AddProduct.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found.' });
+    }
+
+    // Check if the product is already approved or not
+    if (product.status === 'approved') {
+      return res.status(400).json({ message: 'Product is already approved.' });
+    }
+
+    // Update the status to 'approved'
+    product.status = 'approved';
+    await product.save();
+
+    res.status(200).json({ message: 'Product approved successfully!', product });
+  } catch (error) {
+    console.error('Error approving product:', error);
+    res.status(500).json({ message: 'Failed to approve product', error });
   }
 };
 
