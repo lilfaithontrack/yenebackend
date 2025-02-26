@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
-import multer from 'multer'; // Import multer for file uploads
+import multer from 'multer'; // For file uploads
 import path from 'path';
 
 // Set up multer storage
@@ -22,8 +22,8 @@ export const upload = multer({ storage });
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER, // Your email user
-    pass: process.env.EMAIL_PASS, // Your email password or app password
+    user: process.env.EMAIL_USER, // Use environment variable for email
+    pass: process.env.EMAIL_PASS, // Use environment variable for password
   },
 });
 
@@ -44,7 +44,7 @@ export const sendOtp = async (req, res) => {
     otpStorage.set(email, { otp, expiresAt: Date.now() + 300000 }); // Expires in 5 minutes
 
     const mailOptions = {
-      from: process.env.EMAIL_USER, // Use environment variable for email
+      from: process.env.EMAIL_USER,
       to: email,
       subject: 'Your OTP for Registration',
       text: `Your OTP is: ${otp}. It is valid for 5 minutes.`,
@@ -58,84 +58,34 @@ export const sendOtp = async (req, res) => {
   }
 };
 
-// verify otp
-// Verify OTP for registration
+// Verify OTP
 export const verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
 
   try {
-    // Check if OTP exists for the given email
     const otpEntry = otpStorage.get(email);
     if (!otpEntry) {
-      return res.status(400).json({
-        success: false,
-        message: 'No OTP sent for this email.',
-      });
+      return res.status(400).json({ success: false, message: 'No OTP sent for this email.' });
     }
 
-    // Check if the OTP matches and is still valid
     if (otpEntry.otp !== otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid OTP.',
-      });
+      return res.status(400).json({ success: false, message: 'Invalid OTP.' });
     }
 
     if (otpEntry.expiresAt < Date.now()) {
-      return res.status(400).json({
-        success: false,
-        message: 'OTP has expired.',
-      });
+      return res.status(400).json({ success: false, message: 'OTP has expired.' });
     }
 
     // OTP is valid
-    res.status(200).json({
-      success: true,
-      message: 'OTP verified successfully.',
-    });
-    
-    // Optionally clear the OTP from storage after successful verification
-    otpStorage.delete(email);
+    res.status(200).json({ success: true, message: 'OTP verified successfully.' });
 
+    otpStorage.delete(email); // Clear the OTP after successful verification
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-
 // Register a new seller
-
-
-// Seller login
-export const loginSeller = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find seller by email
-    const seller = await Seller.findOne({ where: { email } });
-    if (!seller) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password.',
-      });
-    }
-
-    // Compare the provided password with the hashed password in the database
-    const isPasswordValid = await bcrypt.compare(password, seller.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password.',
-      });
-    }
-
-    // Generate JWT token with 1 year expiration
-    const token = jwt.sign({ id: seller.id }, process.env.JWT_SECRET, {
-      expiresIn: '1y',
-    });
 export const registerSeller = async (req, res) => {
   const { email, password } = req.body;
 
@@ -143,27 +93,19 @@ export const registerSeller = async (req, res) => {
     // Check if the seller already exists
     const existingSeller = await Seller.findOne({ where: { email } });
     if (existingSeller) {
-      return res.status(400).json({
-        success: false,
-        message: 'Seller already exists with this email.',
-      });
+      return res.status(400).json({ success: false, message: 'Seller already exists with this email.' });
     }
 
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new seller
-    const newSeller = await Seller.create({
-      email,
-      password: hashedPassword,
-    });
+    const newSeller = await Seller.create({ email, password: hashedPassword });
 
     // Generate JWT token with 1 year expiration
-    const token = jwt.sign({ id: newSeller.id }, process.env.JWT_SECRET, {
-      expiresIn: '1y',
-    });
+    const token = jwt.sign({ id: newSeller.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       token,
       data: {
@@ -172,12 +114,28 @@ export const registerSeller = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Seller login
+export const loginSeller = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const seller = await Seller.findOne({ where: { email } });
+    if (!seller) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, seller.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    // Generate JWT token with 1 year expiration
+    const token = jwt.sign({ id: seller.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
+
     res.status(200).json({
       success: true,
       token,
@@ -191,45 +149,32 @@ export const registerSeller = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // Update seller details
 export const updateSeller = async (req, res) => {
-  try {
-    const { name, email, phone, password } = req.body;
+  const { name, email, phone, password } = req.body;
 
+  try {
     const seller = await Seller.findByPk(req.params.id);
     if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: 'Seller not found',
-      });
+      return res.status(404).json({ success: false, message: 'Seller not found' });
     }
 
-    // Update seller details, hash password if a new one is provided
     const updatedSeller = await seller.update({
       name: name || seller.name,
       email: email || seller.email,
       phone: phone || seller.phone,
       password: password ? await bcrypt.hash(password, 10) : seller.password,
-      image: req.file ? req.file.filename : seller.image, // Update image if new file provided
-      license_file: req.file ? req.file.filename : seller.license_file, // Update license file if new file provided
+      image: req.file ? req.file.filename : seller.image,
+      license_file: req.file ? req.file.filename : seller.license_file,
     });
 
-    res.status(200).json({
-      success: true,
-      data: updatedSeller,
-    });
+    res.status(200).json({ success: true, data: updatedSeller });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -238,21 +183,12 @@ export const getSellerById = async (req, res) => {
   try {
     const seller = await Seller.findByPk(req.params.id);
     if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: 'Seller not found',
-      });
+      return res.status(404).json({ success: false, message: 'Seller not found' });
     }
 
-    res.status(200).json({
-      success: true,
-      data: seller,
-    });
+    res.status(200).json({ success: true, data: seller });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -261,22 +197,13 @@ export const deleteSeller = async (req, res) => {
   try {
     const seller = await Seller.findByPk(req.params.id);
     if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: 'Seller not found',
-      });
+      return res.status(404).json({ success: false, message: 'Seller not found' });
     }
 
     await seller.destroy();
-    res.status(200).json({
-      success: true,
-      message: 'Seller deleted successfully',
-    });
+    res.status(200).json({ success: true, message: 'Seller deleted successfully' });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -285,27 +212,18 @@ export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
-    // Find seller by email
     const seller = await Seller.findOne({ where: { email } });
     if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: 'Seller not found with that email.',
-      });
+      return res.status(404).json({ success: false, message: 'Seller not found with that email.' });
     }
 
-    // Generate a reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
-
-    // Save the reset token and its expiration time (1 hour validity)
     seller.reset_token = resetToken;
     seller.reset_token_expiry = Date.now() + 3600000; // Token expires in 1 hour
     await seller.save();
 
-    // Construct the reset password URL (adjust according to your front-end routing)
     const resetUrl = `http://yourdomain.com/reset-password/${resetToken}`;
 
-    // Send the reset password email
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: seller.email,
@@ -317,21 +235,12 @@ export const forgotPassword = async (req, res) => {
 
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to send email.',
-        });
+        return res.status(500).json({ success: false, message: 'Failed to send email.' });
       }
-      res.status(200).json({
-        success: true,
-        message: 'Password reset email sent successfully.',
-      });
+      res.status(200).json({ success: true, message: 'Password reset email sent successfully.' });
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -340,32 +249,19 @@ export const resetPassword = async (req, res) => {
   const { resetToken, newPassword } = req.body;
 
   try {
-    // Find the seller by reset token
     const seller = await Seller.findOne({ where: { reset_token: resetToken } });
     if (!seller || seller.reset_token_expiry < Date.now()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired reset token.',
-      });
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset token.' });
     }
 
-    // Hash the new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update the seller's password and clear reset token fields
     seller.password = hashedPassword;
     seller.reset_token = null;
     seller.reset_token_expiry = null;
     await seller.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Password reset successfully.',
-    });
+    res.status(200).json({ success: true, message: 'Password reset successfully.' });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
