@@ -8,6 +8,7 @@ import {
   updateProductForSeller,
   deleteProduct, 
   approveProduct,
+   getProductsBySellerEmail,
   getApprovedProducts,
   upload 
 } from '../controllers/addProductController.js';
@@ -19,6 +20,9 @@ router.get('/', getAllProducts);
 
 // Route to fetch approved products
 router.get('/approved', getApprovedProducts);
+
+// get product 
+router.get('/seller/:seller_email', getProductsBySellerEmail);
 
 // Route to fetch a product by ID
 router.get('/:id', getProductById); 
