@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword, sendOtp, upload, verifyOtp } from '../controllers/sellerController.js';
+import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword, sendOtp, upload, verifyOtp, getProductsBySellerEmail } from '../controllers/sellerController.js';
 
 const router = express.Router();
 
@@ -15,6 +15,10 @@ router.post('/register', upload.fields([{ name: 'image' }, { name: 'license_file
 
 // Seller login
 router.post('/login', loginSeller);
+
+// get product by seller email
+router.get('/seller/:seller_email', getProductsBySellerEmail);
+
 
 // Update seller details (with file upload support)
 router.put('/update/:id', upload.single('image'), updateSeller);
