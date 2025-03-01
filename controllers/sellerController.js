@@ -86,16 +86,15 @@ export const verifyOtp = async (req, res) => {
 };
 
 // Register a new seller
+// Register a new seller
 export const registerSeller = async (req, res) => {
   const { email, password, name } = req.body;
 
-  // Check if name, email, and password are provided
   if (!name || !email || !password) {
     return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
   }
 
   try {
-    // Check if the seller already exists
     const existingSeller = await Seller.findOne({ where: { email } });
     if (existingSeller) {
       return res.status(400).json({ success: false, message: 'Seller already exists with this email.' });
@@ -107,8 +106,8 @@ export const registerSeller = async (req, res) => {
     // Create new seller
     const newSeller = await Seller.create({ email, password: hashedPassword, name });
 
-    // Generate JWT token with 1 year expiration
-    const token = jwt.sign({ id: newSeller.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
+    // Generate JWT token with email included in the payload
+    const token = jwt.sign({ id: newSeller.id, email: newSeller.email }, process.env.JWT_SECRET, { expiresIn: '1y' });
 
     res.status(201).json({
       success: true,
@@ -124,6 +123,7 @@ export const registerSeller = async (req, res) => {
   }
 };
 
+// Seller login
 
 // Seller login
 export const loginSeller = async (req, res) => {
@@ -140,8 +140,8 @@ export const loginSeller = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
 
-    // Generate JWT token with 1 year expiration
-    const token = jwt.sign({ id: seller.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
+    // Generate JWT token with email included in the payload
+    const token = jwt.sign({ id: seller.id, email: seller.email }, process.env.JWT_SECRET, { expiresIn: '1y' });
 
     res.status(200).json({
       success: true,
