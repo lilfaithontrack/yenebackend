@@ -41,7 +41,7 @@ import Payment from './models/Payment.js';
 import Shopper from './models/Shopper.js';
 import DeliveryBoy from './models/DeliveryBoy.js';
 import AssignOrder from './models/AssignOrder.js';
-import sellerProductRoutes from './routes/ssellerProductsRoutes.js';
+import sellerProductRoutes from './routes/sellerProductsRoutes.js';
 // Define __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
