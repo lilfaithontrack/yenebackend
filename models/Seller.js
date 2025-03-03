@@ -26,11 +26,11 @@ const Seller = sequelize.define('Seller', {
   },
   image: {
     type: DataTypes.TEXT,
-    allowNull: true, // Make it optional
+    allowNull: true, // Optional profile photo
   },
   license_file: {
     type: DataTypes.TEXT,
-    allowNull: true, // Make license file optional
+    allowNull: true, // Optional license file
   },
   bank: {
     type: DataTypes.TEXT,
@@ -40,9 +40,15 @@ const Seller = sequelize.define('Seller', {
     type: DataTypes.TEXT,
     allowNull: true, // Optional account number
   },
+  status: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'pending', // Default status set to 'pending'
+  },
 }, {
   tableName: 'seller',
   timestamps: false, // Disable automatic timestamps
 });
 
 export default Seller;
+
