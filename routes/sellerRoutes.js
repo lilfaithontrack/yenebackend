@@ -18,6 +18,7 @@ router.post('/login', loginSeller);
 
 // get product by seller email
 
+router.put('/update/:id', upload.fields([{ name: 'image' }, { name: 'license_file' }]), updateSeller);
 
 
 // Update seller details (with file upload support)
