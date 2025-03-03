@@ -86,9 +86,8 @@ export const verifyOtp = async (req, res) => {
 };
 
 // Register a new seller
-// Register a new seller
 export const registerSeller = async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, bank, account_number } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
@@ -104,7 +103,14 @@ export const registerSeller = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new seller
-    const newSeller = await Seller.create({ email, password: hashedPassword, name });
+    const newSeller = await Seller.create({
+      email,
+      password: hashedPassword,
+      name,
+      bank, 
+      account_number,
+      status: 'pending' // Default status set to 'pending'
+    });
 
     // Generate JWT token with email included in the payload
     const token = jwt.sign({ id: newSeller.id, email: newSeller.email }, process.env.JWT_SECRET, { expiresIn: '1y' });
@@ -122,8 +128,6 @@ export const registerSeller = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// Seller login
 
 // Seller login
 export const loginSeller = async (req, res) => {
@@ -153,6 +157,9 @@ export const loginSeller = async (req, res) => {
         phone: seller.phone,
         image: seller.image,
         license_file: seller.license_file,
+        bank: seller.bank,
+        account_number: seller.account_number,
+        status: seller.status, // Send the status
       },
     });
   } catch (error) {
@@ -162,7 +169,7 @@ export const loginSeller = async (req, res) => {
 
 // Update seller details
 export const updateSeller = async (req, res) => {
-  const { name, email, phone, password } = req.body;
+  const { name, email, phone, password, bank, account_number, status } = req.body;
 
   // Ensure that the name is provided for update
   if (!name) {
@@ -183,6 +190,9 @@ export const updateSeller = async (req, res) => {
       password: password ? await bcrypt.hash(password, 10) : seller.password,
       image: req.file ? req.file.filename : seller.image,
       license_file: req.file ? req.file.filename : seller.license_file,
+      bank: bank || seller.bank,
+      account_number: account_number || seller.account_number,
+      status: status || seller.status, // Optionally update status
     });
 
     res.status(200).json({ success: true, data: updatedSeller });
@@ -190,7 +200,6 @@ export const updateSeller = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 
 // Get seller by ID
 export const getSellerById = async (req, res) => {
