@@ -165,7 +165,6 @@ export const loginSeller = async (req, res) => {
 export const updateSeller = async (req, res) => {
   const { name, email, phone, password, bank, account_number, status } = req.body;
 
-  // Ensure that the name is provided for update
   if (!name) {
     return res.status(400).json({ success: false, message: 'Name is required.' });
   }
@@ -176,20 +175,22 @@ export const updateSeller = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Seller not found' });
     }
 
-    // Update seller data
-    const updatedSeller = await seller.update({
+    // Check if files were uploaded and update accordingly
+    const updatedData = {
       name: name || seller.name,
       email: email || seller.email,
       phone: phone || seller.phone,
       password: password ? await bcrypt.hash(password, 10) : seller.password,
-      image: req.file ? req.file.filename : seller.image,
-      license_file: req.file ? req.file.filename : seller.license_file,
       bank: bank || seller.bank,
       account_number: account_number || seller.account_number,
-      status: status || seller.status, // Optionally update status
-    });
+      status: status || seller.status,
+      image: req.files?.image ? req.files.image[0].filename : seller.image,
+      license_file: req.files?.license_file ? req.files.license_file[0].filename : seller.license_file,
+    };
 
-    res.status(200).json({ success: true, data: updatedSeller });
+    await seller.update(updatedData);
+
+    res.status(200).json({ success: true, data: updatedData });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
