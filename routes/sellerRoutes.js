@@ -17,12 +17,8 @@ router.post('/register', upload.fields([{ name: 'image' }, { name: 'license_file
 router.post('/login', loginSeller);
 
 // get product by seller email
+router.put('/update/:id', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'license_file', maxCount: 1 }]), updateSeller);
 
-router.put('/update/:id', upload.fields([{ name: 'image' }, { name: 'license_file' }]), updateSeller);
-
-
-// Update seller details (with file upload support)
-router.put('/update/:id', upload.single('image'), updateSeller);
 
 // Get seller by ID
 router.get('/:id', getSellerById);
