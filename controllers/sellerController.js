@@ -165,10 +165,6 @@ export const loginSeller = async (req, res) => {
 export const updateSeller = async (req, res) => {
   const { name, email, phone, password, bank, account_number, status } = req.body;
 
-  if (!name) {
-    return res.status(400).json({ success: false, message: 'Name is required.' });
-  }
-
   try {
     const seller = await Seller.findByPk(req.params.id);
     if (!seller) {
@@ -184,10 +180,19 @@ export const updateSeller = async (req, res) => {
       bank: bank || seller.bank,
       account_number: account_number || seller.account_number,
       status: status || seller.status,
-      image: req.files?.image ? req.files.image[0].filename : seller.image,
-      license_file: req.files?.license_file ? req.files.license_file[0].filename : seller.license_file,
     };
 
+    // Handle image upload (if provided)
+    if (req.files?.image) {
+      updatedData.image = req.files.image[0].path; // Save the file path
+    }
+
+    // Handle license file upload (if provided)
+    if (req.files?.license_file) {
+      updatedData.license_file = req.files.license_file[0].path; // Save the file path
+    }
+
+    // Update seller data
     await seller.update(updatedData);
 
     res.status(200).json({ success: true, data: updatedData });
@@ -195,7 +200,6 @@ export const updateSeller = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 // Get seller by ID
 export const getSellerById = async (req, res) => {
   try {
