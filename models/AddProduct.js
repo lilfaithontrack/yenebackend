@@ -59,7 +59,7 @@ const AddProduct = sequelize.define('AddProduct', {
   },
   seller_email: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     validate: {
       isEmail: true,  // Ensure the email is in the correct format
     },
