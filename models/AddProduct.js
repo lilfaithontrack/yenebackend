@@ -80,11 +80,9 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: true,  // Make it optional
   },
   stock: {
-    type: DataTypes.INTEGER,
-    allowNull: true,  // Make it optional
-    validate: {
-      min: 0,  // Ensure stock is not negative
-    },
+    type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
+    allowNull: false,
+    defaultValue: 'in_stock',  // Default to 'in_stock'
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
