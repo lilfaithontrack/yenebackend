@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
- // Import AssignOrder first
+// Import AssignOrder first
 
 const Payment = sequelize.define(
   'Payment',
@@ -26,6 +26,16 @@ const Payment = sequelize.define(
     total_price: {
       type: DataTypes.FLOAT,
       allowNull: false,
+    },
+    service_fee: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    delivery_fee: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
     },
     shipping_address: {
       type: DataTypes.STRING,
@@ -53,8 +63,5 @@ const Payment = sequelize.define(
     timestamps: true,
   }
 );
-
-// Make sure the AssignOrder model is imported first before calling associations
-
 
 export default Payment;
