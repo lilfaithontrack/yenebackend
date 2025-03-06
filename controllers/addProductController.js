@@ -68,39 +68,20 @@ export const getProductById = async (req, res) => {
  */
 export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement } = req.body;
+    const status = 'approved'; // Admin uploads are approved immediately
 
-    // Set status to 'approved' for admin uploads
-    const status = 'approved';
-
-    // Optimize and save images
     const images = [];
     if (req.files) {
       for (const file of req.files) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-
-        await sharp(file.buffer)
-          .resize(800) // Resize to 800px width
-          .webp({ quality: 80 }) // Convert to WebP
-          .toFile(optimizedPath);
-
+        await sharp(file.buffer).resize(800).webp({ quality: 80 }).toFile(optimizedPath);
         images.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
     const newProduct = await AddProduct.create({
-      title,
-      sku,
-      color,
-      size,
-      brand,
-      price,
-      description,
-      catItems,
-      subcat,
-      seller_email,
-      status,  // Set status as 'approved'
-      image: images,
+      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, image: images,
     });
 
     res.status(201).json({ message: 'Product created successfully!', product: newProduct });
@@ -109,60 +90,23 @@ export const createProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to create product', error });
   }
 };
-
-
 // Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
-    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, existingImages } = req.body;
+    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, unit_of_measurement, existingImages } = req.body;
+    let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
 
-    let imageArray = [];
-
-    // Handle existing images (parse from string if needed)
-    if (existingImages) {
-      if (typeof existingImages === 'string') {
-        try {
-          imageArray = JSON.parse(existingImages);
-        } catch (error) {
-          console.warn('Error parsing existingImages:', error);
-        }
-      } else if (Array.isArray(existingImages)) {
-        imageArray = existingImages;
-      }
-    }
-
-    // Handle new images
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-        await sharp(file.buffer)
-          .resize(800)
-          .webp({ quality: 80 })
-          .toFile(optimizedPath);
-
+        await sharp(file.buffer).resize(800).webp({ quality: 80 }).toFile(optimizedPath);
         imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
-    // Update product
     const updatedProduct = await AddProduct.update(
-      {
-        title,
-        price,
-        description,
-        brand,
-        size,
-        sku,
-        color,
-        seller_email,
-        catItems,
-        subcat,
-        status, // Admin can update status directly
-        image: imageArray,
-      },
-      {
-        where: { id: req.params.id },
-      }
+      { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, unit_of_measurement, image: imageArray },
+      { where: { id: req.params.id } }
     );
 
     if (updatedProduct[0] === 0) {
