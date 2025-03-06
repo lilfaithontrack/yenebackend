@@ -93,7 +93,12 @@ export const createProduct = async (req, res) => {
 // Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
-    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, unit_of_measurement, existingImages } = req.body;
+    const { 
+      title, price, description, brand, size, sku, color, 
+      seller_email, catItems, subcat, status, unit_of_measurement, 
+      existingImages, stock 
+    } = req.body;  // Destructure stock from the request body
+    
     let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
 
     if (req.files && req.files.length > 0) {
@@ -105,7 +110,22 @@ export const updateProduct = async (req, res) => {
     }
 
     const updatedProduct = await AddProduct.update(
-      { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, unit_of_measurement, image: imageArray },
+      { 
+        title, 
+        price, 
+        description, 
+        brand, 
+        size, 
+        sku, 
+        color, 
+        seller_email, 
+        catItems, 
+        subcat, 
+        status, 
+        unit_of_measurement, 
+        image: imageArray, 
+        stock  // Include stock in the update
+      },
       { where: { id: req.params.id } }
     );
 
