@@ -68,7 +68,7 @@ export const getProductById = async (req, res) => {
  */
 export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, "for": productFor } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement,  productfor } = req.body;
     const status = 'approved'; // Admin uploads are approved immediately
 
     const images = [];
@@ -81,7 +81,7 @@ export const createProduct = async (req, res) => {
     }
 
     const newProduct = await AddProduct.create({
-      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, productFor, image: images,
+      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, productfor, image: images,
     });
 
     res.status(201).json({ message: 'Product created successfully!', product: newProduct });
@@ -97,7 +97,7 @@ export const updateProduct = async (req, res) => {
     const { 
       title, price, description, brand, size, sku, color, 
       seller_email, catItems, subcat, status, unit_of_measurement, 
-      existingImages, stock, "for":productFor
+      existingImages, stock, productfor
     } = req.body;  // Destructure stock from the request body
     
     let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
@@ -126,7 +126,7 @@ export const updateProduct = async (req, res) => {
         unit_of_measurement, 
         image: imageArray, 
         stock,
-       productFor// Include stock in the update
+       productfor// Include stock in the update
       },
       { where: { id: req.params.id } }
     );
