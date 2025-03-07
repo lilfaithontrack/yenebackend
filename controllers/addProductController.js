@@ -68,7 +68,7 @@ export const getProductById = async (req, res) => {
  */
 export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, for, seller_email, unit_of_measurement } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, for } = req.body;
     const status = 'approved'; // Admin uploads are approved immediately
 
     const images = [];
