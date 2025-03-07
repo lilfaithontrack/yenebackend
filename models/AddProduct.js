@@ -82,12 +82,12 @@ const AddProduct = sequelize.define('AddProduct', {
   stock: {
     type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
     allowNull: false,
-    defaultValue: 'in_stock',// Default to 'in_stock'
+    defaultValue: 'in_stock',  // Default to 'in_stock'
   },
   productfor: {
-    types:DataTypes.ENUM('for_seller , for_user'),
-    allowNull:false,
-    defualtValue:'for_user',
+    type: DataTypes.ENUM('for_seller', 'for_user'),  // Corrected ENUM definition
+    allowNull: false,
+    defaultValue: 'for_user',  // Corrected typo here
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
