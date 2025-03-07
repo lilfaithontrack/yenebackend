@@ -84,10 +84,10 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: false,
     defaultValue: 'in_stock',// Default to 'in_stock'
   },
-  for:{
+  for: {
     types:DataTypes.ENUM('for_seller , for_user'),
     allowNull:false,
-    defualtValue:'for_user'
+    defualtValue:'for_user',
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
