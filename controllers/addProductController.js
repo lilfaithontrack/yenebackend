@@ -68,7 +68,7 @@ export const getProductById = async (req, res) => {
  */
 export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, "for":productFor } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, "for": productFor } = req.body;
     const status = 'approved'; // Admin uploads are approved immediately
 
     const images = [];
@@ -81,15 +81,16 @@ export const createProduct = async (req, res) => {
     }
 
     const newProduct = await AddProduct.create({
-      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, "for":productFor, image: images,
+      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, productFor, image: images,
     });
 
     res.status(201).json({ message: 'Product created successfully!', product: newProduct });
   } catch (error) {
     console.error('Error creating product:', error);
-    res.status(500).json({ message: 'Failed to create product', error });
+    res.status(500).json({ message: 'Failed to create product', error: error.message });
   }
 };
+
 // Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
@@ -125,7 +126,7 @@ export const updateProduct = async (req, res) => {
         unit_of_measurement, 
         image: imageArray, 
         stock,
-         "for":productFor// Include stock in the update
+       productFor// Include stock in the update
       },
       { where: { id: req.params.id } }
     );
