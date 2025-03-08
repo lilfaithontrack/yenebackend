@@ -139,7 +139,7 @@ export const loginSeller = async (req, res) => {
     }
 
     // Generate JWT token with email included in the payload
-    const token = jwt.sign({ id: seller.id, email: seller.email }, process.env.JWT_SECRET, { expiresIn: '1y' });
+    const token = jwt.sign({ id: seller.id, email: seller.email,status: seller.status }, process.env.JWT_SECRET, { expiresIn: '1y' });
 
     res.status(200).json({
       success: true,
