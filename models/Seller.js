@@ -49,7 +49,7 @@ const Seller = sequelize.define('Seller', {
     type: DataTypes.STRING,
     allowNull: true, 
   },
-  adress:{
+ address:{
     type: DataTypes.STRING,
     allowNull: true,
   },
