@@ -45,6 +45,14 @@ const Seller = sequelize.define('Seller', {
     allowNull: false,
     defaultValue: 'pending', // Default status set to 'pending'
   },
+  code: {
+    type: DataTypes.STRING,
+    allowNull: true, 
+  },
+  adress:{
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 }, {
   tableName: 'seller',
   timestamps: false, // Disable automatic timestamps
