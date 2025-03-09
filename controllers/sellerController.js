@@ -163,7 +163,7 @@ export const loginSeller = async (req, res) => {
 
 // Update seller details
 export const updateSeller = async (req, res) => {
-  const { name, email, phone, password, bank, account_number, status } = req.body;
+  const { name, email, phone, password, bank, account_number, status , code, address } = req.body;
 
   try {
     const seller = await Seller.findByPk(req.params.id);
@@ -180,6 +180,8 @@ export const updateSeller = async (req, res) => {
       bank: bank || seller.bank,
       account_number: account_number || seller.account_number,
       status: status || seller.status,
+      code: code || seller.code,
+      address:code || seller.address
     };
 
     // Handle image upload (if provided)
