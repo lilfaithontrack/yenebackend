@@ -181,7 +181,7 @@ export const updateSeller = async (req, res) => {
       account_number: account_number || seller.account_number,
       status: status || seller.status,
       code: code || seller.code,
-      address:code || seller.address
+      address: address || seller.address
     };
 
     // Handle image upload (if provided)
