@@ -289,3 +289,18 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Get all sellers
+export const getAllSellers = async (req, res) => {
+  try {
+    const sellers = await Seller.findAll(); // Fetch all sellers
+
+    res.status(200).json({
+      success: true,
+      data: sellers,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
