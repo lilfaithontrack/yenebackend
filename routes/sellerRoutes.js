@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword, sendOtp, upload, verifyOtp } from '../controllers/sellerController.js';
+import { registerSeller, loginSeller, updateSeller, getSellerById, deleteSeller, forgotPassword, resetPassword, sendOtp, upload, verifyOtp, getAllSellers } from '../controllers/sellerController.js';
 
 const router = express.Router();
 
@@ -22,6 +22,10 @@ router.put('/update/:id', upload.fields([{ name: 'image', maxCount: 1 }, { name:
 
 // Get seller by ID
 router.get('/:id', getSellerById);
+
+// get seller all id 
+
+router.get('/', getAllSellers);
 
 // Delete a seller
 router.delete('/:id', deleteSeller);
