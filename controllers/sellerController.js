@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
-import multer from 'multer'; // For file uploads
+import multer from 'multer'; // For file uploadsu
 import path from 'path';
 
 // Set up multer storage
@@ -174,17 +174,15 @@ export const updateSeller = async (req, res) => {
 
     // Prepare updated data
     const updatedData = {
-      name: name !== undefined ? name : seller.name,
-      email: email !== undefined ? email : seller.email,
-      phone: phone !== undefined ? phone : seller.phone,
+      name: name || seller.name,
+      email: email || seller.email,
+      phone: phone || seller.phone,
       password: password ? await bcrypt.hash(password, 10) : seller.password,
-      bank: bank !== undefined ? bank : seller.bank,
-      account_number: account_number !== undefined ? account_number : seller.account_number,
-      status: status !== undefined ? status : seller.status,
-      
-      // Fix for code and address fields
-      code: code === "null" ? "" : (code !== undefined ? code : seller.code),
-      address: address === "null" ? "" : (address !== undefined ? address : seller.address),
+      bank: bank || seller.bank,
+      account_number: account_number || seller.account_number,
+      status: status || seller.status,
+      code: code || seller.code,
+      address: address || seller.address, // Ensure address is updated
     };
 
     // Handle image upload (if provided)
