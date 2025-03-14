@@ -54,7 +54,7 @@ const SellerProduct = sequelize.define('SellerProduct', {
     allowNull: true,
   },
   stock: {
-    type: DataTypes.ENUM('out_of_stock','in_stock','limited_stock')
+    type: DataTypes.ENUM('out_of_stock','in_stock','limited_stock'),
     allowNull: true,
   },
   bank: {
