@@ -6,6 +6,7 @@ import {
   getPendingSellerProducts, 
   deleteSellerProduct,
   updateSellerProduct,
+   getAllSellerProducts,
   upload 
 } from '../controllers/sellerProductController.js';
 
@@ -16,6 +17,10 @@ router.post('/add', upload.array('image', 10), createSellerProduct);
 
 // Approve a Seller Product (Admin Only)
 router.put('/approve/:id', approveSellerProduct);
+
+//get all the seller products 
+
+router.get('/', getAllSellerProducts);
 
 //update the seller product 
 
