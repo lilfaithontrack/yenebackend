@@ -21,16 +21,6 @@ export const upload = multer({
     }
   },
 });
-  // unit_of_measurement: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  stock: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-  },
-
-      
 // Create Seller Product (Always Pending)
 export const createSellerProduct = async (req, res) => {
   try {
