@@ -142,7 +142,24 @@ export const approveSellerProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to approve seller product', error });
   }
 };
+// get all products 
+ // Get All Seller Products
+export const getAllSellerProducts = async (req, res) => {
+  try {
+    const products = await SellerProduct.findAll();
 
+    if (products.length === 0) {
+      return res.status(404).json({ message: 'No seller products found.' });
+    }
+
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching all seller products:', error);
+    res.status(500).json({ message: 'Failed to fetch seller products.' });
+  }
+};
+
+       
 // Get Seller Products by Email
 export const getSellerProducts = async (req, res) => {
   try {
