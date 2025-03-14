@@ -21,11 +21,20 @@ export const upload = multer({
     }
   },
 });
+  // unit_of_measurement: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  stock: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 
+      
 // Create Seller Product (Always Pending)
 export const createSellerProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number, unit_of_measurement, stock } = req.body;
 
     const images = [];
     if (req.files) {
@@ -54,6 +63,9 @@ export const createSellerProduct = async (req, res) => {
       seller_email,
       bank,
       account_number,
+      stock,
+      unit_of_measurement,
+      
       status: 'pending', // Always pending
       image: images,
     });
@@ -69,7 +81,7 @@ export const createSellerProduct = async (req, res) => {
 export const updateSellerProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number, stock, unit_of_measurement } = req.body;
 
     const product = await SellerProduct.findByPk(id);
     if (!product) {
@@ -104,6 +116,8 @@ export const updateSellerProduct = async (req, res) => {
       subcat,
       seller_email,
       bank,
+      stock,
+      unit_of_measurement,
       account_number,
       image: images,
     });
