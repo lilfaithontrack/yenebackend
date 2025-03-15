@@ -71,7 +71,7 @@ export const createSellerProduct = async (req, res) => {
 export const updateSellerProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number, stock, unit_of_measurement } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number, stock, unit_of_measurement, status } = req.body;
 
     const product = await SellerProduct.findByPk(id);
     if (!product) {
@@ -107,6 +107,7 @@ export const updateSellerProduct = async (req, res) => {
       seller_email,
       bank,
       stock,
+      status,
       unit_of_measurement,
       account_number,
       image: images,
