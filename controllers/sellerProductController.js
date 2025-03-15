@@ -142,7 +142,44 @@ export const approveSellerProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to approve seller product', error });
   }
 };
-// get all products 
+// decline products 
+
+// update the  seller product status    
+ export const updateSellerProductStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // 'approve' or 'decline'
+
+    if (!['approve', 'decline'].includes(action)) {
+      return res.status(400).json({ message: 'Invalid action. Use "approve" or "decline".' });
+    }
+
+    const product = await SellerProduct.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found.' });
+    }
+
+    if (action === 'approve' && product.status === 'approved') {
+      return res.status(400).json({ message: 'Product is already approved.' });
+    }
+
+    if (action === 'decline' && product.status === 'declined') {
+      return res.status(400).json({ message: 'Product is already declined.' });
+    }
+
+    // Update the status based on the action
+    product.status = action === 'approve' ? 'approved' : 'declined';
+    await product.save();
+
+    res.status(200).json({ 
+      message: `Product ${action}d successfully!`, 
+      product 
+    });
+  } catch (error) {
+    console.error(`Error ${action}ing seller product:`, error);
+    res.status(500).json({ message: `Failed to ${action} seller product.`, error });
+  }
+};
  // Get All Seller Products
 export const getAllSellerProducts = async (req, res) => {
   try {
