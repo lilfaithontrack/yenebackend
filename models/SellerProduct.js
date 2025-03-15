@@ -66,7 +66,7 @@ const SellerProduct = sequelize.define('SellerProduct', {
     allowNull: true, // Optional
   },
   status: {
-    type: DataTypes.ENUM('pending', 'approved'),
+    type: DataTypes.ENUM('pending', 'approved' , 'declined'),
     allowNull: false,
     defaultValue: 'pending', // Always starts as 'pending'
   },
