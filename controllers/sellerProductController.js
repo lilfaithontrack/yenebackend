@@ -71,16 +71,37 @@ export const createSellerProduct = async (req, res) => {
 export const updateSellerProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number, stock, unit_of_measurement, status } = req.body;
+    const { 
+      title, sku, color, size, brand, price, description, 
+      catItems, subcat, seller_email, bank, account_number, 
+      stock, unit_of_measurement, status, existingImages 
+    } = req.body;
 
+    console.log("Update request received for product ID:", id);
+    console.log("Request body:", req.body);
+    console.log("Files received:", req.files);
+    
     const product = await SellerProduct.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
-    // If images are uploaded, process them
-    const images = product.image; // Keep existing images unless new ones are uploaded
+    // Handle existing images
+    let images = [];
+    if (existingImages) {
+      try {
+        // Parse the JSON string of existing images
+        images = JSON.parse(existingImages);
+        console.log("Parsed existing images:", images);
+      } catch (e) {
+        console.error('Error parsing existingImages:', e);
+        return res.status(400).json({ message: 'Invalid existingImages format' });
+      }
+    }
+
+    // Process new images if any
     if (req.files && req.files.length > 0) {
+      console.log("Processing new images:", req.files.length);
       for (const file of req.files) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
 
@@ -89,9 +110,13 @@ export const updateSellerProduct = async (req, res) => {
           .webp({ quality: 80 })
           .toFile(optimizedPath);
 
-        images.push(`/uploads/${path.basename(optimizedPath)}`);
+        const imagePath = `/uploads/${path.basename(optimizedPath)}`;
+        images.push(imagePath);
+        console.log("Added new image:", imagePath);
       }
     }
+
+    console.log("Final image array for update:", images);
 
     // Update product fields
     await product.update({
@@ -110,13 +135,19 @@ export const updateSellerProduct = async (req, res) => {
       status,
       unit_of_measurement,
       account_number,
-      image: images,
+      image: images, // Use the combined images array
     });
 
-    res.status(200).json({ message: 'Seller product updated successfully!', product });
+    res.status(200).json({ 
+      message: 'Seller product updated successfully!', 
+      product: {
+        ...product.toJSON(),
+        image: images // Ensure the response includes the updated images
+      }
+    });
   } catch (error) {
     console.error('Error updating seller product:', error);
-    res.status(500).json({ message: 'Failed to update seller product.', error });
+    res.status(500).json({ message: 'Failed to update seller product.', error: error.message });
   }
 };
 
