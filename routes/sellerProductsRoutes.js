@@ -27,8 +27,7 @@ router.put('/updatestatus/:id', updateSellerProductStatus);
 router.get('/', getAllSellerProducts);
 
 //update the seller product 
-
-router.put('/update/:id',  updateSellerProduct);
+router.put('/update/:id', upload.array('image', 10), updateSellerProduct);
 
 // Get All Pending Seller Products (Admin)
 router.get('/pending', getPendingSellerProducts);
