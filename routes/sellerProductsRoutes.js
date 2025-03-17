@@ -6,6 +6,7 @@ import {
   getPendingSellerProducts, 
   deleteSellerProduct,
   updateSellerProduct,
+  getApprovedSellerProducts,
   updateSellerProductStatus,
    getAllSellerProducts,
   upload 
@@ -25,6 +26,9 @@ router.put('/updatestatus/:id', updateSellerProductStatus);
 //get all the seller products 
 
 router.get('/', getAllSellerProducts);
+
+//get the approve products 
+router.get('/', getApprovedSellerProducts);
 
 //update the seller product 
 router.put('/update/:id', upload.array('image', 10), updateSellerProduct);
