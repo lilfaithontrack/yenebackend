@@ -256,6 +256,17 @@ export const getPendingSellerProducts = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch pending seller products.' });
   }
 };
+// Get All approved seller Products
+
+export const getApprovedSellerProducts = async ( req, res) =>{
+  try {
+    const products = await SellerProduct.findAll({where: { status: 'approved'} });
+      res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching Approved seller products:', error);
+    res.status(500).json({ message: 'Failed to fetch Approved seller products.' });
+  }
+};
 
 // Delete Seller Product
 export const deleteSellerProduct = async (req, res) => {
