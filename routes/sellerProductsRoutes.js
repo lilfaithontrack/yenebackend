@@ -28,7 +28,7 @@ router.put('/updatestatus/:id', updateSellerProductStatus);
 router.get('/', getAllSellerProducts);
 
 //get the approve products 
-router.get('/', getApprovedSellerProducts);
+router.get('/approved', getApprovedSellerProducts);
 
 //update the seller product 
 router.put('/update/:id', upload.array('image', 10), updateSellerProduct);
