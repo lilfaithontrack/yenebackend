@@ -175,6 +175,24 @@ export const approveSellerProduct = async (req, res) => {
   }
 };
 // decline products 
+export const getApprovedSellerProductById = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const product = await SellerProduct.findOne({
+      where: { id, status: 'approved' }
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found or not approved.' });
+    }
+
+    res.status(200).json(product);
+  } catch (error) {
+    console.error('Error fetching Approved seller product by ID:', error);
+    res.status(500).json({ message: 'Failed to fetch Approved seller product.' });
+  }
+};
 
 // update the  seller product status    
  export const updateSellerProductStatus = async (req, res) => {
