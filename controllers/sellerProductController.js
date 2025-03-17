@@ -257,16 +257,26 @@ export const getPendingSellerProducts = async (req, res) => {
   }
 };
 // Get All approved seller Products
-
-export const getApprovedSellerProducts = async ( req, res) =>{
+export const getApprovedSellerProducts = async (req, res) => {
   try {
-    const products = await SellerProduct.findAll({where: { status: 'approved'} });
-      res.status(200).json(products);
+    const { page = 1, limit = 10 } = req.query; // Default pagination values
+    const offset = (page - 1) * limit;
+
+    const products = await SellerProduct.findAll({
+      where: { status: 'approved' },
+      attributes: ['id', 'name', 'price', 'image'], // Adjust based on required fields
+      order: [['createdAt', 'DESC']], // Order by latest products
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    res.status(200).json(products);
   } catch (error) {
-    console.error('Error fetching Approved seller products:', error);
-    res.status(500).json({ message: 'Failed to fetch Approved seller products.' });
+    console.error('Error fetching approved seller products:', error.message);
+    res.status(500).json({ message: 'Failed to fetch approved seller products.', error: error.message });
   }
 };
+
 
 // Delete Seller Product
 export const deleteSellerProduct = async (req, res) => {
