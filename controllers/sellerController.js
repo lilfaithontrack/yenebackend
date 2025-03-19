@@ -163,6 +163,14 @@ export const loginSeller = async (req, res) => {
 
 // Update seller details
 // Update seller details
+const generateToken = (seller) => {
+  return jwt.sign(
+    { id: seller.id, email: seller.email, status: seller.status },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' } // Token valid for 15 minutes
+  );
+};
+
 export const updateSeller = async (req, res) => {
   const { name, email, phone, password, bank, account_number, status, code, address } = req.body;
 
@@ -171,6 +179,9 @@ export const updateSeller = async (req, res) => {
     if (!seller) {
       return res.status(404).json({ success: false, message: 'Seller not found' });
     }
+
+    let newToken = null;
+    const previousStatus = seller.status;
 
     // Prepare updated data
     const updatedData = {
@@ -182,36 +193,35 @@ export const updateSeller = async (req, res) => {
       account_number: account_number || seller.account_number,
       status: status || seller.status,
       code: code || seller.code,
-      address: address || seller.address, // Ensure address is updated
+      address: address || seller.address,
     };
 
     // Handle image upload (if provided)
     if (req.files?.image) {
-      updatedData.image = req.files.image[0].path; // Save the file path
+      updatedData.image = req.files.image[0].path;
     }
 
     // Handle license file upload (if provided)
     if (req.files?.license_file) {
-      updatedData.license_file = req.files.license_file[0].path; // Save the file path
+      updatedData.license_file = req.files.license_file[0].path;
     }
 
     // Update seller data
     await seller.update(updatedData);
 
-    res.status(200).json({ success: true, data: updatedData });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-// Get seller by ID
-export const getSellerById = async (req, res) => {
-  try {
-    const seller = await Seller.findByPk(req.params.id);
-    if (!seller) {
-      return res.status(404).json({ success: false, message: 'Seller not found' });
+    // Fetch the updated seller data from the database
+    const updatedSeller = await Seller.findByPk(req.params.id);
+
+    // If the seller status changes (approved or declined), generate a new token
+    if (status && status !== previousStatus) {
+      newToken = generateToken(updatedSeller); // Use the updated seller data
     }
 
-    res.status(200).json({ success: true, data: seller });
+    res.status(200).json({
+      success: true,
+      data: updatedData,
+      newAccessToken: newToken, // Send new token if status changed
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
