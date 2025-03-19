@@ -314,4 +314,20 @@ export const getAllSellers = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+//get seller by id 
 
+export const getSellerById = async (req, res) => {
+  try {
+    const seller = await Seller.findByPk(req.params.id);
+    if (!seller) {
+      return res.status(404).json({ success: false, message: 'Seller not found' });
+    }
+
+    // Generate a fresh token
+    const newToken = generateToken(seller);
+
+    res.status(200).json({ success: true, data: seller, newAccessToken: newToken });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
