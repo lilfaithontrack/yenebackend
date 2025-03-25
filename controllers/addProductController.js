@@ -356,4 +356,55 @@ export const getProductsBySellerEmail = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch seller products.' });
   }
 };
+const getLocationByCoordinates = async (latitude, longitude) => {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`;
 
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching location data:", error);
+    return null;
+  }
+};
+
+/**
+ * Get products based on user location (latitude and longitude)
+ */
+export const getProductsByLocation = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.query; // Get latitude and longitude from the query parameters
+
+    // Fetch location details from the geolocation API
+    const locationData = await getLocationByCoordinates(latitude, longitude);
+    if (!locationData) {
+      return res.status(400).json({ message: 'Unable to determine location' });
+    }
+
+    // Extract the country or city from the response (you can adjust this based on your needs)
+    const country = locationData.address.country;
+    const city = locationData.address.city || locationData.address.town || locationData.address.village;
+
+    // Fetch products based on location (you can adjust based on pricing, stock, etc.)
+    const products = await AddProduct.findAll({
+      where: {
+        location: {
+          // Example: filter products by country or city
+          [Op.or]: [
+            { country: country },
+            { city: city }
+          ]
+        }
+      }
+    });
+
+    if (products.length === 0) {
+      return res.status(404).json({ message: 'No products found for this location' });
+    }
+
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching products by location:', error);
+    res.status(500).json({ message: 'Failed to fetch products by location' });
+  }
+};
