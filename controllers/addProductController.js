@@ -68,9 +68,10 @@ export const getProductById = async (req, res) => {
  */
 export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement,  productfor } = req.body;
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, productfor, location_prices } = req.body;
     const status = 'approved'; // Admin uploads are approved immediately
 
+    // Handle images
     const images = [];
     if (req.files) {
       for (const file of req.files) {
@@ -80,8 +81,23 @@ export const createProduct = async (req, res) => {
       }
     }
 
+    // Create the product with location-based price if available
     const newProduct = await AddProduct.create({
-      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, productfor, image: images,
+      title, 
+      sku, 
+      color, 
+      size, 
+      brand, 
+      price, 
+      description, 
+      catItems, 
+      subcat, 
+      seller_email, 
+      unit_of_measurement, 
+      status, 
+      productfor, 
+      image: images,
+      location_prices: location_prices || {},  // Use location_prices from the request or default to empty
     });
 
     res.status(201).json({ message: 'Product created successfully!', product: newProduct });
@@ -91,15 +107,12 @@ export const createProduct = async (req, res) => {
   }
 };
 
+
 // Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
-    const { 
-      title, price, description, brand, size, sku, color, 
-      seller_email, catItems, subcat, status, unit_of_measurement, 
-      existingImages, stock, productfor
-    } = req.body;  // Destructure stock from the request body
-    
+    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, unit_of_measurement, existingImages, stock, productfor, location_prices } = req.body; // Include location_prices
+
     let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
 
     if (req.files && req.files.length > 0) {
@@ -126,7 +139,8 @@ export const updateProduct = async (req, res) => {
         unit_of_measurement, 
         image: imageArray, 
         stock,
-       productfor// Include stock in the update
+        productfor,
+        location_prices: location_prices || {}, // Update the location_prices field
       },
       { where: { id: req.params.id } }
     );
