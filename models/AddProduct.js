@@ -10,12 +10,21 @@ const AddProduct = sequelize.define('AddProduct', {
   sku: {
     type: DataTypes.STRING,
     allowNull: true,
-    validate: { is: /^[a-zA-Z0-9-_]+$/i },
-    unique: true,
+    validate: {
+      isAlphanumeric: true,  // Ensure SKU is alphanumeric (optional)
+    },
+ color: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
-  color: DataTypes.STRING,
-  size: DataTypes.STRING,
-  brand: DataTypes.STRING,
+  size: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  brand: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   price: {
     type: DataTypes.FLOAT,
     allowNull: false,
