@@ -184,9 +184,12 @@ export const updateProduct = async (req, res) => {
     }
 
     // Define updatedLocationPrices
-    const updatedLocationPrices = location_prices
-      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
-      : { 'Addis Ababa': price, ...product.location_prices };
+    let updatedLocationPrices = {};
+    if (location_prices && typeof location_prices === 'object') {
+      updatedLocationPrices = { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices };
+    } else {
+      updatedLocationPrices = { 'Addis Ababa': price, ...product.location_prices };
+    }
 
     // Log final object to update
     console.log("Final object to update:", {
@@ -228,6 +231,7 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product', error: error.message });
   }
 };
+
 
 
 // Backend part of handling existing images in update request
