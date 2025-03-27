@@ -127,83 +127,94 @@ export const createProduct = async (req, res) => {
 };
 // update product 
 export const updateProduct = async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { 
-        title, sku, color, size, brand, price, description, 
-        catItems, subcat, stock, unit_of_measurement, status, existingImages 
-      } = req.body;
-  
-      console.log("Update request received for product ID:", id);
-      console.log("Request body:", req.body);
-      console.log("Files received:", req.files);
-      
-      const product = await Product.findByPk(id);
-      if (!product) {
-        return res.status(404).json({ message: 'Product not found.' });
+  try {
+    const { id } = req.params;
+    const { 
+      title, sku, color, size, brand, price, description, 
+      catItems, subcat, stock, unit_of_measurement, status, existingImages 
+    } = req.body;
+
+    console.log("Update request received for product ID:", id);
+    console.log("Request body:", req.body);
+    console.log("Files received:", req.files);
+
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found.' });
+    }
+
+    // Validate the inputs (optional)
+    if (!title || !sku || !price) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+
+    // Handle existing images
+    let images = [];
+    if (existingImages) {
+      try {
+        // Parse the JSON string of existing images
+        images = JSON.parse(existingImages);
+        console.log("Parsed existing images:", images);
+      } catch (e) {
+        console.error('Error parsing existingImages:', e);
+        return res.status(400).json({ message: 'Invalid existingImages format' });
       }
-  
-      // Handle existing images
-      let images = [];
-      if (existingImages) {
+    }
+
+    // Process new images if any
+    if (req.files && req.files.length > 0) {
+      console.log("Processing new images:", req.files.length);
+      for (const file of req.files) {
         try {
-          // Parse the JSON string of existing images
-          images = JSON.parse(existingImages);
-          console.log("Parsed existing images:", images);
-        } catch (e) {
-          console.error('Error parsing existingImages:', e);
-          return res.status(400).json({ message: 'Invalid existingImages format' });
-        }
-      }
-  
-      // Process new images if any
-      if (req.files && req.files.length > 0) {
-        console.log("Processing new images:", req.files.length);
-        for (const file of req.files) {
-          const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-  
+          const fileName = `${id}-${Date.now()}-${file.originalname}`;
+          const optimizedPath = path.join(__dirname, '../uploads', `${fileName}.webp`);
+
           await sharp(file.buffer)
             .resize(800)
             .webp({ quality: 80 })
             .toFile(optimizedPath);
-  
+
           const imagePath = `/uploads/${path.basename(optimizedPath)}`;
           images.push(imagePath);
           console.log("Added new image:", imagePath);
+        } catch (err) {
+          console.error('Error processing image:', err);
+          return res.status(500).json({ message: 'Error processing image', error: err.message });
         }
       }
-  
-      console.log("Final image array for update:", images);
-  
-      // Update product fields
-      await product.update({
-        title,
-        sku,
-        color,
-        size,
-        brand,
-        price,
-        description,
-        catItems,
-        subcat,
-        stock,
-        status,
-        unit_of_measurement,
-        image: images, // Use the combined images array
-      });
-  
-      res.status(200).json({ 
-        message: ' product updated successfully!', 
-        product: {
-          ...product.toJSON(),
-          image: images // Ensure the response includes the updated images
-        }
-      });
-    } catch (error) {
-      console.error('Error updating  product:', error);
-      res.status(500).json({ message: 'Failed to update  product.', error: error.message });
     }
-  };
+
+    console.log("Final image array for update:", images);
+
+    // Update product fields
+    await product.update({
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      stock,
+      status,
+      unit_of_measurement,
+      image: images, // Use the combined images array
+    });
+
+    res.status(200).json({ 
+      message: 'Product updated successfully!', 
+      product: {
+        ...product.toJSON(),
+        image: images // Ensure the response includes the updated images
+      }
+    });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ message: 'Failed to update product.', error: error.message });
+  }
+};
   
 
 // Backend part of handling existing images in update request
