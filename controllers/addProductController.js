@@ -91,54 +91,26 @@ export const createProduct = async (req, res) => {
   }
 };
 
+// Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
     const { 
       title, price, description, brand, size, sku, color, 
       seller_email, catItems, subcat, status, unit_of_measurement, 
       existingImages, stock, productfor
-    } = req.body;
+    } = req.body;  // Destructure stock from the request body
+    
+    let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
 
-    // Handle existing images with robust parsing
-    let imageArray = [];
-    if (existingImages) {
-      try {
-        // If it's a string, parse it as JSON
-        if (typeof existingImages === 'string') {
-          imageArray = JSON.parse(existingImages);
-        } 
-        // If it's already an array, use it directly
-        else if (Array.isArray(existingImages)) {
-          imageArray = existingImages;
-        }
-      } catch (error) {
-        console.error('Error processing existingImages:', error);
-        return res.status(400).json({ 
-          message: 'Invalid existingImages format',
-          details: 'Should be either a JSON string or an array'
-        });
-      }
-    }
-
-    // Process new uploaded files
     if (req.files && req.files.length > 0) {
-      try {
-        for (const file of req.files) {
-          const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-          await sharp(file.buffer)
-            .resize(800)
-            .webp({ quality: 80 })
-            .toFile(optimizedPath);
-          imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
-        }
-      } catch (error) {
-        console.error('Error processing uploaded files:', error);
-        return res.status(500).json({ message: 'Failed to process uploaded images' });
+      for (const file of req.files) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+        await sharp(file.buffer).resize(800).webp({ quality: 80 }).toFile(optimizedPath);
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
-    // Update the product
-    const [updatedCount] = await AddProduct.update(
+    const updatedProduct = await AddProduct.update(
       { 
         title, 
         price, 
@@ -154,30 +126,23 @@ export const updateProduct = async (req, res) => {
         unit_of_measurement, 
         image: imageArray, 
         stock,
-        productfor
+       productfor// Include stock in the update
       },
       { where: { id: req.params.id } }
     );
 
-    if (updatedCount === 0) {
-      return res.status(404).json({ message: 'Product not found or no changes made' });
+    if (updatedProduct[0] === 0) {
+      return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Fetch the updated product to return in response
-    const updatedProduct = await AddProduct.findByPk(req.params.id);
-    res.status(200).json({ 
-      message: 'Product updated successfully',
-      product: updatedProduct
-    });
-
+    res.status(200).json({ message: 'Product updated successfully' });
   } catch (error) {
     console.error('Error updating product:', error);
-    res.status(500).json({ 
-      message: 'Failed to update product',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ message: 'Failed to update product' });
   }
 };
+
+// update for the seller producct 
 
 export const updateProductForSeller = async (req, res) => {
   try {
