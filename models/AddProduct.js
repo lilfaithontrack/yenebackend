@@ -11,9 +11,10 @@ const AddProduct = sequelize.define('AddProduct', {
     type: DataTypes.STRING,
     allowNull: true,
     validate: {
-      isAlphanumeric: true,  // Ensure SKU is alphanumeric (optional)
+      isAlphanumeric: true, // Ensure SKU is alphanumeric (optional)
     },
- color: {
+  }, // <-- Missing closing brace fixed here
+  color: {
     type: DataTypes.STRING,
     allowNull: true,
   },
@@ -55,7 +56,10 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: true,
     defaultValue: [],
   },
-  unit_of_measurement: DataTypes.STRING,
+  unit_of_measurement: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   stock: {
     type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
     allowNull: false,
