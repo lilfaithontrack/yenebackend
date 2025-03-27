@@ -6,13 +6,6 @@ const AddProduct = sequelize.define('AddProduct', {
     type: DataTypes.STRING,
     allowNull: false,
     validate: { notEmpty: true },
-  },
-  sku: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      isAlphanumeric: true, // Ensure SKU is alphanumeric (optional)
-    },
   }, // <-- Missing closing brace fixed here
   color: {
     type: DataTypes.STRING,
