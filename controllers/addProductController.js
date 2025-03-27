@@ -144,9 +144,8 @@ export const updateProduct = async (req, res) => {
       existingImages,
     } = req.body;
 
-    // Log to check the size of location_prices and existingImages
-    console.log("Location Prices size:", Object.keys(location_prices || {}).length);
-    console.log("Existing Images length:", existingImages ? (Array.isArray(existingImages) ? existingImages.length : existingImages.length) : 0);
+    // Logging to inspect the data
+    console.log("Incoming request data:", req.body);
 
     // Find the product by ID
     const product = await AddProduct.findByPk(req.params.id);
@@ -155,6 +154,9 @@ export const updateProduct = async (req, res) => {
     }
 
     let imageArray = product.image || [];
+
+    // Log the image array length
+    console.log("Image Array size before update:", imageArray.length);
 
     // Handle existing images
     if (existingImages) {
@@ -181,15 +183,22 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Ensure location_prices is not too large
-    const updatedLocationPrices = location_prices
-      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
-      : { 'Addis Ababa': price, ...product.location_prices };
-
-    // Limit the number of properties being updated
-    if (Object.keys(updatedLocationPrices).length > 1000) {
-      return res.status(400).json({ message: 'Too many location prices to update' });
-    }
+    // Log final update object before applying
+    console.log("Final object to update:", {
+      title,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      unit_of_measurement,
+      productfor,
+      image: imageArray,
+      location_prices: updatedLocationPrices,
+    });
 
     await product.update({
       title,
@@ -213,6 +222,7 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product', error: error.message });
   }
 };
+
 
 // Backend part of handling existing images in update request
 export const updateProductForSeller = async (req, res) => {
