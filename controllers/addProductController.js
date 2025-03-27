@@ -125,7 +125,88 @@ export const createProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to create product', error: error.message });
   }
 };
+// update product 
+export const updateProduct = async (req, res) => {
+  try {
+    const {
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      unit_of_measurement,
+      productfor,
+      location_prices,
+      existingImages,
+    } = req.body;
 
+    // Find the product by ID
+    const product = await AddProduct.findByPk(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    let imageArray = product.image || [];
+
+    // Handle existing images (parse from string if needed)
+    if (existingImages) {
+      if (typeof existingImages === 'string') {
+        try {
+          imageArray = JSON.parse(existingImages);
+        } catch (error) {
+          console.warn('Error parsing existingImages:', error);
+        }
+      } else if (Array.isArray(existingImages)) {
+        imageArray = existingImages;
+      }
+    }
+
+    // Handle new images
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+        await sharp(file.buffer)
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(optimizedPath);
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
+      }
+    }
+
+    // Preserve existing location prices and ensure Addis Ababa has a price
+    const updatedLocationPrices = location_prices
+      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
+      : { 'Addis Ababa': price, ...product.location_prices };
+
+    // Update the product
+    await product.update({
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      unit_of_measurement,
+      productfor,
+      image: imageArray,
+      location_prices: updatedLocationPrices,
+    });
+
+    res.status(200).json({ message: 'Product updated successfully!' });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ message: 'Failed to update product', error: error.message });
+  }
+};
 
 // Backend part of handling existing images in update request
 export const updateProductForSeller = async (req, res) => {
