@@ -126,7 +126,7 @@ export const createProduct = async (req, res) => {
   }
 };
 // update product 
-export const updateProduct = async (req, res) => {
+export const updateProduct= async (req, res) => {
   try {
     const {
       title,
