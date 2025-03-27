@@ -5,112 +5,86 @@ const AddProduct = sequelize.define('AddProduct', {
   title: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: {
-      notEmpty: true,  // Ensure title is not empty
-    },
+    validate: { notEmpty: true },
   },
   sku: {
     type: DataTypes.STRING,
     allowNull: true,
-    validate: {
-      isAlphanumeric: true,  // Ensure SKU is alphanumeric (optional)
-    },
+    validate: { is: /^[a-zA-Z0-9-_]+$/i },
+    unique: true,
   },
-  color: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  size: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  brand: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+  color: DataTypes.STRING,
+  size: DataTypes.STRING,
+  brand: DataTypes.STRING,
   price: {
     type: DataTypes.FLOAT,
     allowNull: false,
-    validate: {
-      isFloat: true,  // Ensure price is a valid number
-      min: 0,  // Ensure price is a non-negative value
-    },
+    validate: { isFloat: true, min: 0 },
   },
   description: {
     type: DataTypes.TEXT,
     allowNull: false,
-    validate: {
-      notEmpty: true,  // Ensure description is not empty
-    },
+    validate: { notEmpty: true },
   },
   catItems: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: {
-      notEmpty: true,  // Ensure category is not empty
-    },
+    validate: { notEmpty: true },
   },
   subcat: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: {
-      notEmpty: true,  // Ensure subcategory is not empty
-    },
+    validate: { notEmpty: true },
   },
   seller_email: {
     type: DataTypes.STRING,
     allowNull: true,
-    validate: {
-      isEmail: true,  // Ensure the email is in the correct format
-    },
+    validate: { isEmail: true },
   },
   image: {
-    type: DataTypes.JSON,  // Storing an array of image URLs
+    type: DataTypes.JSON,
     allowNull: true,
-    get() {
-      const value = this.getDataValue('image');
-      return value ? JSON.parse(value) : [];  // Parse the JSON array if it exists
-    },
-    set(value) {
-      this.setDataValue('image', JSON.stringify(value));  // Store the value as a JSON string
-    },
+    defaultValue: [],
   },
-  unit_of_measurement: {
-    type: DataTypes.STRING,
-    allowNull: true,  // Make it optional
-  },
+  unit_of_measurement: DataTypes.STRING,
   stock: {
     type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
     allowNull: false,
-    defaultValue: 'in_stock',  // Default to 'in_stock'
+    defaultValue: 'in_stock',
   },
   productfor: {
-    type: DataTypes.ENUM('for_seller', 'for_user'),  // Corrected ENUM definition
+    type: DataTypes.ENUM('for_seller', 'for_user'),
     allowNull: false,
-    defaultValue: 'for_user',  // Corrected typo here
+    defaultValue: 'for_user',
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
     allowNull: false,
-    defaultValue: 'pending',  // All products start as 'pending'
+    defaultValue: 'pending',
+  },
+  reviewed_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
   },
   location_prices: {
-    type: DataTypes.JSON,  // Store location-based prices as a JSON object
+    type: DataTypes.JSON,
     allowNull: true,
-    defaultValue: {}, // Default empty object
+    defaultValue: { 'Addis Ababa': 0 }, // Default price for Addis Ababa
     get() {
       const value = this.getDataValue('location_prices');
-      return value ? JSON.parse(value) : {};  // Parse the JSON array if it exists
+      return value ? JSON.parse(value) : { 'Addis Ababa': 0 }; // Ensure default if null
     },
     set(value) {
-      this.setDataValue('location_prices', JSON.stringify(value));  // Store the value as a JSON string
+      const existingValue = this.getDataValue('location_prices') || {};
+      this.setDataValue('location_prices', JSON.stringify({ ...existingValue, ...value }));
     },
   },
 }, {
   tableName: 'products',
-  timestamps: true,  // Enable timestamps for createdAt and updatedAt fields
-  createdAt: 'created_at',  // Custom column name for createdAt
-  updatedAt: 'updated_at',  // Custom column name for updatedAt
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  indexes: [{ unique: true, fields: ['sku'] }],
 });
 
 export default AddProduct;
