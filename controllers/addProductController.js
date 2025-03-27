@@ -63,16 +63,7 @@ export const getProductById = async (req, res) => {
   }
 };
 
-/**
- * Create a new product with optimized images
- */
-import path from 'path';
-import sharp from 'sharp';
-import { fileURLToPath } from 'url';
-import AddProduct from '../models/AddProduct.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+//
 
 export const createProduct = async (req, res) => {
   try {
