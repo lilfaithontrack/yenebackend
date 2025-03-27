@@ -130,7 +130,6 @@ export const updateProduct= async (req, res) => {
   try {
     const {
       title,
-      sku,
       color,
       size,
       brand,
@@ -186,7 +185,6 @@ export const updateProduct= async (req, res) => {
     // Update the product
     await product.update({
       title,
-      sku,
       color,
       size,
       brand,
