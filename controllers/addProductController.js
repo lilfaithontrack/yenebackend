@@ -128,47 +128,78 @@ export const createProduct = async (req, res) => {
 
 
 // Backend part of handling existing images in update request
-export const updateProduct = async (req, res) => {
+export const updateProductForSeller = async (req, res) => {
   try {
-    const { title, price, description, brand, size, sku, color, seller_email, catItems, subcat, status, unit_of_measurement, existingImages, stock, productfor, location_prices } = req.body; // Include location_prices
+    const { 
+      title, 
+      price, 
+      description, 
+      brand, 
+      size, 
+      sku, 
+      color, 
+      catItems, 
+      subcat, 
+      existingImages, 
+      location_prices 
+    } = req.body;
+    
+    let imageArray = [];
 
-    let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
+    // Handle existing images (parse from string if needed)
+    if (existingImages) {
+      if (typeof existingImages === 'string') {
+        try {
+          imageArray = JSON.parse(existingImages);
+        } catch (error) {
+          console.warn('Error parsing existingImages:', error);
+        }
+      } else if (Array.isArray(existingImages)) {
+        imageArray = existingImages;
+      }
+    }
 
+    // Handle new images
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-        await sharp(file.buffer).resize(800).webp({ quality: 80 }).toFile(optimizedPath);
+        await sharp(file.buffer)
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(optimizedPath);
+
         imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
-    const updatedProduct = await AddProduct.update(
-      { 
-        title, 
-        price, 
-        description, 
-        brand, 
-        size, 
-        sku, 
-        color, 
-        seller_email, 
-        catItems, 
-        subcat, 
-        status, 
-        unit_of_measurement, 
-        image: imageArray, 
-        stock,
-        productfor,
-        location_prices: location_prices || {}, // Update the location_prices field
-      },
-      { where: { id: req.params.id } }
-    );
-
-    if (updatedProduct[0] === 0) {
+    // Find existing product
+    const product = await AddProduct.findByPk(req.params.id);
+    if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    res.status(200).json({ message: 'Product updated successfully' });
+    // Ensure location_prices includes Addis Ababa price by default
+    const updatedLocationPrices = location_prices
+      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
+      : { 'Addis Ababa': price, ...product.location_prices }; // Preserve existing locations
+
+    // Update the product with status set to 'pending' (requires re-approval)
+    await product.update({
+      title,
+      price,
+      description,
+      brand,
+      size,
+      sku,
+      color,
+      catItems,
+      subcat,
+      status: 'pending', // Seller updates require re-approval
+      image: imageArray,
+      location_prices: updatedLocationPrices, // Update location prices
+    });
+
+    res.status(200).json({ message: 'Product updated successfully, awaiting admin approval.' });
   } catch (error) {
     console.error('Error updating product:', error);
     res.status(500).json({ message: 'Failed to update product' });
