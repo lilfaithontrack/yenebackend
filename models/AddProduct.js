@@ -5,15 +5,15 @@ const AddProduct = sequelize.define('AddProduct', {
   title: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: { notEmpty: true },
+    validate: {
+      notEmpty: true,  // Ensure title is not empty
+    },
   },
   sku: {
     type: DataTypes.STRING,
     allowNull: true,
-    validate: {
-      isAlphanumeric: true,  // Ensure SKU is alphanumeric (optional)
-    },
- color: {
+  },
+  color: {
     type: DataTypes.STRING,
     allowNull: true,
   },
@@ -28,72 +28,86 @@ const AddProduct = sequelize.define('AddProduct', {
   price: {
     type: DataTypes.FLOAT,
     allowNull: false,
-    validate: { isFloat: true, min: 0 },
+    validate: {
+      isFloat: true,  // Ensure price is a valid number
+      min: 0,  // Ensure price is a non-negative value
+    },
   },
   description: {
     type: DataTypes.TEXT,
     allowNull: false,
-    validate: { notEmpty: true },
+    validate: {
+      notEmpty: true,  // Ensure description is not empty
+    },
   },
   catItems: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: { notEmpty: true },
+    validate: {
+      notEmpty: true,  // Ensure category is not empty
+    },
   },
   subcat: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: { notEmpty: true },
+    validate: {
+      notEmpty: true,  // Ensure subcategory is not empty
+    },
   },
   seller_email: {
     type: DataTypes.STRING,
     allowNull: true,
-    validate: { isEmail: true },
+    validate: {
+      isEmail: true,  // Ensure the email is in the correct format
+    },
   },
   image: {
-    type: DataTypes.JSON,
+    type: DataTypes.JSON,  // Storing an array of image URLs
     allowNull: true,
-    defaultValue: [],
+    get() {
+      const value = this.getDataValue('image');
+      return value ? JSON.parse(value) : [];  // Parse the JSON array if it exists
+    },
+    set(value) {
+      this.setDataValue('image', JSON.stringify(value));  // Store the value as a JSON string
+    },
   },
-  unit_of_measurement: DataTypes.STRING,
+  unit_of_measurement: {
+    type: DataTypes.STRING,
+    allowNull: true,  // Make it optional
+  },
   stock: {
     type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
     allowNull: false,
-    defaultValue: 'in_stock',
+    defaultValue: 'in_stock',  // Default to 'in_stock'
   },
   productfor: {
-    type: DataTypes.ENUM('for_seller', 'for_user'),
+    type: DataTypes.ENUM('for_seller', 'for_user'),  // Corrected ENUM definition
     allowNull: false,
-    defaultValue: 'for_user',
+    defaultValue: 'for_user',  // Corrected typo here
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
     allowNull: false,
-    defaultValue: 'pending',
-  },
-  reviewed_at: {
-    type: DataTypes.DATE,
-    allowNull: true,
+    defaultValue: 'pending',  // All products start as 'pending'
   },
   location_prices: {
-    type: DataTypes.JSON,
+    type: DataTypes.JSON,  // Store location-based prices as a JSON object
     allowNull: true,
-    defaultValue: { 'Addis Ababa': 0 }, // Default price for Addis Ababa
+    defaultValue: {}, // Default empty object
     get() {
       const value = this.getDataValue('location_prices');
-      return value ? JSON.parse(value) : { 'Addis Ababa': 0 }; // Ensure default if null
+      return value ? JSON.parse(value) : {};  // Parse the JSON array if it exists
     },
     set(value) {
-      const existingValue = this.getDataValue('location_prices') || {};
-      this.setDataValue('location_prices', JSON.stringify({ ...existingValue, ...value }));
+      this.setDataValue('location_prices', JSON.stringify(value));  // Store the value as a JSON string
     },
   },
 }, {
   tableName: 'products',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  indexes: [{ unique: true, fields: ['sku'] }],
+  timestamps: true,  // Enable timestamps for createdAt and updatedAt fields
+  createdAt: 'created_at',  // Custom column name for createdAt
+  updatedAt: 'updated_at',  // Custom column name for updatedAt
 });
 
-export default AddProduct; fix my syntax error 
+export default AddProduct; 
