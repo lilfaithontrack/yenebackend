@@ -7,8 +7,13 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: false,
     validate: { notEmpty: true },
   },
-  sku:{ type : DataTypes.STRING, allowNull: true,},// <-- Missing closing brace fixed here
-  color: {
+  sku: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isAlphanumeric: true,  // Ensure SKU is alphanumeric (optional)
+    },
+ color: {
     type: DataTypes.STRING,
     allowNull: true,
   },
@@ -50,10 +55,7 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: true,
     defaultValue: [],
   },
-  unit_of_measurement: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+  unit_of_measurement: DataTypes.STRING,
   stock: {
     type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
     allowNull: false,
@@ -94,4 +96,4 @@ const AddProduct = sequelize.define('AddProduct', {
   indexes: [{ unique: true, fields: ['sku'] }],
 });
 
-export default AddProduct;
+export default AddProduct; fix my syntax error 
