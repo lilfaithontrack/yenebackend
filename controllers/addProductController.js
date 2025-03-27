@@ -144,7 +144,7 @@ export const updateProduct = async (req, res) => {
       existingImages,
     } = req.body;
 
-    // Log the incoming data
+    // Log the incoming data for debugging
     console.log("Incoming request data:", req.body);
 
     // Find the product by ID
@@ -155,7 +155,7 @@ export const updateProduct = async (req, res) => {
 
     let imageArray = product.image || [];
 
-    // Log the image array length
+    // Log the current image array size
     console.log("Image Array size before update:", imageArray.length);
 
     // Handle existing images
@@ -166,7 +166,7 @@ export const updateProduct = async (req, res) => {
         } catch (error) {
           console.warn('Error parsing existingImages:', error);
         }
-      } else if (Array.isArray(existingImages)) {
+      } else if (Array.isArray(existingImages) && existingImages.length > 0) {
         imageArray = existingImages;
       }
     }
@@ -191,7 +191,7 @@ export const updateProduct = async (req, res) => {
       updatedLocationPrices = { 'Addis Ababa': price, ...product.location_prices };
     }
 
-    // Log final object to update
+    // Log the final object to be updated
     console.log("Final object to update:", {
       title,
       color,
