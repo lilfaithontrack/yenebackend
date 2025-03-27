@@ -144,7 +144,7 @@ export const updateProduct = async (req, res) => {
       existingImages,
     } = req.body;
 
-    // Logging to inspect the data
+    // Log the incoming data
     console.log("Incoming request data:", req.body);
 
     // Find the product by ID
@@ -183,7 +183,12 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Log final update object before applying
+    // Define updatedLocationPrices
+    const updatedLocationPrices = location_prices
+      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
+      : { 'Addis Ababa': price, ...product.location_prices };
+
+    // Log final object to update
     console.log("Final object to update:", {
       title,
       color,
@@ -200,6 +205,7 @@ export const updateProduct = async (req, res) => {
       location_prices: updatedLocationPrices,
     });
 
+    // Update the product
     await product.update({
       title,
       color,
