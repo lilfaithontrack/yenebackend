@@ -215,7 +215,6 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product.', error: error.message });
   }
 };
-  
 
 // Backend part of handling existing images in update request
 export const updateProductForSeller = async (req, res) => {
