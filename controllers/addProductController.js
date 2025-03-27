@@ -138,7 +138,7 @@ export const updateProduct = async (req, res) => {
       console.log("Request body:", req.body);
       console.log("Files received:", req.files);
       
-      const product = await SellerProduct.findByPk(id);
+      const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({ message: 'Product not found.' });
       }
