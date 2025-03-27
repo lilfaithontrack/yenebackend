@@ -126,7 +126,7 @@ export const createProduct = async (req, res) => {
   }
 };
 // update product 
-export const updateProduct= async (req, res) => {
+export const updateProduct = async (req, res) => {
   try {
     const {
       title,
@@ -144,6 +144,10 @@ export const updateProduct= async (req, res) => {
       existingImages,
     } = req.body;
 
+    // Log to check the size of location_prices and existingImages
+    console.log("Location Prices size:", Object.keys(location_prices || {}).length);
+    console.log("Existing Images length:", existingImages ? (Array.isArray(existingImages) ? existingImages.length : existingImages.length) : 0);
+
     // Find the product by ID
     const product = await AddProduct.findByPk(req.params.id);
     if (!product) {
@@ -152,7 +156,7 @@ export const updateProduct= async (req, res) => {
 
     let imageArray = product.image || [];
 
-    // Handle existing images (parse from string if needed)
+    // Handle existing images
     if (existingImages) {
       if (typeof existingImages === 'string') {
         try {
@@ -177,12 +181,16 @@ export const updateProduct= async (req, res) => {
       }
     }
 
-    // Preserve existing location prices and ensure Addis Ababa has a price
+    // Ensure location_prices is not too large
     const updatedLocationPrices = location_prices
       ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
       : { 'Addis Ababa': price, ...product.location_prices };
 
-    // Update the product
+    // Limit the number of properties being updated
+    if (Object.keys(updatedLocationPrices).length > 1000) {
+      return res.status(400).json({ message: 'Too many location prices to update' });
+    }
+
     await product.update({
       title,
       color,
