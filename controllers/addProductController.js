@@ -63,29 +63,14 @@ export const getProductById = async (req, res) => {
   }
 };
 
-//
-
+/**
+ * Create a new product with optimized images
+ */
 export const createProduct = async (req, res) => {
   try {
-    const {
-      title,
-      sku,
-      color,
-      size,
-      brand,
-      price,
-      description,
-      catItems,
-      subcat,
-      seller_email,
-      unit_of_measurement,
-      productfor,
-      location_prices, // Keep as is
-    } = req.body;
-
+    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement,  productfor } = req.body;
     const status = 'approved'; // Admin uploads are approved immediately
 
-    // Handle images
     const images = [];
     if (req.files) {
       for (const file of req.files) {
@@ -95,28 +80,8 @@ export const createProduct = async (req, res) => {
       }
     }
 
-    // Ensure Addis Ababa is included in location_prices
-    const updatedLocationPrices = location_prices
-      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
-      : { 'Addis Ababa': price };
-
-    // Create the product
     const newProduct = await AddProduct.create({
-      title,
-      sku,
-      color,
-      size,
-      brand,
-      price,
-      description,
-      catItems,
-      subcat,
-      seller_email,
-      unit_of_measurement,
-      status,
-      productfor,
-      image: images,
-      location_prices: updatedLocationPrices,
+      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, productfor, image: images,
     });
 
     res.status(201).json({ message: 'Product created successfully!', product: newProduct });
@@ -125,113 +90,63 @@ export const createProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to create product', error: error.message });
   }
 };
-// update product 
+
+// Backend part of handling existing images in update request
 export const updateProduct = async (req, res) => {
   try {
-    const { id } = req.params;
     const { 
-      title, sku, color, size, brand, price, description, 
-      catItems, subcat, stock, unit_of_measurement, status, existingImages 
-    } = req.body;
+      title, price, description, brand, size, sku, color, 
+      seller_email, catItems, subcat, status, unit_of_measurement, 
+      existingImages, stock, productfor
+    } = req.body;  // Destructure stock from the request body
+    
+    let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
 
-    console.log("Update request received for product ID:", id);
-    console.log("Request body:", req.body);
-    console.log("Files received:", req.files);
-
-    const product = await Product.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found.' });
-    }
-
-    // Validate the inputs (optional)
-    if (!title || !sku || !price) {
-      return res.status(400).json({ message: 'Missing required fields.' });
-    }
-
-    // Handle existing images
-    let images = [];
-    if (existingImages) {
-      try {
-        // Parse the JSON string of existing images
-        images = JSON.parse(existingImages);
-        console.log("Parsed existing images:", images);
-      } catch (e) {
-        console.error('Error parsing existingImages:', e);
-        return res.status(400).json({ message: 'Invalid existingImages format' });
-      }
-    }
-
-    // Process new images if any
     if (req.files && req.files.length > 0) {
-      console.log("Processing new images:", req.files.length);
       for (const file of req.files) {
-        try {
-          const fileName = `${id}-${Date.now()}-${file.originalname}`;
-          const optimizedPath = path.join(__dirname, '../uploads', `${fileName}.webp`);
-
-          await sharp(file.buffer)
-            .resize(800)
-            .webp({ quality: 80 })
-            .toFile(optimizedPath);
-
-          const imagePath = `/uploads/${path.basename(optimizedPath)}`;
-          images.push(imagePath);
-          console.log("Added new image:", imagePath);
-        } catch (err) {
-          console.error('Error processing image:', err);
-          return res.status(500).json({ message: 'Error processing image', error: err.message });
-        }
+        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+        await sharp(file.buffer).resize(800).webp({ quality: 80 }).toFile(optimizedPath);
+        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
 
-    console.log("Final image array for update:", images);
+    const updatedProduct = await AddProduct.update(
+      { 
+        title, 
+        price, 
+        description, 
+        brand, 
+        size, 
+        sku, 
+        color, 
+        seller_email, 
+        catItems, 
+        subcat, 
+        status, 
+        unit_of_measurement, 
+        image: imageArray, 
+        stock,
+       productfor// Include stock in the update
+      },
+      { where: { id: req.params.id } }
+    );
 
-    // Update product fields
-    await product.update({
-      title,
-      sku,
-      color,
-      size,
-      brand,
-      price,
-      description,
-      catItems,
-      subcat,
-      stock,
-      status,
-      unit_of_measurement,
-      image: images, // Use the combined images array
-    });
+    if (updatedProduct[0] === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
 
-    res.status(200).json({ 
-      message: 'Product updated successfully!', 
-      product: {
-        ...product.toJSON(),
-        image: images // Ensure the response includes the updated images
-      }
-    });
+    res.status(200).json({ message: 'Product updated successfully' });
   } catch (error) {
     console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Failed to update product.', error: error.message });
+    res.status(500).json({ message: 'Failed to update product' });
   }
 };
 
-// Backend part of handling existing images in update request
+// update for the seller producct 
+
 export const updateProductForSeller = async (req, res) => {
   try {
-    const { 
-      title, 
-      price, 
-      description, 
-      brand, 
-      size, 
-      sku, 
-      color, 
-      catItems, 
-      subcat, 
-      existingImages, 
-      location_prices 
-    } = req.body;
+    const { title, price, description, brand, size, sku, color, catItems, subcat, existingImages } = req.body;
     
     let imageArray = [];
 
@@ -261,32 +176,29 @@ export const updateProductForSeller = async (req, res) => {
       }
     }
 
-    // Find existing product
-    const product = await AddProduct.findByPk(req.params.id);
-    if (!product) {
+    // Update the product with status set to 'pending' (requires re-approval)
+    const updatedProduct = await AddProduct.update(
+      {
+        title,
+        price,
+        description,
+        brand,
+        size,
+        sku,
+        color,
+        catItems,
+        subcat,
+        status: 'pending', // Seller updates require re-approval
+        image: imageArray,
+      },
+      {
+        where: { id: req.params.id },
+      }
+    );
+
+    if (updatedProduct[0] === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
-
-    // Ensure location_prices includes Addis Ababa price by default
-    const updatedLocationPrices = location_prices
-      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
-      : { 'Addis Ababa': price, ...product.location_prices }; // Preserve existing locations
-
-    // Update the product with status set to 'pending' (requires re-approval)
-    await product.update({
-      title,
-      price,
-      description,
-      brand,
-      size,
-      sku,
-      color,
-      catItems,
-      subcat,
-      status: 'pending', // Seller updates require re-approval
-      image: imageArray,
-      location_prices: updatedLocationPrices, // Update location prices
-    });
 
     res.status(200).json({ message: 'Product updated successfully, awaiting admin approval.' });
   } catch (error) {
@@ -430,55 +342,4 @@ export const getProductsBySellerEmail = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch seller products.' });
   }
 };
-const getLocationByCoordinates = async (latitude, longitude) => {
-  const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`;
 
-  try {
-    const response = await axios.get(url);
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching location data:", error);
-    return null;
-  }
-};
-
-/**
- * Get products based on user location (latitude and longitude)
- */
-export const getProductsByLocation = async (req, res) => {
-  try {
-    const { latitude, longitude } = req.query; // Get latitude and longitude from the query parameters
-
-    // Fetch location details from the geolocation API
-    const locationData = await getLocationByCoordinates(latitude, longitude);
-    if (!locationData) {
-      return res.status(400).json({ message: 'Unable to determine location' });
-    }
-
-    // Extract the country or city from the response (you can adjust this based on your needs)
-    const country = locationData.address.country;
-    const city = locationData.address.city || locationData.address.town || locationData.address.village;
-
-    // Fetch products based on location (you can adjust based on pricing, stock, etc.)
-    const products = await AddProduct.findAll({
-      where: {
-        location: {
-          // Example: filter products by country or city
-          [Op.or]: [
-            { country: country },
-            { city: city }
-          ]
-        }
-      }
-    });
-
-    if (products.length === 0) {
-      return res.status(404).json({ message: 'No products found for this location' });
-    }
-
-    res.status(200).json(products);
-  } catch (error) {
-    console.error('Error fetching products by location:', error);
-    res.status(500).json({ message: 'Failed to fetch products by location' });
-  }
-};
