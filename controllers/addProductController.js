@@ -66,9 +66,32 @@ export const getProductById = async (req, res) => {
 /**
  * Create a new product with optimized images
  */
+import path from 'path';
+import sharp from 'sharp';
+import { fileURLToPath } from 'url';
+import AddProduct from '../models/AddProduct.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export const createProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, productfor, location_prices } = req.body;
+    const {
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      unit_of_measurement,
+      productfor,
+      location_prices, // Keep as is
+    } = req.body;
+
     const status = 'approved'; // Admin uploads are approved immediately
 
     // Handle images
@@ -81,23 +104,28 @@ export const createProduct = async (req, res) => {
       }
     }
 
-    // Create the product with location-based price if available
+    // Ensure Addis Ababa is included in location_prices
+    const updatedLocationPrices = location_prices
+      ? { 'Addis Ababa': location_prices['Addis Ababa'] ?? price, ...location_prices }
+      : { 'Addis Ababa': price };
+
+    // Create the product
     const newProduct = await AddProduct.create({
-      title, 
-      sku, 
-      color, 
-      size, 
-      brand, 
-      price, 
-      description, 
-      catItems, 
-      subcat, 
-      seller_email, 
-      unit_of_measurement, 
-      status, 
-      productfor, 
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      unit_of_measurement,
+      status,
+      productfor,
       image: images,
-      location_prices: location_prices || {},  // Use location_prices from the request or default to empty
+      location_prices: updatedLocationPrices,
     });
 
     res.status(201).json({ message: 'Product created successfully!', product: newProduct });
