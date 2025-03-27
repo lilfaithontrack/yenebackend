@@ -12,6 +12,9 @@ const AddProduct = sequelize.define('AddProduct', {
   sku: {
     type: DataTypes.STRING,
     allowNull: true,
+    validate: {
+      isAlphanumeric: true,  // Ensure SKU is alphanumeric (optional)
+    },
   },
   color: {
     type: DataTypes.STRING,
@@ -91,18 +94,6 @@ const AddProduct = sequelize.define('AddProduct', {
     allowNull: false,
     defaultValue: 'pending',  // All products start as 'pending'
   },
-  location_prices: {
-    type: DataTypes.JSON,  // Store location-based prices as a JSON object
-    allowNull: true,
-    defaultValue: {}, // Default empty object
-    get() {
-      const value = this.getDataValue('location_prices');
-      return value ? JSON.parse(value) : {};  // Parse the JSON array if it exists
-    },
-    set(value) {
-      this.setDataValue('location_prices', JSON.stringify(value));  // Store the value as a JSON string
-    },
-  },
 }, {
   tableName: 'products',
   timestamps: true,  // Enable timestamps for createdAt and updatedAt fields
@@ -110,4 +101,4 @@ const AddProduct = sequelize.define('AddProduct', {
   updatedAt: 'updated_at',  // Custom column name for updatedAt
 });
 
-export default AddProduct; 
+export default AddProduct;
