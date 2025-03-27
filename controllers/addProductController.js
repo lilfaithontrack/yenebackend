@@ -95,7 +95,7 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { 
-      title, price, description, brand, size, sku, color, 
+      title, price, description, brand, size, color, 
       seller_email, catItems, subcat, status, unit_of_measurement, 
       existingImages, stock, productfor
     } = req.body;  // Destructure stock from the request body
@@ -117,7 +117,6 @@ export const updateProduct = async (req, res) => {
         description, 
         brand, 
         size, 
-        sku, 
         color, 
         seller_email, 
         catItems, 
