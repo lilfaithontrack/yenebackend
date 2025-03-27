@@ -4,7 +4,7 @@ import {
   getProductById,
   createProduct, 
   createProductForSeller,
-
+updateProduct,
   updateProductForSeller,
   deleteProduct, 
   approveProduct,
@@ -37,7 +37,7 @@ router.post('/add', upload.array('image', 10), createProduct);
 router.post('/seller/add', upload.array('image', 10), createProductForSeller);
 
 // Route to update a product (admin)
-//router.put('/:id', upload.array('image', 10), updateProduct);
+router.put('/:id', upload.array('image', 10), updateProduct);
 
 // Route to update a product (seller, sets status to pending)
 router.put('/seller/:id', upload.array('image', 10), updateProductForSeller);
