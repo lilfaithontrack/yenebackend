@@ -9,7 +9,6 @@ updateProduct,
   deleteProduct, 
   approveProduct,
    getProductsBySellerEmail,
-  getProductsByLocation,
   getApprovedProducts,
   upload 
 } from '../controllers/addProductController.js';
@@ -28,7 +27,7 @@ router.get('/seller/:seller_email', getProductsBySellerEmail);
 // Route to fetch a product by ID
 router.get('/:id', getProductById); 
 // Route to get the product by location 
-router.get('/location',  getProductsByLocation); 
+
 
 // Route to create a product (admin)
 router.post('/add', upload.array('image', 10), createProduct);
