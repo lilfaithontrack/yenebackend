@@ -66,7 +66,7 @@ const Product = sequelize.define('Product', {
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
-    defaultValue: 'pending'
+    defaultValue: 'approved'
   },
   stock: {
     type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
