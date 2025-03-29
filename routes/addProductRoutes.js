@@ -1,50 +1,65 @@
 import express from 'express';
 import { 
-  getAllProducts, 
+  getAllProducts,
   getProductById,
-  createProduct, 
-  createProductForSeller,
-updateProduct,
-  updateProductForSeller,
-  deleteProduct, 
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getProductsByLocation,
+  getLocationPrice,
+  updateLocationPrice,
+  getPendingProducts,
   approveProduct,
-   getProductsBySellerEmail,
-  getApprovedProducts,
-  upload 
-} from '../controllers/addProductController.js';
+  upload
+} from '../controllers/productController.js'; // Updated import path
 
 const router = express.Router();
 
-// Route to fetch all products
+// PRODUCT ROUTES WITH LOCATION SUPPORT
+
+// Get products (with optional location filter)
+// GET /products?lat=40.7128&lng=-74.0060&radius=10
+// GET /products?subcat=electronics
 router.get('/', getAllProducts);
 
-// Route to fetch approved products
-router.get('/approved', getApprovedProducts);
+// Get products within specific location radius
+// GET /products/location?lat=40.7128&lng=-74.0060&radius=20
+router.get('/location', getProductsByLocation);
 
-// get product 
-router.get('/seller/:seller_email', getProductsBySellerEmail);
+// Get single product with formatted location data
+// GET /products/123
+router.get('/:id', getProductById);
 
-// Route to fetch a product by ID
-router.get('/:id', getProductById); 
-// Route to get the product by location 
+// Get location-specific price for a product
+// GET /products/123/price?location=NYC
+router.get('/:id/price', getLocationPrice);
 
+// ADMIN ROUTES
 
-// Route to create a product (admin)
-router.post('/add', upload.array('image', 10), createProduct);
+// Create product with full location data
+// POST /products
+router.post('/', upload.array('image', 10), createProduct);
 
-// Route to create a product (seller, requires approval)
-router.post('/seller/add', upload.array('image', 10), createProductForSeller);
-
-// Route to update a product (admin)
+// Update product with location data
+// PUT /products/123
 router.put('/:id', upload.array('image', 10), updateProduct);
 
-// Route to update a product (seller, sets status to pending)
-router.put('/seller/:id', upload.array('image', 10), updateProductForSeller);
+// Approve pending product
+// PUT /products/123/approve
+router.put('/:id/approve', approveProduct);
 
-// Route to approve a product
-router.put('/approve/:id', approveProduct);
+// Get pending products (for admin approval)
+// GET /products/pending
+router.get('/pending', getPendingProducts);
 
-// Route to delete a product by ID
+// Delete product
+// DELETE /products/123
 router.delete('/:id', deleteProduct);
+
+// LOCATION-SPECIFIC PRICING ROUTES
+
+// Update location-specific price
+// PUT /products/123/price/NYC
+router.put('/:id/price/:location', updateLocationPrice);
 
 export default router;
