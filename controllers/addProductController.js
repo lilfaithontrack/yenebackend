@@ -1,4 +1,4 @@
-import AddProduct from '../models/AddProduct.js';
+import Product from '../models/Product.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
@@ -9,34 +9,300 @@ import fs from 'fs/promises';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Middleware for file uploads
-const storage = multer.memoryStorage(); // Use memory storage for image optimization
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
 export const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Unsupported file type.'), false);
-    }
-  },
+    cb(null, allowedTypes.includes(file.mimetype));
+  }
 });
 
-// Controller functions
+// ======================
+// MAIN CONTROLLER METHODS
+// ======================
 
 /**
- * Fetch all products, with optional filtering by subcategory (subcat)
+ * Create product with location data
+ */
+export const createProduct = async (req, res) => {
+  try {
+    const { 
+      title, price, description, brand, size, color,
+      catItems, subcat, unit_of_measurement, stock,
+      // Location fields
+      location_type, location_name, coordinates, location_radius,
+      location_prices, location_stock
+    } = req.body;
+
+    // Process images
+    const images = await processUploadedImages(req.files);
+
+    // Parse coordinates if provided
+    let geoData = null;
+    if (coordinates) {
+      try {
+        const { lat, lng } = JSON.parse(coordinates);
+        geoData = { type: 'Point', coordinates: [lng, lat] };
+      } catch (e) {
+        console.error('Error parsing coordinates:', e);
+      }
+    }
+
+    // Create product
+    const product = await Product.create({
+      title,
+      price,
+      description,
+      brand,
+      size,
+      color,
+      catItems,
+      subcat,
+      unit_of_measurement,
+      stock: stock || 'in_stock',
+      status: 'approved',
+      image: images,
+      // Location data
+      location_type: location_type || 'region',
+      location_name,
+      coordinates: geoData,
+      location_radius: location_radius ? parseFloat(location_radius) : null,
+      location_prices: location_prices ? JSON.parse(location_prices) : {},
+      location_stock: location_stock ? JSON.parse(location_stock) : {}
+    });
+
+    res.status(201).json(product);
+  } catch (error) {
+    console.error('Error creating product:', error);
+    res.status(500).json({ message: 'Failed to create product', error: error.message });
+  }
+};
+
+/**
+ * Update product with location data
+ */
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      existingImages, 
+      coordinates,  // Expects { lat, lng } object
+      ...updateData 
+    } = req.body;
+
+    // Handle images
+    let images = parseExistingImages(existingImages);
+    if (req.files) {
+      const newImages = await processUploadedImages(req.files);
+      images = [...images, ...newImages];
+    }
+
+    // Prepare update object
+    const updateFields = {
+      ...updateData,
+      image: images
+    };
+
+    // Process coordinates if provided
+    if (coordinates) {
+      try {
+        const { lat, lng } = JSON.parse(coordinates);
+        updateFields.coordinates = { type: 'Point', coordinates: [lng, lat] };
+        updateFields.location_type = updateData.location_name ? 'hybrid' : 'coordinates';
+      } catch (e) {
+        console.error('Error parsing coordinates:', e);
+      }
+    }
+
+    // Handle JSON fields
+    if (updateData.location_prices) {
+      updateFields.location_prices = JSON.parse(updateData.location_prices);
+    }
+    if (updateData.location_stock) {
+      updateFields.location_stock = JSON.parse(updateData.location_stock);
+    }
+
+    const [updated] = await Product.update(updateFields, { where: { id } });
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const updatedProduct = await Product.findByPk(id);
+    res.status(200).json(updatedProduct);
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ message: 'Failed to update product' });
+  }
+};
+
+/**
+ * Get products by location (radius search)
+ */
+export const getProductsByLocation = async (req, res) => {
+  try {
+    const { lat, lng, radius = 10 } = req.query; // radius in km
+    
+    if (!lat || !lng) {
+      return res.status(400).json({ message: 'Latitude and longitude are required' });
+    }
+
+    const products = await sequelize.query(`
+      SELECT *, 
+      ST_Distance_Sphere(
+        POINT(?, ?),
+        coordinates
+      ) / 1000 AS distance
+      FROM products
+      WHERE ST_Distance_Sphere(
+        POINT(?, ?),
+        coordinates
+      ) <= ? * 1000
+      AND status = 'approved'
+      ORDER BY distance
+    `, {
+      replacements: [lng, lat, lng, lat, radius],
+      type: sequelize.QueryTypes.SELECT,
+      model: Product,
+      mapToModel: true
+    });
+
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Location search error:', error);
+    res.status(500).json({ message: 'Failed to search by location' });
+  }
+};
+
+/**
+ * Get price for specific location
+ */
+export const getLocationPrice = async (req, res) => {
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const { location } = req.query;
+    const price = product.location_prices[location] || product.price;
+    
+    res.status(200).json({ price });
+  } catch (error) {
+    console.error('Error fetching location price:', error);
+    res.status(500).json({ message: 'Failed to get location price' });
+  }
+};
+
+/**
+ * Update location-specific price
+ */
+export const updateLocationPrice = async (req, res) => {
+  try {
+    const { id, location } = req.params;
+    const { price } = req.body;
+
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const locationPrices = { ...product.location_prices };
+    locationPrices[location] = parseFloat(price);
+    
+    await product.update({ location_prices: locationPrices });
+    res.status(200).json(product);
+  } catch (error) {
+    console.error('Error updating location price:', error);
+    res.status(500).json({ message: 'Failed to update location price' });
+  }
+};
+
+// ======================
+// HELPER FUNCTIONS
+// ======================
+
+async function processUploadedImages(files) {
+  if (!files || files.length === 0) return [];
+  
+  const images = [];
+  for (const file of files) {
+    const filename = `${Date.now()}-${file.originalname}.webp`;
+    const filepath = path.join(__dirname, '../uploads', filename);
+    
+    await sharp(file.buffer)
+      .resize(800)
+      .webp({ quality: 80 })
+      .toFile(filepath);
+    
+    images.push(`/uploads/${filename}`);
+  }
+  return images;
+}
+
+function parseExistingImages(images) {
+  if (!images) return [];
+  return Array.isArray(images) ? images : JSON.parse(images || '[]');
+}
+
+async function deleteProductImages(imagePaths) {
+  if (!imagePaths || imagePaths.length === 0) return;
+  
+  for (const imagePath of imagePaths) {
+    try {
+      const fullPath = path.join(__dirname, '..', imagePath);
+      await fs.unlink(fullPath);
+    } catch (error) {
+      console.error('Error deleting image:', error);
+    }
+  }
+}
+//
+/**
+ * Get all products (with optional subcategory filter)
+ * Now includes location data in responses
  */
 export const getAllProducts = async (req, res) => {
   try {
-    const { subcat } = req.query;
+    const { subcat, lat, lng, radius } = req.query;
 
-    // Fetch all products or filter by subcat
-    const query = subcat ? { where: { subcat } } : {};
-    const products = await AddProduct.findAll(query);
+    // Base query conditions
+    let where = { status: 'approved' };
+    if (subcat) where.subcat = subcat;
 
+    // Location-based query
+    if (lat && lng) {
+      const radiusMeters = (radius || 10) * 1000; // Default 10km radius
+      
+      const products = await sequelize.query(`
+        SELECT *, 
+        ST_Distance_Sphere(
+          POINT(?, ?),
+          coordinates
+        ) / 1000 AS distance
+        FROM products
+        WHERE ST_Distance_Sphere(
+          POINT(?, ?),
+          coordinates
+        ) <= ?
+        AND status = 'approved'
+        ${subcat ? `AND subcat = '${subcat}'` : ''}
+        ORDER BY distance
+      `, {
+        replacements: [lng, lat, lng, lat, radiusMeters],
+        type: sequelize.QueryTypes.SELECT,
+        model: Product,
+        mapToModel: true
+      });
+
+      return res.status(200).json(products);
+    }
+
+    // Regular non-location query
+    const products = await Product.findAll({ where });
     res.status(200).json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
@@ -45,300 +311,30 @@ export const getAllProducts = async (req, res) => {
 };
 
 /**
- * Fetch product by ID
+ * Get product by ID
+ * Enhanced with location data formatting
  */
 export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const product = await AddProduct.findByPk(id);
+    const product = await Product.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
-    res.status(200).json(product);
+    // Format coordinates if they exist
+    const response = product.toJSON();
+    if (product.coordinates) {
+      response.coordinates = {
+        lat: product.coordinates.coordinates[1],
+        lng: product.coordinates.coordinates[0]
+      };
+    }
+
+    res.status(200).json(response);
   } catch (error) {
     console.error('Error fetching product by ID:', error);
     res.status(500).json({ message: 'Failed to fetch product by ID.' });
   }
 };
-
-/**
- * Create a new product with optimized images
- */
-export const createProduct = async (req, res) => {
-  try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement,  productfor } = req.body;
-    const status = 'approved'; // Admin uploads are approved immediately
-
-    const images = [];
-    if (req.files) {
-      for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-        await sharp(file.buffer).resize(800).webp({ quality: 80 }).toFile(optimizedPath);
-        images.push(`/uploads/${path.basename(optimizedPath)}`);
-      }
-    }
-
-    const newProduct = await AddProduct.create({
-      title, sku, color, size, brand, price, description, catItems, subcat, seller_email, unit_of_measurement, status, productfor, image: images,
-    });
-
-    res.status(201).json({ message: 'Product created successfully!', product: newProduct });
-  } catch (error) {
-    console.error('Error creating product:', error);
-    res.status(500).json({ message: 'Failed to create product', error: error.message });
-  }
-};
-
-// Backend part of handling existing images in update request
-export const updateProduct = async (req, res) => {
-  try {
-    const { 
-      title, price, description, brand, size, color, 
-      seller_email, catItems, subcat, status, unit_of_measurement, 
-      existingImages, stock, productfor
-    } = req.body;  // Destructure stock from the request body
-    
-    let imageArray = Array.isArray(existingImages) ? existingImages : JSON.parse(existingImages || '[]');
-
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-        await sharp(file.buffer).resize(800).webp({ quality: 80 }).toFile(optimizedPath);
-        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
-      }
-    }
-
-    const updatedProduct = await AddProduct.update(
-      { 
-        title, 
-        price, 
-        description, 
-        brand, 
-        size, 
-        color, 
-        seller_email, 
-        catItems, 
-        subcat, 
-        status, 
-        unit_of_measurement, 
-        image: imageArray, 
-        stock,
-       productfor// Include stock in the update
-      },
-      { where: { id: req.params.id } }
-    );
-
-    if (updatedProduct[0] === 0) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    res.status(200).json({ message: 'Product updated successfully' });
-  } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Failed to update product' });
-  }
-};
-
-// update for the seller producct 
-
-export const updateProductForSeller = async (req, res) => {
-  try {
-    const { title, price, description, brand, size, sku, color, catItems, subcat, existingImages } = req.body;
-    
-    let imageArray = [];
-
-    // Handle existing images (parse from string if needed)
-    if (existingImages) {
-      if (typeof existingImages === 'string') {
-        try {
-          imageArray = JSON.parse(existingImages);
-        } catch (error) {
-          console.warn('Error parsing existingImages:', error);
-        }
-      } else if (Array.isArray(existingImages)) {
-        imageArray = existingImages;
-      }
-    }
-
-    // Handle new images
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-        await sharp(file.buffer)
-          .resize(800)
-          .webp({ quality: 80 })
-          .toFile(optimizedPath);
-
-        imageArray.push(`/uploads/${path.basename(optimizedPath)}`);
-      }
-    }
-
-    // Update the product with status set to 'pending' (requires re-approval)
-    const updatedProduct = await AddProduct.update(
-      {
-        title,
-        price,
-        description,
-        brand,
-        size,
-        sku,
-        color,
-        catItems,
-        subcat,
-        status: 'pending', // Seller updates require re-approval
-        image: imageArray,
-      },
-      {
-        where: { id: req.params.id },
-      }
-    );
-
-    if (updatedProduct[0] === 0) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    res.status(200).json({ message: 'Product updated successfully, awaiting admin approval.' });
-  } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Failed to update product' });
-  }
-};
-
-
-
-export const deleteProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const product = await AddProduct.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found.' });
-    }
-
-    // Delete associated image files
-    for (const imagePath of product.image) {
-      const filePath = path.join(__dirname, '..', imagePath);
-      try {
-        await fs.unlink(filePath);
-      } catch (err) {
-        console.error('Error deleting file:', filePath, err);
-      }
-    }
-
-    await product.destroy();
-    res.status(200).json({ message: 'Product deleted successfully!' });
-  } catch (error) {
-    console.error('Error deleting product:', error);
-    res.status(500).json({ message: 'Failed to delete product.' });
-  }
-};
-
-
-// create product for the seller
-export const createProductForSeller = async (req, res) => {
-  try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email } = req.body;
-
-    // Set status to 'pending' for seller uploads
-    const status = 'pending';
-
-    // Optimize and save images
-    const images = [];
-    if (req.files) {
-      for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
-
-        await sharp(file.buffer)
-          .resize(800) // Resize to 800px width
-          .webp({ quality: 80 }) // Convert to WebP
-          .toFile(optimizedPath);
-
-        images.push(`/uploads/${path.basename(optimizedPath)}`);
-      }
-    }
-
-    const newProduct = await AddProduct.create({
-      title,
-      sku,
-      color,
-      size,
-      brand,
-      price,
-      description,
-      catItems,
-      subcat,
-      seller_email,
-      status,  // Set status as 'pending'
-      image: images,
-    });
-
-    res.status(201).json({ message: 'Product uploaded successfully, waiting for approval.', product: newProduct });
-  } catch (error) {
-    console.error('Error uploading product for approval:', error);
-    res.status(500).json({ message: 'Failed to upload product for approval', error });
-  }
-};
-// approval for the seller created product
-
-export const approveProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Find the product by ID
-    const product = await AddProduct.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found.' });
-    }
-
-    // Check if the product is already approved or not
-    if (product.status === 'approved') {
-      return res.status(400).json({ message: 'Product is already approved.' });
-    }
-
-    // Update the status to 'approved'
-    product.status = 'approved';
-    await product.save();
-
-    res.status(200).json({ message: 'Product approved successfully!', product });
-  } catch (error) {
-    console.error('Error approving product:', error);
-    res.status(500).json({ message: 'Failed to approve product', error });
-  }
-};
-
-//get approved product 
-
-export const getApprovedProducts = async (req, res) => {
-  try {
-    const products = await AddProduct.findAll({
-      where: { status: 'approved' } // Fetch only approved products
-    });
-
-    res.status(200).json(products);
-  } catch (error) {
-    console.error('Error fetching approved products:', error);
-    res.status(500).json({ message: 'Failed to fetch approved products' });
-  }
-};
-
-export const getProductsBySellerEmail = async (req, res) => {
-  try {
-    const { seller_email } = req.params; // Get seller_email from request params
-
-    const products = await AddProduct.findAll({
-      where: { seller_email } // Filter products by seller_email
-    });
-
-    if (products.length === 0) {
-      return res.status(404).json({ message: 'No products found for this seller.' });
-    }
-
-    res.status(200).json(products);
-  } catch (error) {
-    console.error('Error fetching seller products:', error);
-    res.status(500).json({ message: 'Failed to fetch seller products.' });
-  }
-};
-
