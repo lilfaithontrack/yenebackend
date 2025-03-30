@@ -56,9 +56,15 @@ const Product = sequelize.define('Product', {
     },
   },
   image: {
-    type: DataTypes.JSON,  // JSON can store an array directly
+    type: DataTypes.JSON,  // Storing an array of image URLs
     allowNull: true,
-  },
+    get() {
+      const value = this.getDataValue('image');
+      return value ? JSON.parse(value) : [];  // Parse the JSON array if it exists
+    },
+    set(value) {
+      this.setDataValue('image', JSON.stringify(value));  // Store the value as a JSON string
+    },
   unit_of_measurement: {
     type: DataTypes.STRING,
     allowNull: true,
