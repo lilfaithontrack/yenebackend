@@ -254,14 +254,20 @@ async function deleteProductImages(imagePaths) {
   }
 }
 
+//get all  product function
+
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.findAll();
-    console.log(products); // Check if products are fetched
+    const { subcat } = req.query;
+
+    // Fetch all products or filter by subcat
+    const query = subcat ? { where: { subcat } } : {};
+    const products = await AddProduct.findAll(query);
+
     res.status(200).json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
-    res.status(500).json({ message: 'Failed to fetch products', error: error.message });
+    res.status(500).json({ message: 'Failed to fetch products.' });
   }
 };
 
