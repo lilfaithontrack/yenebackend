@@ -79,7 +79,7 @@ const Product = sequelize.define('Product', {
   sku: {
     type: DataTypes.STRING(255),
     allowNull: true,
-    unique: true
+    unique: true // Keep this unique constraint if needed
   },
   // Location Features
   location_type: {
@@ -124,28 +124,15 @@ const Product = sequelize.define('Product', {
       this.setDataValue('location_stock', validated);
     }
   }
-},{
+}, {
   tableName: 'products',
   timestamps: true,
   createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  indexes: [
-    { fields: ['title'] },
-    { fields: ['status', 'stock'] },
-    { fields: ['catItems', 'subcat'] },
-    { 
-      fields: ['coordinates'],
-      type: 'SPATIAL'  // Correct syntax for MariaDB
-    },
-    { 
-      type: 'FULLTEXT',
-      fields: ['title', 'description'] 
-    }
-  ]
+  updatedAt: 'updated_at'
+  // Removed the indexes array completely
 });
 
-
-// Location Methods
+// Keep your location methods if you need them
 Product.prototype.setLocation = function({ name, lat, lng, radius }) {
   if (lat && lng) {
     this.coordinates = { type: 'Point', coordinates: [lng, lat] };
