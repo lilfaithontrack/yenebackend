@@ -56,15 +56,16 @@ const Product = sequelize.define('Product', {
     },
   },
   image: {
-    type: DataTypes.JSON,  // Storing an array of image URLs
+    type: DataTypes.JSON,
     allowNull: true,
     get() {
       const value = this.getDataValue('image');
-      return value ? JSON.parse(value) : [];  // Parse the JSON array if it exists
+      return value ? JSON.parse(value) : [];
     },
     set(value) {
-      this.setDataValue('image', JSON.stringify(value));  // Store the value as a JSON string
-    },
+      this.setDataValue('image', JSON.stringify(value));
+    }
+  },
   unit_of_measurement: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -125,7 +126,7 @@ const Product = sequelize.define('Product', {
   coordinates: {
     type: DataTypes.GEOMETRY('POINT'),
     allowNull: true,
-    defaultValue: () => ({ type: 'Point', coordinates: [38.74, 9.03] }) // Default must be a function
+    defaultValue: () => ({ type: 'Point', coordinates: [38.74, 9.03] })
   },
   location_radius: {
     type: DataTypes.FLOAT,
