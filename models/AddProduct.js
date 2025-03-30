@@ -124,7 +124,7 @@ const Product = sequelize.define('Product', {
       this.setDataValue('location_stock', validated);
     }
   }
-}, {
+},{
   tableName: 'products',
   timestamps: true,
   createdAt: 'created_at',
@@ -135,7 +135,7 @@ const Product = sequelize.define('Product', {
     { fields: ['catItems', 'subcat'] },
     { 
       fields: ['coordinates'],
-      using: 'SPATIAL' 
+      type: 'SPATIAL'  // Correct syntax for MariaDB
     },
     { 
       type: 'FULLTEXT',
@@ -143,6 +143,7 @@ const Product = sequelize.define('Product', {
     }
   ]
 });
+
 
 // Location Methods
 Product.prototype.setLocation = function({ name, lat, lng, radius }) {
