@@ -331,4 +331,29 @@ export const getProductById = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch product by ID.' });
   }
 };
+export const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    const product = await AddProduct.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found.' });
+    }
+
+    // Delete associated image files
+    for (const imagePath of product.image) {
+      const filePath = path.join(__dirname, '..', imagePath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.error('Error deleting file:', filePath, err);
+      }
+    }
+
+    await product.destroy();
+    res.status(200).json({ message: 'Product deleted successfully!' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).json({ message: 'Failed to delete product.' });
+  }
+};
