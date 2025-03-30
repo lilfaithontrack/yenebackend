@@ -1,4 +1,4 @@
-import Product from '../models/Product.js';
+import Product from '../models/AddProduct.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
