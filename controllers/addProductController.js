@@ -20,13 +20,6 @@ export const upload = multer({
   }
 });
 
-// ======================
-// MAIN CONTROLLER METHODS
-// ======================
-
-/**
- * Create product with location data
- */
 export const createProduct = async (req, res) => {
   try {
     const { 
