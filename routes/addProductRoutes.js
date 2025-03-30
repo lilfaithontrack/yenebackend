@@ -10,7 +10,7 @@ import {
   updateLocationPrice,
 
   upload
-} from '../controllers/productController.js';
+} from '../controllers/addProductController.js';
 
 const router = express.Router();
 
