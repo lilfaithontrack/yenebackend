@@ -21,7 +21,7 @@ router.get('/:id', getProductById); // Get single product
 router.get('/:id/price', getLocationPrice); // Get location price
 
 // PRODUCT MANAGEMENT ROUTES
-router.post('/', upload.array('image', 10),  createProduct); // Create product
+router.post('/add', upload.array('image', 10),  createProduct); // Create product
 router.put('/:id', upload.array('image', 10), updateProduct); // Update product
 router.delete('/:id', deleteProduct); // Delete product
 
