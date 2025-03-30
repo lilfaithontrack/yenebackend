@@ -253,100 +253,19 @@ async function deleteProductImages(imagePaths) {
     }
   }
 }
-//
-/**
- * Get all products (with optional subcategory filter)
- * Now includes location data in responses
- */
+
 export const getAllProducts = async (req, res) => {
   try {
-    const { subcat, lat, lng, radius } = req.query;
-
-    // Base query conditions
-    let where = { status: 'approved' };
-    if (subcat) where.subcat = subcat;
-
-    // Validate coordinates if provided
-    const hasValidCoordinates = lat && lng && 
-                              !isNaN(parseFloat(lat)) && 
-                              !isNaN(parseFloat(lng));
-
-    // Location-based query
-    if (hasValidCoordinates) {
-      const radiusMeters = (radius || 10) * 1000; // Default 10km radius
-      const parsedLat = parseFloat(lat);
-      const parsedLng = parseFloat(lng);
-      
-      const products = await sequelize.query(`
-        SELECT 
-          p.*,
-          ST_Distance_Sphere(
-            POINT(:lng, :lat),
-            coordinates
-          ) / 1000 AS distance
-        FROM products p
-        WHERE ST_Distance_Sphere(
-          POINT(:lng, :lat),
-          coordinates
-        ) <= :radiusMeters
-        AND status = 'approved'
-        ${subcat ? 'AND subcat = :subcat' : ''}
-        ORDER BY distance
-      `, {
-        replacements: { 
-          lat: parsedLat,
-          lng: parsedLng,
-          radiusMeters,
-          ...(subcat && { subcat })
-        },
-        type: sequelize.QueryTypes.SELECT,
-        model: Product,
-        mapToModel: true
-      });
-
-      // Format coordinates in response
-      const formattedProducts = products.map(product => {
-        const productData = product.toJSON();
-        if (product.coordinates) {
-          productData.coordinates = {
-            lat: product.coordinates.coordinates[1],
-            lng: product.coordinates.coordinates[0]
-          };
-        }
-        return productData;
-      });
-
-      return res.status(200).json(formattedProducts);
-    }
-
-    // Regular non-location query
-    const products = await Product.findAll({ where });
-    
-    // Format coordinates in response
-    const formattedProducts = products.map(product => {
-      const productData = product.toJSON();
-      if (product.coordinates) {
-        productData.coordinates = {
-          lat: product.coordinates.coordinates[1],
-          lng: product.coordinates.coordinates[0]
-        };
-      }
-      return productData;
-    });
-
-    res.status(200).json(formattedProducts);
+    const products = await Product.findAll();
+    console.log(products); // Check if products are fetched
+    res.status(200).json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch products.',
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Failed to fetch products', error: error.message });
   }
 };
-/**
- * Get product by ID
- * Enhanced with location data formatting
- */
+
+ 
 export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
