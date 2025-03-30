@@ -262,7 +262,7 @@ export const getAllProducts = async (req, res) => {
 
     // Fetch all products or filter by subcat
     const query = subcat ? { where: { subcat } } : {};
-    const products = await AddProduct.findAll(query);
+    const products = await Product.findAll(query);
 
     res.status(200).json(products);
   } catch (error) {
