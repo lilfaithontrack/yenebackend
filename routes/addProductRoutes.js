@@ -8,8 +8,7 @@ import {
   getProductsByLocation,
   getLocationPrice,
   updateLocationPrice,
-  getPendingProducts,
-  approveProduct,
+
   upload
 } from '../controllers/productController.js';
 
