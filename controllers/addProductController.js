@@ -256,6 +256,14 @@ async function deleteProductImages(imagePaths) {
 
 //get all  product function
 
+const shuffleArray = (array) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+  }
+  return array;
+};
+
 export const getAllProducts = async (req, res) => {
   try {
     const { subcat } = req.query;
@@ -264,13 +272,16 @@ export const getAllProducts = async (req, res) => {
     const query = subcat ? { where: { subcat } } : {};
     const products = await Product.findAll(query);
 
-    res.status(200).json(products);
+    // Shuffle the products
+    const shuffledProducts = shuffleArray(products);
+
+    // Send the shuffled products as the response
+    res.status(200).json(shuffledProducts);
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ message: 'Failed to fetch products.' });
   }
 };
-
  
 export const getProductById = async (req, res) => {
   try {
