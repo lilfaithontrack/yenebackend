@@ -21,10 +21,31 @@ export const upload = multer({
     }
   },
 });
+
 // Create Seller Product (Always Pending)
 export const createSellerProduct = async (req, res) => {
   try {
-    const { title, sku, color, size, brand, price, description, catItems, subcat, seller_email, bank, account_number, unit_of_measurement, stock } = req.body;
+    const {
+      title,
+      sku,
+      color,
+      size,
+      brand,
+      price,
+      description,
+      catItems,
+      subcat,
+      seller_email,
+      bank,
+      account_number,
+      unit_of_measurement,
+      stock,
+      location_prices,  // New field for location-specific prices
+      location_stock,   // New field for location-specific stock status
+      location_name,    // New field for the location name
+      coordinates,      // New field for coordinates (geo data)
+      location_radius,  // New field for location radius
+    } = req.body;
 
     const images = [];
     if (req.files) {
@@ -55,15 +76,27 @@ export const createSellerProduct = async (req, res) => {
       account_number,
       stock,
       unit_of_measurement,
-      
       status: 'pending', // Always pending
       image: images,
+
+      // New fields for location-based data
+      location_prices: location_prices || {},  // Set default if not provided
+      location_stock: location_stock || { "Addis Ababa": "in_stock" }, // Default to 'Addis Ababa'
+      location_name: location_name || 'Addis Ababa', // Default to 'Addis Ababa'
+      coordinates: coordinates || { type: 'Point', coordinates: [38.74, 9.03] }, // Default coordinates
+      location_radius: location_radius || 10, // Default radius to 10
     });
 
-    res.status(201).json({ message: 'Product uploaded successfully, awaiting approval.', product: newProduct });
+    res.status(201).json({
+      message: 'Product uploaded successfully, awaiting approval.',
+      product: newProduct,
+    });
   } catch (error) {
     console.error('Error uploading seller product:', error);
-    res.status(500).json({ message: 'Failed to upload seller product', error });
+    res.status(500).json({
+      message: 'Failed to upload seller product',
+      error,
+    });
   }
 };
 // update the seller prodcuct 
@@ -74,7 +107,8 @@ export const updateSellerProduct = async (req, res) => {
     const { 
       title, sku, color, size, brand, price, description, 
       catItems, subcat, seller_email, bank, account_number, 
-      stock, unit_of_measurement, status, existingImages 
+      stock, unit_of_measurement, status, existingImages,
+      location_prices, location_stock, location_name, coordinates, location_radius 
     } = req.body;
 
     console.log("Update request received for product ID:", id);
@@ -118,7 +152,7 @@ export const updateSellerProduct = async (req, res) => {
 
     console.log("Final image array for update:", images);
 
-    // Update product fields
+    // Update product fields including new location data
     await product.update({
       title,
       sku,
@@ -131,11 +165,18 @@ export const updateSellerProduct = async (req, res) => {
       subcat,
       seller_email,
       bank,
-      stock,
-      status,
-      unit_of_measurement,
       account_number,
+      stock,
+      unit_of_measurement,
+      status,
       image: images, // Use the combined images array
+
+      // New fields
+      location_prices: location_prices || product.location_prices,  // Keep existing if not provided
+      location_stock: location_stock || product.location_stock,    // Keep existing if not provided
+      location_name: location_name || product.location_name,        // Keep existing if not provided
+      coordinates: coordinates || product.coordinates,              // Keep existing if not provided
+      location_radius: location_radius || product.location_radius   // Keep existing if not provided
     });
 
     res.status(200).json({ 
@@ -150,6 +191,7 @@ export const updateSellerProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update seller product.', error: error.message });
   }
 };
+
 
 // Approve Seller Product
 export const approveSellerProduct = async (req, res) => {
