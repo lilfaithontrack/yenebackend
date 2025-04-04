@@ -45,16 +45,9 @@ const SellerProduct = sequelize.define('SellerProduct', {
       isEmail: true,
     },
   },
-  image: {
+   image: {
     type: DataTypes.JSON,
     allowNull: true,
-    get() {
-      const value = this.getDataValue('image');
-      return value ? JSON.parse(value) : [];
-    },
-    set(value) {
-      this.setDataValue('image', JSON.stringify(value));
-    }
   },
   unit_of_measurement: {
     type: DataTypes.STRING,
