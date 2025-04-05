@@ -25,6 +25,9 @@ export const upload = multer({
 // Create Seller Product (Always Pending)
 export const createSellerProduct = async (req, res) => {
   try {
+    console.log("Request body:", req.body);
+    console.log("Files:", req.files);
+
     const {
       title,
       sku,
@@ -40,17 +43,22 @@ export const createSellerProduct = async (req, res) => {
       account_number,
       unit_of_measurement,
       stock,
-      location_prices,  // New field for location-specific prices
-      location_stock,   // New field for location-specific stock status
-      location_name,    // New field for the location name
-      coordinates,      // New field for coordinates (geo data)
-      location_radius,  // New field for location radius
+      location_prices,
+      location_stock,
+      location_name,
+      coordinates,
+      location_radius,
     } = req.body;
 
     const images = [];
-    if (req.files) {
+
+    if (req.files && Array.isArray(req.files)) {
       for (const file of req.files) {
         const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+
+        // Ensure uploads directory exists
+        const uploadDir = path.join(__dirname, '../uploads');
+        await fs.promises.mkdir(uploadDir, { recursive: true });
 
         await sharp(file.buffer)
           .resize(800)
@@ -60,6 +68,15 @@ export const createSellerProduct = async (req, res) => {
         images.push(`/uploads/${path.basename(optimizedPath)}`);
       }
     }
+
+    // Parse fields if they are JSON strings
+    const parsedLocationPrices = typeof location_prices === 'string' ? JSON.parse(location_prices) : location_prices;
+    const parsedLocationStock = typeof location_stock === 'string' ? JSON.parse(location_stock) : location_stock;
+    const parsedCoordinates = typeof coordinates === 'string' ? JSON.parse(coordinates) : coordinates;
+
+    console.log("Parsed location_prices:", parsedLocationPrices);
+    console.log("Parsed location_stock:", parsedLocationStock);
+    console.log("Parsed coordinates:", parsedCoordinates);
 
     const newProduct = await SellerProduct.create({
       title,
@@ -76,15 +93,15 @@ export const createSellerProduct = async (req, res) => {
       account_number,
       stock,
       unit_of_measurement,
-      status: 'pending', // Always pending
+      status: 'pending',
       image: images,
 
-      // New fields for location-based data
-      location_prices: location_prices || {},  // Set default if not provided
-      location_stock: location_stock || { "Addis Ababa": "in_stock" }, // Default to 'Addis Ababa'
-      location_name: location_name || 'Addis Ababa', // Default to 'Addis Ababa'
-      coordinates: coordinates || { type: 'Point', coordinates: [38.74, 9.03] }, // Default coordinates
-      location_radius: location_radius || 10, // Default radius to 10
+      // Location-based data
+      location_prices: parsedLocationPrices || {},
+      location_stock: parsedLocationStock || { "Addis Ababa": "in_stock" },
+      location_name: location_name || 'Addis Ababa',
+      coordinates: parsedCoordinates || { type: 'Point', coordinates: [38.74, 9.03] },
+      location_radius: location_radius || 10,
     });
 
     res.status(201).json({
@@ -92,13 +109,14 @@ export const createSellerProduct = async (req, res) => {
       product: newProduct,
     });
   } catch (error) {
-    console.error('Error uploading seller product:', error);
+    console.error('❌ Error uploading seller product:', error);
     res.status(500).json({
       message: 'Failed to upload seller product',
       error,
     });
   }
 };
+
 // update the seller prodcuct 
 // Update Seller Product
 export const updateSellerProduct = async (req, res) => {
