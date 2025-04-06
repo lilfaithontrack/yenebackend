@@ -122,40 +122,78 @@ export const createSellerProduct = async (req, res) => {
 export const updateSellerProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      title, sku, color, size, brand, price, description, 
-      catItems, subcat, seller_email, bank, account_number, 
+    const {
+      title, sku, color, size, brand, price, description,
+      catItems, subcat, seller_email, bank, account_number,
       stock, unit_of_measurement, status, existingImages,
-      location_prices, location_stock, location_name, coordinates, location_radius 
+      location_prices, location_stock, location_name, coordinates, location_radius
     } = req.body;
 
     console.log("Update request received for product ID:", id);
-    console.log("Request body:", req.body);
-    console.log("Files received:", req.files);
-    
+    // Keep logging req.body to see the raw input
+    // console.log("Request body:", req.body);
+    // console.log("Files received:", req.files);
+
     const product = await SellerProduct.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
+    // --- PARSE JSON STRINGS ---
+    let parsedCoordinates;
+    let parsedLocationPrices;
+    let parsedLocationStock;
+
+    try {
+      // Use the incoming value if it's a string, otherwise use it directly (or default to existing)
+      parsedCoordinates = typeof coordinates === 'string'
+        ? JSON.parse(coordinates)
+        : (coordinates || product.coordinates); // Keep existing if null/undefined
+
+      parsedLocationPrices = typeof location_prices === 'string'
+        ? JSON.parse(location_prices)
+        : (location_prices || product.location_prices); // Keep existing if null/undefined
+
+      parsedLocationStock = typeof location_stock === 'string'
+        ? JSON.parse(location_stock)
+        : (location_stock || product.location_stock); // Keep existing if null/undefined
+
+      console.log("Parsed update coordinates:", parsedCoordinates);
+      console.log("Parsed update location_prices:", parsedLocationPrices);
+      console.log("Parsed update location_stock:", parsedLocationStock);
+
+    } catch (e) {
+      console.error('Error parsing JSON fields during update:', e);
+      // Decide if this is a fatal error or if you can proceed without the parsed field
+      return res.status(400).json({ message: 'Invalid format for coordinates, location_prices, or location_stock' });
+    }
+    // --- END PARSING ---
+
+
     // Handle existing images
     let images = [];
     if (existingImages) {
       try {
-        // Parse the JSON string of existing images
         images = JSON.parse(existingImages);
-        console.log("Parsed existing images:", images);
+        // console.log("Parsed existing images:", images);
       } catch (e) {
         console.error('Error parsing existingImages:', e);
         return res.status(400).json({ message: 'Invalid existingImages format' });
       }
+    } else {
+      // If existingImages is not sent, assume we keep the current ones (or start fresh if none)
+      images = product.image || [];
     }
+
 
     // Process new images if any
     if (req.files && req.files.length > 0) {
       console.log("Processing new images:", req.files.length);
+      const uploadDir = path.join(__dirname, '../uploads');
+      await fs.promises.mkdir(uploadDir, { recursive: true }); // Ensure dir exists
+
       for (const file of req.files) {
-        const optimizedPath = path.join(__dirname, '../uploads', `${Date.now()}-${file.originalname}.webp`);
+        const optimizedPath = path.join(uploadDir, `${Date.now()}-${file.originalname}.webp`);
 
         await sharp(file.buffer)
           .resize(800)
@@ -170,7 +208,7 @@ export const updateSellerProduct = async (req, res) => {
 
     console.log("Final image array for update:", images);
 
-    // Update product fields including new location data
+    // Update product fields using PARSED values
     await product.update({
       title,
       sku,
@@ -186,31 +224,30 @@ export const updateSellerProduct = async (req, res) => {
       account_number,
       stock,
       unit_of_measurement,
-      status,
+      status, // Make sure status is included if it can be updated here
       image: images, // Use the combined images array
 
-      // New fields
-      location_prices: location_prices || product.location_prices,  // Keep existing if not provided
-      location_stock: location_stock || product.location_stock,    // Keep existing if not provided
-      location_name: location_name || product.location_name,        // Keep existing if not provided
-      coordinates: coordinates || product.coordinates,              // Keep existing if not provided
-      location_radius: location_radius || product.location_radius   // Keep existing if not provided
+      // Use the PARSED values or default to existing if parsing wasn't needed/possible
+      location_prices: parsedLocationPrices,
+      location_stock: parsedLocationStock,
+      location_name: location_name || product.location_name, // Keep existing if not provided
+      coordinates: parsedCoordinates,
+      location_radius: location_radius || product.location_radius // Keep existing if not provided
     });
 
-    res.status(200).json({ 
-      message: 'Seller product updated successfully!', 
-      product: {
-        ...product.toJSON(),
-        image: images // Ensure the response includes the updated images
-      }
+    // Fetch the updated product to ensure the response includes fresh data
+    const updatedProduct = await SellerProduct.findByPk(id);
+
+    res.status(200).json({
+      message: 'Seller product updated successfully!',
+      product: updatedProduct // Send back the updated product
     });
   } catch (error) {
     console.error('Error updating seller product:', error);
+    // Send back the specific error message if available
     res.status(500).json({ message: 'Failed to update seller product.', error: error.message });
   }
 };
-
-
 // Approve Seller Product
 export const approveSellerProduct = async (req, res) => {
   try {
