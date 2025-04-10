@@ -38,6 +38,11 @@ const SellerProduct = sequelize.define('SellerProduct', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  productfor: {
+  type: DataTypes.STRING,
+  allowNull: false,
+  defaultValue: 'for_user'
+},
   seller_email: {
     type: DataTypes.STRING,
     allowNull: false,
