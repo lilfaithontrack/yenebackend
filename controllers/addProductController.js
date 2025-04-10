@@ -267,11 +267,14 @@ const shuffleArray = (array) => {
 
 export const getAllProducts = async (req, res) => {
   try {
-    const { subcat } = req.query;
+    const { subcat, mode } = req.query;
 
-    // Fetch all products or filter by subcat
-    const query = subcat ? { where: { subcat } } : {};
-    const products = await Product.findAll(query);
+    // Build dynamic filter object
+    const where = {};
+    if (subcat) where.subcat = subcat;
+    if (mode) where.productfor = mode; // mode = 'for_user' or 'for_seller'
+
+    const products = await Product.findAll({ where });
 
     // Shuffle the products
     const shuffledProducts = shuffleArray(products);
@@ -283,6 +286,7 @@ export const getAllProducts = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch products.' });
   }
 };
+
  
 export const getProductById = async (req, res) => {
   try {
