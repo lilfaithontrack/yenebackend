@@ -24,7 +24,7 @@ export const createProduct = async (req, res) => {
   try {
     const { 
       title, price, description, brand, size, color,
-      catItems, subcat, unit_of_measurement, stock,
+      catItems, subcat, unit_of_measurement, stock,productfor,
       // Location fields
       location_type, location_name, coordinates, location_radius,
       location_prices, location_stock
@@ -54,6 +54,7 @@ export const createProduct = async (req, res) => {
       color,
       catItems,
       subcat,
+      productfor,
       unit_of_measurement,
       stock: stock || 'in_stock',
       status: 'approved',
