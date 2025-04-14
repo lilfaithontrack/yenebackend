@@ -1,7 +1,8 @@
 // controllers/
-import db from '../models/index.js'; // assumes Sequelize is initialized in models/index.js
-const { Telalaki, sequelize } = db;
+import sequelize from '../db/dbConnect.js';// assumes Sequelize is initialized in models/index.js
+
 import { QueryTypes } from 'sequelize';
+const { Telalaki, sequelize } = db;
 
 export const createTelalaki = async (req, res) => {
   try {
