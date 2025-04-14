@@ -1,5 +1,5 @@
-// models/
-module.exports = (sequelize, DataTypes) => {
+// models/Telalaki.js
+export default (sequelize, DataTypes) => {
   const Telalaki = sequelize.define('Telalaki', {
     pickup_lat: DataTypes.FLOAT,
     pickup_lng: DataTypes.FLOAT,
