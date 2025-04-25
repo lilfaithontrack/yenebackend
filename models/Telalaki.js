@@ -1,6 +1,9 @@
-// models/Telalaki.js
+// models/index.js
+import sequelize from '../db/dbConnect.js';
+import { DataTypes } from 'sequelize';
+
 export default (sequelize, DataTypes) => {
-  // User Model (Basic User Registration)
+  // Define all your models as before
   const User = sequelize.define('User', {
     full_name: DataTypes.STRING,
     phone: {
@@ -9,7 +12,6 @@ export default (sequelize, DataTypes) => {
     },
   });
 
-  // Vehicle Model (Car registration details)
   const Vehicle = sequelize.define('Vehicle', {
     owner_full_name: DataTypes.STRING,
     region: DataTypes.STRING,
@@ -31,7 +33,6 @@ export default (sequelize, DataTypes) => {
     owner_photo: DataTypes.STRING,
   });
 
-  // Driver Model (Driver-specific info)
   const Driver = sequelize.define('Driver', {
     user_id: DataTypes.INTEGER,
     full_name: DataTypes.STRING,
@@ -49,7 +50,6 @@ export default (sequelize, DataTypes) => {
     },
   });
 
-  // Admin Approval Model (Track the approval/rejection status)
   const AdminApproval = sequelize.define('AdminApproval', {
     driver_id: DataTypes.INTEGER,
     status: {
@@ -60,7 +60,6 @@ export default (sequelize, DataTypes) => {
     rejected_reason: DataTypes.STRING,
   });
 
-  // Delivery Request Model (Tracking deliveries)
   const DeliveryRequest = sequelize.define('DeliveryRequest', {
     pickup_lat: DataTypes.FLOAT,
     pickup_lng: DataTypes.FLOAT,
@@ -75,14 +74,12 @@ export default (sequelize, DataTypes) => {
     size: DataTypes.STRING,
     quantity: DataTypes.INTEGER,
     price: DataTypes.FLOAT,
-
-    // Payment Info Fields
     payment_method: {
       type: DataTypes.ENUM('screenshot', 'cash'),
       defaultValue: 'cash',
     },
-    payment_proof_url: DataTypes.STRING,  // For uploaded payment screenshot
-    receipt_link: DataTypes.STRING,       // Receipt link alternative
+    payment_proof_url: DataTypes.STRING,
+    receipt_link: DataTypes.STRING,
     is_payment_approved: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
@@ -90,7 +87,6 @@ export default (sequelize, DataTypes) => {
     approved_by: DataTypes.ENUM('admin', 'driver'),
   });
 
-  // Dynamic Pricing Model (Price calculation logic)
   const DynamicPricing = sequelize.define('DynamicPricing', {
     price_per_km: DataTypes.FLOAT,
     price_per_kg: DataTypes.FLOAT,
@@ -98,7 +94,7 @@ export default (sequelize, DataTypes) => {
     price_per_quantity: DataTypes.FLOAT,
   });
 
-  // Associations
+  // Define relationships
   User.hasOne(Driver, { foreignKey: 'user_id' });
   Driver.belongsTo(User, { foreignKey: 'user_id' });
 
