@@ -7,29 +7,46 @@ import {
   driverApproveCash,
   createDelivery,
   updatePricing,
-} from '../controllers/telalakiController.js';
+} from '../controllers/telalakiController.js'; // Assuming this is the correct controller path
+
+// --- Optional: Import your middleware ---
+// import { isAdmin, isAuthenticated, isDriver } from '../middleware/authMiddleware.js';
+// import { validateRegistration, validateApproval, ... } from '../middleware/validationMiddleware.js';
+// ------------------------------------
 
 const router = express.Router();
 
-// Driver Registration
-router.post('/register-driver', registerDriver);
+// --- Driver Registration ---
+// POST /drivers/register - Register a new driver (linked to a sender)
+// Middleware suggestion: Input validation
+router.post('/drivers/register', /* validateRegistration, */ registerDriver);
 
-// Admin Approval (for drivers)
-router.post('/admin-approve', updateApproval);
+// --- Approvals (Admin) ---
+// PATCH /admin/approvals - Admin approves or rejects a driver registration
+// Middleware suggestion: Authentication (isAdmin), Input validation
+router.patch('/admin/approvals', /* isAdmin, validateApproval, */ updateApproval); // Changed from POST
 
-// Payment Proof Submission (screenshot or receipt)
-router.post('/submit-payment-proof', submitPaymentProof);
+// --- Deliveries ---
+// POST /deliveries - Create a new delivery request
+// Middleware suggestion: Authentication (isAuthenticated - Sender role), Input validation
+router.post('/deliveries', /* isAuthenticated, */ createDelivery); // Changed path
 
-// Admin approves payment (screenshot)
-router.post('/approve-payment/admin', adminApprovePayment);
+// --- Payments ---
+// PATCH /payments/proof - Sender submits payment proof for a delivery
+// Middleware suggestion: Authentication (isAuthenticated - Sender role), Input validation
+router.patch('/payments/proof', /* isAuthenticated, */ submitPaymentProof); // Changed from POST, changed path
 
-// Driver approves payment (cash)
-router.post('/approve-payment/driver', driverApproveCash);
+// PATCH /admin/payments/approve - Admin approves a screenshot payment
+// Middleware suggestion: Authentication (isAdmin), Input validation
+router.patch('/admin/payments/approve', /* isAdmin, */ adminApprovePayment); // Changed from POST, changed path
 
-// Create Delivery Request
-router.post('/create-delivery', createDelivery);
+// PATCH /driver/payments/approve-cash - Driver confirms cash payment received
+// Middleware suggestion: Authentication (isDriver), Input validation, Authorization (check if assigned driver?)
+router.patch('/driver/payments/approve-cash', /* isDriver, */ driverApproveCash); // Changed from POST, changed path
 
-// Update Dynamic Pricing
-router.post('/update-pricing', updatePricing);
+// --- Pricing (Admin) ---
+// PATCH /admin/pricing - Update dynamic pricing settings
+// Middleware suggestion: Authentication (isAdmin), Input validation
+router.patch('/admin/pricing', /* isAdmin, */ updatePricing); // Changed from POST, changed path
 
 export default router;
