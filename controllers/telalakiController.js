@@ -1,9 +1,14 @@
 import db from '../models/Telalaki.js'; // Assuming Telalaki.js correctly exports sequelize instance and models
 import { Sequelize } from 'sequelize'; // Import Sequelize for Op and transaction
+import bcrypt from 'bcrypt'; // For hashing PINs
+import jwt from 'jsonwebtoken'; // For generating login tokens
 
 // Destructure models and the sequelize instance
 const { Sender, Vehicle, Driver, AdminApproval, DeliveryRequest, DynamicPricing, Notification, sequelize } = db;
 const Op = Sequelize.Op; // Useful for complex queries
+
+const JWT_SECRET = process.env.JWT_SECRET; // Load secret from environment variables
+const SALT_ROUNDS = 10; // Cost factor for bcrypt hashing
 
 // --- Helper Function for Notifications (to avoid repetition) ---
 const createNotification = async (details, transaction = null) => {
@@ -20,10 +25,139 @@ const createNotification = async (details, transaction = null) => {
 // --- Helper for Error Responses ---
 const sendErrorResponse = (res, statusCode, message, error = null) => {
     console.error(`Error ${statusCode}: ${message}`, error ? error.message || error : ''); // Log the error server-side
+    // Extract specific validation errors if available
+    let details;
+    if (error && Array.isArray(error) && error.length > 0 && error[0].message) {
+        details = error.map(e => ({ field: e.path, message: e.message }));
+    } else if (error && error.message) {
+         details = error.message;
+    }
+
     return res.status(statusCode).json({
         message: message,
-        error: error ? (error.message || error) : undefined // Avoid leaking sensitive details
+        error: details || (error ? 'An unexpected error occurred.' : undefined) // Avoid leaking sensitive details in production
     });
+};
+
+// =============================================
+// Sender Authentication
+// =============================================
+
+export const registerSender = async (req, res) => {
+    const { full_name, phone, pin } = req.body;
+
+    // --- Basic Input Validation ---
+    if (!full_name || !phone || !pin) {
+        return sendErrorResponse(res, 400, 'Full name, phone number, and PIN are required.');
+    }
+    // Add more specific validation (e.g., phone format, PIN format)
+     if (!/^\d{4}$/.test(pin)) { // Basic check for 4 digits
+         return sendErrorResponse(res, 400, 'PIN must be exactly 4 digits.');
+     }
+     // Basic Ethiopian phone number check (Starts with 09, followed by 8 digits) - adjust if needed
+     if (!/^09\d{8}$/.test(phone)) {
+         return sendErrorResponse(res, 400, 'Invalid phone number format. Use 09xxxxxxxx format.');
+     }
+
+    try {
+        // Check if phone number already exists
+        const existingSender = await Sender.findOne({ where: { phone } });
+        if (existingSender) {
+            return sendErrorResponse(res, 409, 'Phone number is already registered.');
+        }
+
+        // Hash the PIN securely
+        const hashedPin = await bcrypt.hash(pin, SALT_ROUNDS);
+
+        // Create the new Sender record
+        const newSender = await Sender.create({
+            full_name,
+            phone,
+            pin: hashedPin // Store the hashed PIN
+        });
+
+        // Exclude PIN from the response
+        const senderData = { ...newSender.toJSON() };
+        delete senderData.pin;
+
+        return res.status(201).json({
+            message: 'Sender registered successfully.',
+            sender: senderData
+        });
+
+    } catch (err) {
+        // Handle potential validation errors from the model
+        if (err.name === 'SequelizeValidationError') {
+            return sendErrorResponse(res, 400, 'Registration failed due to validation errors.', err.errors);
+        }
+        // Generic internal server error
+        return sendErrorResponse(res, 500, 'Sender registration failed due to an internal error.', err);
+    }
+};
+
+export const loginSender = async (req, res) => {
+    const { phone, pin } = req.body;
+
+    // --- Basic Input Validation ---
+    if (!phone || !pin) {
+        return sendErrorResponse(res, 400, 'Phone number and PIN are required.');
+    }
+     // Optional: Basic phone format check on login too
+     if (!/^09\d{8}$/.test(phone)) {
+         return sendErrorResponse(res, 400, 'Invalid phone number format.');
+     }
+
+    try {
+        // Find the sender by phone number
+        // IMPORTANT: Explicitly include the 'pin' attribute if you have default scopes excluding it.
+        const sender = await Sender.findOne({
+             where: { phone },
+             attributes: ['id', 'full_name', 'phone', 'pin', 'createdAt', 'updatedAt'] // Ensure pin is selected
+        });
+
+        if (!sender) {
+            // Use a generic message to avoid revealing if the phone number exists or not
+            return sendErrorResponse(res, 401, 'Login failed: Invalid phone number or PIN.');
+        }
+
+        // Compare the provided PIN with the stored hash
+        const isPinValid = await bcrypt.compare(pin, sender.pin);
+
+        if (!isPinValid) {
+            // Generic message again
+            return sendErrorResponse(res, 401, 'Login failed: Invalid phone number or PIN.');
+        }
+
+        // --- Login Successful - Generate JWT ---
+        if (!JWT_SECRET) {
+             console.error("FATAL ERROR: JWT_SECRET is not defined in environment variables!");
+             return sendErrorResponse(res, 500, 'Login failed due to server configuration error.');
+        }
+
+        const payload = {
+            id: sender.id,
+            phone: sender.phone,
+            type: 'sender' // Add a type to distinguish sender tokens from driver tokens if needed
+        };
+
+        const accessToken = jwt.sign(payload, JWT_SECRET, {
+            expiresIn: '1d' // Token expires in 1 day (adjust as needed)
+        });
+
+        // Exclude PIN from the response sender object
+        const senderData = { ...sender.toJSON() };
+        delete senderData.pin;
+
+        return res.status(200).json({
+            message: 'Login successful.',
+            accessToken,
+            sender: senderData
+        });
+
+    } catch (err) {
+        // Generic internal server error
+        return sendErrorResponse(res, 500, 'Login failed due to an internal error.', err);
+    }
 };
 
 
@@ -32,27 +166,62 @@ const sendErrorResponse = (res, statusCode, message, error = null) => {
 // =============================================
 
 export const registerDriver = async (req, res) => {
-    const { sender, driver, vehicle } = req.body;
-    let transaction; // Define transaction variable outside try block
+    const { sender, driver, vehicle } = req.body; // Sender here includes full_name, phone, and the *4-digit* PIN
+    let transaction;
 
     // --- Basic Input Validation ---
-    if (!sender || !sender.phone || !driver || !driver.full_name) { // Add more required fields as needed
-        return sendErrorResponse(res, 400, 'Sender (with phone) and Driver (with full_name) information are required.');
+    if (!sender || !sender.phone || !sender.pin || !sender.full_name || !driver || !driver.full_name || !driver.pin) {
+        return sendErrorResponse(res, 400, 'Sender (name, phone, 4-digit PIN) and Driver (name, 6-digit PIN) information are required.');
     }
+    // Sender PIN validation
+     if (!/^\d{4}$/.test(sender.pin)) {
+         return sendErrorResponse(res, 400, 'Sender PIN must be exactly 4 digits.');
+     }
+    // Driver PIN validation
+    if (!/^\d{6}$/.test(driver.pin)) {
+         return sendErrorResponse(res, 400, 'Driver PIN must be exactly 6 digits.');
+     }
+    // Phone validation
+    if (!/^09\d{8}$/.test(sender.phone)) {
+         return sendErrorResponse(res, 400, 'Invalid Sender phone number format. Use 09xxxxxxxx format.');
+    }
+    // Add check for driver phone format if it differs or is also required
+    // ...
+
     if (driver.is_owner === false && !vehicle) {
          return sendErrorResponse(res, 400, 'Vehicle information is required if the driver is not the owner.');
     }
-    // TODO: Add more specific validation (e.g., phone format, email format) using a library like Joi
+    // TODO: Add more specific validation (e.g., email format) using a library like Joi
 
     try {
         transaction = await sequelize.transaction(); // Start transaction
 
-        // 1. Create Sender
-        const newSender = await Sender.create(sender, { transaction });
+        // Check if sender phone already exists
+        const existingSender = await Sender.findOne({ where: { phone: sender.phone }, transaction });
+        if (existingSender) {
+             await transaction.rollback();
+             return sendErrorResponse(res, 409, 'Sender phone number is already registered.');
+        }
+        // Check if driver phone already exists (if driver phone is unique)
+        // const existingDriverPhone = await Driver.findOne({ where: { phone: driver.phone }, transaction });
+        // if (existingDriverPhone) {
+        //      await transaction.rollback();
+        //      return sendErrorResponse(res, 409, 'Driver phone number is already registered.');
+        // }
 
-        // 2. Create Driver, linking to Sender
+        // 1. Hash PINs and Create Sender
+        const hashedSenderPin = await bcrypt.hash(sender.pin, SALT_ROUNDS);
+        const newSender = await Sender.create({
+             full_name: sender.full_name,
+             phone: sender.phone,
+             pin: hashedSenderPin
+        }, { transaction });
+
+        // 2. Hash Driver PIN and Create Driver, linking to Sender
+        const hashedDriverPin = await bcrypt.hash(driver.pin, SALT_ROUNDS);
         const newDriver = await Driver.create({
             ...driver,
+            pin: hashedDriverPin, // Store hashed driver pin
             sender_id: newSender.id,
         }, { transaction });
 
@@ -97,13 +266,14 @@ export const registerDriver = async (req, res) => {
             return sendErrorResponse(res, 409, `Registration failed. The ${field} provided might already be in use.`);
         }
         if (err.name === 'SequelizeValidationError') {
-             return sendErrorResponse(res, 400, 'Registration failed due to validation errors.', err.errors.map(e => e.message));
+             return sendErrorResponse(res, 400, 'Registration failed due to validation errors.', err.errors);
         }
         // Generic internal server error
         return sendErrorResponse(res, 500, 'Driver registration failed due to an internal error.', err);
     }
 };
 
+// ... (Keep the rest of your existing controller functions: updateApproval, payment handling, delivery creation, pricing etc.)
 export const updateApproval = async (req, res) => {
     // --- Authorization ---
     // TODO: Implement middleware to check if req.user is an admin
@@ -207,90 +377,160 @@ export const updateApproval = async (req, res) => {
 export const submitPaymentProof = async (req, res) => {
     const { delivery_id, payment_proof_url, receipt_link } = req.body;
     // --- Authorization ---
-    // TODO: Get sender ID from authenticated user
-    // const senderId = req.user.id;
-    // if (req.user.role !== 'sender') return sendErrorResponse(res, 403, 'Unauthorized: Sender access required.');
+    // TODO: Get sender ID from authenticated user (using JWT)
+    // const senderId = req.user.id; // Assuming JWT middleware adds user to req
+    // if (!senderId || req.user.type !== 'sender') return sendErrorResponse(res, 403, 'Unauthorized: Sender access required.');
 
     // --- Validation ---
      if (!delivery_id) {
-        return sendErrorResponse(res, 400, 'Delivery ID is required.');
-    }
-    if (!payment_proof_url && !receipt_link) {
-      return sendErrorResponse(res, 400, 'Either a payment_proof_url (screenshot) or receipt_link is required.');
-    }
-    // TODO: Validate URL formats
+         return sendErrorResponse(res, 400, 'Delivery ID is required.');
+     }
+     if (!payment_proof_url && !receipt_link) {
+       return sendErrorResponse(res, 400, 'Either a payment_proof_url (screenshot) or receipt_link is required.');
+     }
+     // TODO: Validate URL formats
 
-    let transaction;
-    try {
-        transaction = await sequelize.transaction();
+     let transaction;
+     try {
+         transaction = await sequelize.transaction();
 
-        const delivery = await DeliveryRequest.findByPk(delivery_id, {
-             include: [Sender], // Include Sender for notification later if needed
-             transaction // Lock row
-        });
+         const delivery = await DeliveryRequest.findByPk(delivery_id, {
+              include: [Sender], // Include Sender for notification later if needed
+              transaction // Lock row
+         });
 
-        if (!delivery) {
-            await transaction.rollback();
-            return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
-        }
+         if (!delivery) {
+             await transaction.rollback();
+             return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
+         }
 
-        // --- Authorization Check ---
-        // TODO: Uncomment and use actual sender ID from auth
-        // if (delivery.sender_id !== senderId) {
-        //     await transaction.rollback();
-        //     return sendErrorResponse(res, 403, 'Unauthorized: You can only submit proof for your own delivery requests.');
-        // }
-        // --------------------------
+         // --- Authorization Check ---
+         // TODO: Uncomment and use actual sender ID from auth
+         // if (delivery.sender_id !== senderId) {
+         //     await transaction.rollback();
+         //     return sendErrorResponse(res, 403, 'Unauthorized: You can only submit proof for your own delivery requests.');
+         // }
+         // --------------------------
 
-        // Check if payment can be submitted based on status (e.g., only after delivered?)
-        // if (!['delivered', 'pending_payment'].includes(delivery.status)) { // Example status check
-        //      await transaction.rollback();
-        //      return sendErrorResponse(res, 400, `Payment proof cannot be submitted when delivery status is ${delivery.status}.`);
-        // }
+         // Check if payment can be submitted based on status (e.g., only after delivered?)
+         // if (!['delivered', 'pending_payment'].includes(delivery.status)) { // Example status check
+         //     await transaction.rollback();
+         //     return sendErrorResponse(res, 400, `Payment proof cannot be submitted when delivery status is ${delivery.status}.`);
+         // }
 
-        // Update delivery record
-        delivery.payment_method = payment_proof_url ? 'screenshot' : 'cash'; // Assume screenshot if URL provided
-        delivery.payment_proof_url = payment_proof_url || null;
-        delivery.receipt_link = receipt_link || null;
-        delivery.is_payment_approved = false; // Reset approval status
-        delivery.approved_by = null;
+         // Update delivery record
+         delivery.payment_method = payment_proof_url ? 'screenshot' : 'cash'; // Assume screenshot if URL provided
+         delivery.payment_proof_url = payment_proof_url || null;
+         delivery.receipt_link = receipt_link || null;
+         delivery.is_payment_approved = false; // Reset approval status
+         delivery.approved_by = null;
 
-        await delivery.save({ transaction });
+         await delivery.save({ transaction });
 
-        // Notify Sender of submission success
-        await createNotification({
-            sender_id: delivery.sender_id, // Use sender_id from the delivery record
-            message: `Payment proof for delivery #${delivery.id} submitted successfully. It is now pending review.`,
-            type: 'payment_proof_submitted',
-            related_entity_id: delivery.id,
-            related_entity_type: 'DeliveryRequestPayment'
-        }, transaction);
+         // Notify Sender of submission success
+         await createNotification({
+             sender_id: delivery.sender_id, // Use sender_id from the delivery record
+             message: `Payment proof for delivery #${delivery.id} submitted successfully. It is now pending review.`,
+             type: 'payment_proof_submitted',
+             related_entity_id: delivery.id,
+             related_entity_type: 'DeliveryRequestPayment'
+         }, transaction);
 
-        // Optionally notify Admin pool here
+         // Optionally notify Admin pool here
 
-        await transaction.commit();
+         await transaction.commit();
 
-        res.status(200).json({ message: 'Payment information submitted successfully. Waiting for approval.' });
+         res.status(200).json({ message: 'Payment information submitted successfully. Waiting for approval.' });
 
-    } catch (err) {
-        if (transaction) await transaction.rollback();
-        return sendErrorResponse(res, 500, 'Failed to submit payment information.', err);
-    }
+     } catch (err) {
+         if (transaction) await transaction.rollback();
+         return sendErrorResponse(res, 500, 'Failed to submit payment information.', err);
+     }
 };
 
 export const adminApprovePayment = async (req, res) => {
-     // --- Authorization ---
-    // TODO: Implement middleware to check if req.user is an admin
-    // if (req.user.role !== 'admin') return sendErrorResponse(res, 403, 'Unauthorized: Admin access required.');
+      // --- Authorization ---
+     // TODO: Implement middleware to check if req.user is an admin
+     // if (req.user.role !== 'admin') return sendErrorResponse(res, 403, 'Unauthorized: Admin access required.');
 
-    const { delivery_id } = req.body;
+     const { delivery_id } = req.body;
+     // --- Validation ---
+     if (!delivery_id) {
+         return sendErrorResponse(res, 400, 'Delivery ID is required.');
+     }
+
+     let transaction;
+     try {
+          transaction = await sequelize.transaction();
+
+          const delivery = await DeliveryRequest.findByPk(delivery_id, {
+               include: [Sender], // Include Sender for notification
+               transaction
+          });
+
+          if (!delivery) {
+              await transaction.rollback();
+              return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
+          }
+
+          // --- Business Logic Checks ---
+          if (delivery.payment_method !== 'screenshot') {
+              await transaction.rollback();
+              return sendErrorResponse(res, 400, 'Payment method is not "screenshot". Admin cannot approve this type.');
+          }
+           if (!delivery.payment_proof_url && !delivery.receipt_link) {
+               await transaction.rollback();
+               return sendErrorResponse(res, 400, 'No payment proof (screenshot URL or receipt link) found for this delivery.');
+           }
+          if (delivery.is_payment_approved) {
+               await transaction.rollback();
+               // Check who approved it to give a more specific message
+               const approver = delivery.approved_by || 'unknown';
+               return sendErrorResponse(res, 409, `Payment for delivery #${delivery.id} has already been approved by ${approver}.`);
+          }
+          // --------------------------
+
+          delivery.is_payment_approved = true;
+          delivery.approved_by = 'admin'; // Mark as approved by admin
+          await delivery.save({ transaction });
+
+          // Notify Sender
+          await createNotification({
+              sender_id: delivery.sender_id,
+              message: `Admin has approved the payment for your delivery #${delivery.id}.`,
+              type: 'payment_approved_admin',
+              related_entity_id: delivery.id,
+              related_entity_type: 'DeliveryRequestPayment'
+          }, transaction);
+
+          await transaction.commit();
+
+          res.status(200).json({ message: `Payment for delivery #${delivery.id} approved by admin.` });
+
+     } catch (err) {
+         if (transaction) await transaction.rollback();
+         return sendErrorResponse(res, 500, 'Failed to approve payment by admin.', err);
+     }
+};
+
+export const driverApproveCash = async (req, res) => {
+    // --- Authorization ---
+    // TODO: Get driver ID from authenticated user (using JWT)
+    // const driverId = req.user.id; // Assuming JWT middleware adds user to req
+    // if (!driverId || req.user.type !== 'driver') return sendErrorResponse(res, 403, 'Unauthorized: Driver access required.');
+    const { delivery_id, driverId } = req.body; // REMOVE driverId from body once JWT is implemented
+
     // --- Validation ---
-    if (!delivery_id) {
-        return sendErrorResponse(res, 400, 'Delivery ID is required.');
-    }
+     if (!delivery_id) {
+         return sendErrorResponse(res, 400, 'Delivery ID is required.');
+     }
+     // TODO: Remove driverId validation once using JWT
+     if (!driverId) {
+         return sendErrorResponse(res, 400, 'Driver ID is required (should come from authentication).');
+     }
 
-    let transaction;
-    try {
+     let transaction;
+     try {
          transaction = await sequelize.transaction();
 
          const delivery = await DeliveryRequest.findByPk(delivery_id, {
@@ -299,122 +539,53 @@ export const adminApprovePayment = async (req, res) => {
          });
 
          if (!delivery) {
-            await transaction.rollback();
-            return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
+             await transaction.rollback();
+             return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
          }
 
-         // --- Business Logic Checks ---
-         if (delivery.payment_method !== 'screenshot') {
-            await transaction.rollback();
-            return sendErrorResponse(res, 400, 'Payment method is not "screenshot". Admin cannot approve this type.');
-         }
-          if (!delivery.payment_proof_url && !delivery.receipt_link) {
+         // --- Authorization & Business Logic Checks ---
+         // TODO: Replace driverId body param with authenticated driverId from JWT (req.user.id)
+         if (delivery.assigned_driver_id !== parseInt(driverId, 10)) { // Ensure type comparison if needed
              await transaction.rollback();
-             return sendErrorResponse(res, 400, 'No payment proof (screenshot URL or receipt link) found for this delivery.');
+             return sendErrorResponse(res, 403, 'Unauthorized: You are not assigned to this delivery request.');
          }
+         if (delivery.payment_method !== 'cash') {
+             await transaction.rollback();
+             return sendErrorResponse(res, 400, 'Payment method is not "cash". Driver cannot approve this type.');
+         }
+          // Allow approval only at specific stages, e.g., upon delivery
+          if (!['at_dropoff', 'delivered'].includes(delivery.status)) {
+               await transaction.rollback();
+               return sendErrorResponse(res, 400, `Cash payment cannot be confirmed while delivery status is ${delivery.status}.`);
+          }
          if (delivery.is_payment_approved) {
-             await transaction.rollback();
-             // Check who approved it to give a more specific message
-             const approver = delivery.approved_by || 'unknown';
-             return sendErrorResponse(res, 409, `Payment for delivery #${delivery.id} has already been approved by ${approver}.`);
-         }
-         // --------------------------
+               await transaction.rollback();
+               const approver = delivery.approved_by || 'unknown';
+               return sendErrorResponse(res, 409, `Payment for delivery #${delivery.id} has already been approved by ${approver}.`);
+          }
+         // -------------------------------------------
 
          delivery.is_payment_approved = true;
-         delivery.approved_by = 'admin'; // Mark as approved by admin
+         delivery.approved_by = 'driver'; // Mark as approved by driver
          await delivery.save({ transaction });
 
          // Notify Sender
          await createNotification({
-            sender_id: delivery.sender_id,
-            message: `Admin has approved the payment for your delivery #${delivery.id}.`,
-            type: 'payment_approved_admin',
-            related_entity_id: delivery.id,
-            related_entity_type: 'DeliveryRequestPayment'
-        }, transaction);
+             sender_id: delivery.sender_id,
+             message: `The driver has confirmed receiving cash payment for your delivery #${delivery.id}.`,
+             type: 'payment_approved_driver',
+             related_entity_id: delivery.id,
+             related_entity_type: 'DeliveryRequestPayment'
+         }, transaction);
 
-        await transaction.commit();
+         await transaction.commit();
 
-        res.status(200).json({ message: `Payment for delivery #${delivery.id} approved by admin.` });
+         res.status(200).json({ message: `Cash payment for delivery #${delivery.id} confirmed by driver.` });
 
-    } catch (err) {
-        if (transaction) await transaction.rollback();
-        return sendErrorResponse(res, 500, 'Failed to approve payment by admin.', err);
-    }
-};
-
-export const driverApproveCash = async (req, res) => {
-    // --- Authorization ---
-    // TODO: Get driver ID from authenticated user
-    // const driverId = req.user.id;
-    // if (req.user.role !== 'driver') return sendErrorResponse(res, 403, 'Unauthorized: Driver access required.');
-    const { delivery_id, driverId } = req.body; // Assuming driverId might come in body for now, replace with req.user.id
-
-    // --- Validation ---
-     if (!delivery_id) {
-        return sendErrorResponse(res, 400, 'Delivery ID is required.');
-    }
-    // TODO: Remove driverId from body and use authenticated driverId
-     if (!driverId) {
-        return sendErrorResponse(res, 400, 'Driver ID is required (should come from authentication).');
-    }
-
-    let transaction;
-    try {
-        transaction = await sequelize.transaction();
-
-        const delivery = await DeliveryRequest.findByPk(delivery_id, {
-            include: [Sender], // Include Sender for notification
-            transaction
-        });
-
-        if (!delivery) {
-           await transaction.rollback();
-           return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
-        }
-
-        // --- Authorization & Business Logic Checks ---
-        if (delivery.assigned_driver_id !== driverId) { // Use the authenticated driver ID here
-           await transaction.rollback();
-           return sendErrorResponse(res, 403, 'Unauthorized: You are not assigned to this delivery request.');
-        }
-        if (delivery.payment_method !== 'cash') {
-           await transaction.rollback();
-           return sendErrorResponse(res, 400, 'Payment method is not "cash". Driver cannot approve this type.');
-        }
-         // Allow approval only at specific stages, e.g., upon delivery
-         if (!['at_dropoff', 'delivered'].includes(delivery.status)) {
-             await transaction.rollback();
-             return sendErrorResponse(res, 400, `Cash payment cannot be confirmed while delivery status is ${delivery.status}.`);
-         }
-        if (delivery.is_payment_approved) {
-             await transaction.rollback();
-             const approver = delivery.approved_by || 'unknown';
-             return sendErrorResponse(res, 409, `Payment for delivery #${delivery.id} has already been approved by ${approver}.`);
-         }
-        // -------------------------------------------
-
-        delivery.is_payment_approved = true;
-        delivery.approved_by = 'driver'; // Mark as approved by driver
-        await delivery.save({ transaction });
-
-        // Notify Sender
-        await createNotification({
-            sender_id: delivery.sender_id,
-            message: `The driver has confirmed receiving cash payment for your delivery #${delivery.id}.`,
-            type: 'payment_approved_driver',
-            related_entity_id: delivery.id,
-            related_entity_type: 'DeliveryRequestPayment'
-        }, transaction);
-
-        await transaction.commit();
-
-        res.status(200).json({ message: `Cash payment for delivery #${delivery.id} confirmed by driver.` });
-
-    } catch (err) {
-        if (transaction) await transaction.rollback();
-        return sendErrorResponse(res, 500, 'Failed to confirm cash payment by driver.', err);
-    }
+     } catch (err) {
+         if (transaction) await transaction.rollback();
+         return sendErrorResponse(res, 500, 'Failed to confirm cash payment by driver.', err);
+     }
 };
 
 
@@ -423,70 +594,71 @@ export const driverApproveCash = async (req, res) => {
 // =============================================
 
 export const createDelivery = async (req, res) => {
-    // --- Authorization ---
-    // TODO: Get sender ID from authenticated user
-    // const senderId = req.user.id;
-    // if (req.user.role !== 'sender') return sendErrorResponse(res, 403, 'Unauthorized: Sender access required.');
-    const { sender_id, ...deliveryData } = req.body; // Extract sender_id, keep rest in deliveryData
+     // --- Authorization ---
+     // TODO: Get sender ID from authenticated user (using JWT)
+     // const senderId = req.user.id;
+     // if (!senderId || req.user.type !== 'sender') return sendErrorResponse(res, 403, 'Unauthorized: Sender access required.');
+     const { sender_id, ...deliveryData } = req.body; // Extract sender_id, keep rest in deliveryData
 
-    // --- Validation ---
-    if (!sender_id) {
-        return sendErrorResponse(res, 400, 'sender_id is required to create a delivery request.');
-    }
+     // --- Validation ---
+     // TODO: REMOVE sender_id from body and use authenticated senderId (req.user.id)
+     if (!sender_id) {
+         return sendErrorResponse(res, 400, 'sender_id is required (should come from authentication).');
+     }
      // TODO: Uncomment and use actual sender ID from auth
-    // if (sender_id !== senderId) {
-    //     return sendErrorResponse(res, 403, 'Unauthorized: You can only create deliveries for your own account.');
-    // }
-    if (!deliveryData.pickup_lat || !deliveryData.pickup_lng || !deliveryData.dropoff_lat || !deliveryData.dropoff_lng) {
-        return sendErrorResponse(res, 400, 'Pickup and Dropoff coordinates (lat, lng) are required.');
-    }
-    // TODO: Add validation for coordinate ranges, weight/size formats etc.
+     // if (parseInt(sender_id, 10) !== senderId) { // Ensure type comparison if needed
+     //     return sendErrorResponse(res, 403, 'Unauthorized: You can only create deliveries for your own account.');
+     // }
+     if (!deliveryData.pickup_lat || !deliveryData.pickup_lng || !deliveryData.dropoff_lat || !deliveryData.dropoff_lng) {
+         return sendErrorResponse(res, 400, 'Pickup and Dropoff coordinates (lat, lng) are required.');
+     }
+     // TODO: Add validation for coordinate ranges, weight/size formats etc.
 
-    let transaction;
-    try {
-        transaction = await sequelize.transaction();
+     let transaction;
+     try {
+         transaction = await sequelize.transaction();
 
-        // Optional: Verify sender exists (could be skipped if auth guarantees it)
-        const senderExists = await Sender.findByPk(sender_id, { transaction });
-        if (!senderExists) {
-            await transaction.rollback();
-            return sendErrorResponse(res, 404, `Sender with ID ${sender_id} not found.`);
-        }
+         // Optional: Verify sender exists (guaranteed by JWT auth middleware)
+         // const senderExists = await Sender.findByPk(senderId, { transaction });
+         // if (!senderExists) {
+         //     await transaction.rollback();
+         //     return sendErrorResponse(res, 404, `Sender not found.`); // Should not happen if JWT is valid
+         // }
 
-        // Create the delivery request
-        const newDelivery = await DeliveryRequest.create({
-            sender_id,
-            ...deliveryData,
-            status: 'pending' // Ensure initial status is set correctly
-        }, { transaction });
+         // Create the delivery request using the authenticated senderId
+         const newDelivery = await DeliveryRequest.create({
+             sender_id: sender_id, // TODO: Replace with senderId from JWT (req.user.id)
+             ...deliveryData,
+             status: 'pending' // Ensure initial status is set correctly
+         }, { transaction });
 
-        // Notify Sender
-        await createNotification({
-            sender_id: newDelivery.sender_id,
-            message: `Your delivery request #${newDelivery.id} from [Pickup Location Name] to [Dropoff Location Name] has been created successfully. We are finding a driver for you.`, // TODO: Get location names via reverse geocoding if possible
-            type: 'delivery_created',
-            related_entity_id: newDelivery.id,
-            related_entity_type: 'DeliveryRequest'
-        }, transaction);
+         // Notify Sender
+         await createNotification({
+             sender_id: newDelivery.sender_id,
+             message: `Your delivery request #${newDelivery.id} from [Pickup Location Name] to [Dropoff Location Name] has been created successfully. We are finding a driver for you.`, // TODO: Get location names via reverse geocoding if possible
+             type: 'delivery_created',
+             related_entity_id: newDelivery.id,
+             related_entity_type: 'DeliveryRequest'
+         }, transaction);
 
-        // --- Trigger Driver Matching Logic (Asynchronous) ---
-        // This should ideally happen outside the controller response path
-        // Example: dispatchJobToQueue('findDriverForDelivery', newDelivery.id);
-        console.log(`Delivery #${newDelivery.id} created. TODO: Trigger driver matching.`);
-        // --------------------------------------------------
+         // --- Trigger Driver Matching Logic (Asynchronous) ---
+         // This should ideally happen outside the controller response path
+         // Example: dispatchJobToQueue('findDriverForDelivery', newDelivery.id);
+         console.log(`Delivery #${newDelivery.id} created. TODO: Trigger driver matching.`);
+         // --------------------------------------------------
 
-        await transaction.commit();
+         await transaction.commit();
 
-        // Return the created object (or a cleaner DTO)
-        res.status(201).json(newDelivery);
+         // Return the created object (or a cleaner DTO)
+         res.status(201).json(newDelivery);
 
-    } catch (err) {
-        if (transaction) await transaction.rollback();
-         if (err.name === 'SequelizeValidationError') {
-             return sendErrorResponse(res, 400, 'Delivery creation failed due to validation errors.', err.errors.map(e => e.message));
-        }
-        return sendErrorResponse(res, 500, 'Failed to create delivery request.', err);
-    }
+     } catch (err) {
+         if (transaction) await transaction.rollback();
+          if (err.name === 'SequelizeValidationError') {
+               return sendErrorResponse(res, 400, 'Delivery creation failed due to validation errors.', err.errors);
+         }
+         return sendErrorResponse(res, 500, 'Failed to create delivery request.', err);
+     }
 };
 
 // TODO: Add controllers for:
@@ -496,6 +668,7 @@ export const createDelivery = async (req, res) => {
 // - Fetching deliveries (for Sender, Driver, Admin with filtering/pagination) -> getDeliveries
 // - Fetching notifications (for Sender, Driver) -> getNotifications
 // - Matching new requests to 'on the way' drivers (System action)
+// - Add Driver Login (similar to Sender Login, but using driver phone/6-digit PIN)
 
 
 // =============================================
@@ -503,42 +676,42 @@ export const createDelivery = async (req, res) => {
 // =============================================
 
 export const updatePricing = async (req, res) => {
-    // --- Authorization ---
-    // TODO: Implement middleware to check if req.user is an admin
-    // if (req.user.role !== 'admin') return sendErrorResponse(res, 403, 'Unauthorized: Admin access required.');
+     // --- Authorization ---
+     // TODO: Implement middleware to check if req.user is an admin
+     // if (req.user.role !== 'admin') return sendErrorResponse(res, 403, 'Unauthorized: Admin access required.');
 
-    const { price_per_km, price_per_kg, price_per_size_unit, price_per_quantity } = req.body;
+     const { price_per_km, price_per_kg, price_per_size_unit, price_per_quantity } = req.body;
 
-    // --- Validation ---
-    // Basic check if any data is provided
-    if (price_per_km === undefined && price_per_kg === undefined && price_per_size_unit === undefined && price_per_quantity === undefined) {
-         return sendErrorResponse(res, 400, 'At least one pricing parameter must be provided.');
-    }
-    // TODO: Add validation to ensure provided values are numbers >= 0
+     // --- Validation ---
+     // Basic check if any data is provided
+     if (price_per_km === undefined && price_per_kg === undefined && price_per_size_unit === undefined && price_per_quantity === undefined) {
+          return sendErrorResponse(res, 400, 'At least one pricing parameter must be provided.');
+     }
+     // TODO: Add validation to ensure provided values are numbers >= 0
 
-    try {
-        // Assuming a single, global pricing config stored with ID 1
-        // Upsert ensures it's created if it doesn't exist, or updated if it does.
-        const [pricing, created] = await DynamicPricing.upsert(
-            {
-                id: 1, // Target the specific row
-                price_per_km: price_per_km,
-                price_per_kg: price_per_kg,
-                price_per_size_unit: price_per_size_unit,
-                price_per_quantity: price_per_quantity
-            },
-            { returning: true } // Return the created/updated record
-        );
+     try {
+         // Assuming a single, global pricing config stored with ID 1
+         // Upsert ensures it's created if it doesn't exist, or updated if it does.
+         const [pricing, created] = await DynamicPricing.upsert(
+             {
+                 id: 1, // Target the specific row
+                 price_per_km: price_per_km,
+                 price_per_kg: price_per_kg,
+                 price_per_size_unit: price_per_size_unit,
+                 price_per_quantity: price_per_quantity
+             },
+             { returning: true } // Return the created/updated record
+         );
 
-        res.status(200).json({
-            message: `Dynamic pricing configuration ${created ? 'created' : 'updated'}.`,
-            pricing: pricing // Send back the updated pricing object
-        });
+         res.status(200).json({
+             message: `Dynamic pricing configuration ${created ? 'created' : 'updated'}.`,
+             pricing: pricing // Send back the updated pricing object
+         });
 
-    } catch (err) {
-         if (err.name === 'SequelizeValidationError') {
-             return sendErrorResponse(res, 400, 'Pricing update failed due to validation errors.', err.errors.map(e => e.message));
-        }
-        return sendErrorResponse(res, 500, 'Failed to update dynamic pricing.', err);
-    }
+     } catch (err) {
+          if (err.name === 'SequelizeValidationError') {
+               return sendErrorResponse(res, 400, 'Pricing update failed due to validation errors.', err.errors);
+         }
+         return sendErrorResponse(res, 500, 'Failed to update dynamic pricing.', err);
+     }
 };
