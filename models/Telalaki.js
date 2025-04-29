@@ -11,6 +11,16 @@ export default (sequelize, DataTypes) => {
       unique: true,
       allowNull: false, // Usually phone number is required
     },
+    pin: { // Added PIN for Sender
+      type: DataTypes.STRING, // Store as string to preserve leading zeros and for hashing
+      allowNull: false,
+      validate: {
+        isNumeric: true, // Ensure it's composed of digits
+        len: [4, 4]      // Ensure it's exactly 4 digits long
+      },
+      // SECURITY WARNING: This field MUST be hashed before saving to the DB!
+      // Use a library like bcrypt in your application logic.
+    },
   }, {
       // Optional: Add table options like timestamps true (default) or table name
       // tableName: 'Senders'
@@ -59,6 +69,16 @@ export default (sequelize, DataTypes) => {
     is_owner: { // Is the driver also the vehicle owner? Useful info.
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+    },
+    pin: { // Added PIN for Driver
+      type: DataTypes.STRING, // Store as string for hashing
+      allowNull: false,
+      validate: {
+        isNumeric: true, // Ensure it's composed of digits
+        len: [6, 6]      // Ensure it's exactly 6 digits long
+      },
+      // SECURITY WARNING: This field MUST be hashed before saving to the DB!
+      // Use a library like bcrypt in your application logic.
     },
     // --- Fields for Tracking & Availability ---
     current_lat: {
@@ -141,18 +161,18 @@ export default (sequelize, DataTypes) => {
     },
     status: {
       type: DataTypes.ENUM( // Expanded statuses
-          'pending',          // Request created, awaiting assignment
-          'assigned',         // Driver assigned, not yet confirmed/moving
-          'driver_confirmed', // Driver acknowledged assignment
-          'en_route_pickup',  // Driver heading to pickup location
-          'at_pickup',        // Driver arrived at pickup location
-          'en_route_dropoff', // Driver has package(s), heading to dropoff
-          'at_dropoff',       // Driver arrived at dropoff location
-          'delivered',        // Package successfully delivered
-          'cancelled_sender', // Cancelled by sender
-          'cancelled_driver', // Cancelled by driver (provide reason?)
-          'cancelled_admin'   // Cancelled by admin
-       ),
+          'pending',           // Request created, awaiting assignment
+          'assigned',          // Driver assigned, not yet confirmed/moving
+          'driver_confirmed',  // Driver acknowledged assignment
+          'en_route_pickup',   // Driver heading to pickup location
+          'at_pickup',         // Driver arrived at pickup location
+          'en_route_dropoff',  // Driver has package(s), heading to dropoff
+          'at_dropoff',        // Driver arrived at dropoff location
+          'delivered',         // Package successfully delivered
+          'cancelled_sender',  // Cancelled by sender
+          'cancelled_driver',  // Cancelled by driver (provide reason?)
+          'cancelled_admin'    // Cancelled by admin
+         ),
       defaultValue: 'pending',
       allowNull: false,
     },
