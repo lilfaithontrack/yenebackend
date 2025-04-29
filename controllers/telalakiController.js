@@ -1,10 +1,11 @@
-import db from '../models/Telalaki.js'; // Assuming Telalaki.js correctly exports sequelize instance and models
-import { Sequelize } from 'sequelize'; // Import Sequelize for Op and transaction
+ // Assuming Telalaki.js correctly exports sequelize instance and models
+import { Sequelize } from 'sequelize'; 
+import  { Sender, Vehicle, Driver, AdminApproval, DeliveryRequest, DynamicPricing, Notification } from '..models/Telalaki.js';// Import Sequelize for Op and transaction
 import bcrypt from 'bcrypt'; // For hashing PINs
 import jwt from 'jsonwebtoken'; // For generating login tokens
 
 // Destructure models and the sequelize instance
-const { Sender, Vehicle, Driver, AdminApproval, DeliveryRequest, DynamicPricing, Notification, sequelize } = db;
+
 const Op = Sequelize.Op; // Useful for complex queries
 
 const JWT_SECRET = process.env.JWT_SECRET; // Load secret from environment variables
