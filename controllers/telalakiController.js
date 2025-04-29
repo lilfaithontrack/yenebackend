@@ -677,73 +677,66 @@ export const driverApproveCash = async (req, res) => {
 // =============================================
 
 export const createDelivery = async (req, res) => {
-      // --- Authorization ---
-      // TODO: Get sender ID from authenticated user (req.user.id)
-      const senderId = req.user?.id; // Example from auth middleware
-      // if (!senderId || req.user.type !== 'sender') return sendErrorResponse(res, 403, 'Unauthorized: Sender access required.');
+  // --- Get sender ID from req.user (set by authentication middleware) ---
+  const senderId = req.user?.id; // Use optional chaining just in case
 
-      // Use authenticated senderId, remove sender_id from body
-      const { pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, ...deliveryData } = req.body;
+  // --- Check if senderId was actually found ---
+  if (!senderId) {
+      // This means authentication failed or middleware didn't attach user correctly
+      console.error("Error creating delivery: req.user.id not found. Check authentication middleware.");
+      // Use your error response helper
+      return sendErrorResponse(res, 401, 'Authentication failed or user ID not found in token.');
+  }
 
-      // --- Validation ---
-      // Remove sender_id validation once using JWT
-      // if (!senderId) {
-      //     return sendErrorResponse(res, 400, 'Sender ID missing from authentication.');
-      // }
-      if (!pickup_lat || !pickup_lng || !dropoff_lat || !dropoff_lng) {
-          return sendErrorResponse(res, 400, 'Pickup and Dropoff coordinates (lat, lng) are required.');
-      }
-      // TODO: Add validation for coordinate ranges, weight/size formats etc.
+  // Get the rest of the data from the request body
+  const { pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, ...deliveryData } = req.body;
 
-      let transaction;
-      try {
-          // Use imported sequelize instance
-          transaction = await sequelize.transaction();
+  // --- Validation for coordinates etc. ---
+  if (!pickup_lat || !pickup_lng || !dropoff_lat || !dropoff_lng) {
+      return sendErrorResponse(res, 400, 'Pickup and Dropoff coordinates (lat, lng) are required.');
+  }
+  // Add other necessary validations here
 
-          // Optional: Verify sender exists (should be guaranteed by JWT auth middleware)
-          // const senderExists = await Sender.findByPk(senderId, { transaction });
-          // if (!senderExists) { ... } // Should not happen if JWT is valid
+  let transaction;
+  try {
+      transaction = await sequelize.transaction();
 
-          // Create the delivery request using the authenticated senderId
-          // Uses imported DeliveryRequest model
-          const newDelivery = await DeliveryRequest.create({
-              sender_id: senderId, // Use ID from authenticated user
-              pickup_lat,
-              pickup_lng,
-              dropoff_lat,
-              dropoff_lng,
-              ...deliveryData, // Spread remaining optional fields (weight, size, quantity, price etc.)
-              status: 'pending', // Ensure initial status is set correctly
-              payment_method: deliveryData.payment_method || 'cash' // Set default payment method if not provided
-          }, { transaction });
+      // *** Use the extracted senderId here ***
+      const newDelivery = await DeliveryRequest.create({
+          sender_id: senderId, // Make sure this line uses the senderId from req.user.id
+          pickup_lat,
+          pickup_lng,
+          dropoff_lat,
+          dropoff_lng,
+          ...deliveryData, // Spread remaining optional fields
+          status: 'pending' // Ensure initial status
+      }, { transaction });
 
-          // Notify Sender (using helper)
-          await createNotification({
-              sender_id: newDelivery.sender_id,
-              message: `Your delivery request #${newDelivery.id} has been created. We are finding a driver.`, // Simplified message
-              type: 'delivery_created',
-              related_entity_id: newDelivery.id,
-              related_entity_type: 'DeliveryRequest'
-          }, transaction);
+      // Notify Sender (using helper)
+      await createNotification({
+          sender_id: newDelivery.sender_id, // Use ID from the newly created record
+          message: `Your delivery request #${newDelivery.id} has been created. We are finding a driver.`,
+          type: 'delivery_created',
+          related_entity_id: newDelivery.id,
+          related_entity_type: 'DeliveryRequest'
+      }, transaction);
 
-          // --- Trigger Driver Matching Logic (Asynchronous) ---
-          // This should ideally happen outside the controller response path
-          console.log(`Delivery #${newDelivery.id} created. TODO: Trigger driver matching.`);
-          // Example: queueService.add('findDriver', { deliveryId: newDelivery.id });
-          // --------------------------------------------------
+      // TODO: Trigger driver matching logic (async)
 
-          await transaction.commit();
+      await transaction.commit();
 
-          // Return the created object (or a cleaner DTO)
-          res.status(201).json(newDelivery);
+      res.status(201).json(newDelivery); // Return the created delivery
 
-      } catch (err) {
-          if (transaction) await transaction.rollback();
-           if (err.name === 'SequelizeValidationError') {
-                return sendErrorResponse(res, 400, 'Delivery creation failed due to validation errors.', err.errors);
-           }
-          return sendErrorResponse(res, 500, 'Failed to create delivery request.', err);
-      }
+  } catch (err) {
+      if (transaction) await transaction.rollback();
+      // Check if it's a Sequelize validation error (though it shouldn't be for sender_id if code above is right)
+       if (err.name === 'SequelizeValidationError') {
+            return sendErrorResponse(res, 400, 'Delivery creation failed due to validation errors.', err.errors);
+       }
+       // Log the detailed error and send a generic response
+       console.error("Error in createDelivery controller:", err);
+      return sendErrorResponse(res, 500, 'Failed to create delivery request due to an internal error.', err);
+  }
 };
 
 // =============================================
