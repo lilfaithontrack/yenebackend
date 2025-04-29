@@ -10,7 +10,7 @@ import {
     DynamicPricing,
     Notification,
     sequelize // Import the instance for transactions
-} from '../models/telalaki.js'; // Adjust path as needed
+} from '../models/Telalaki.js'; // Adjust path as needed
 
 // Import Sequelize library directly for Op etc.
 import { Sequelize } from 'sequelize';
