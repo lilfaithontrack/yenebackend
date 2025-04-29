@@ -11,7 +11,7 @@ import { connectDB } from './db/dbConnect.js';
 import sequelize from './db/dbConnect.js';
 import catitemRoutes from './routes/catItemRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
-//import telalakiRoutes from'./routes/telalakiRoutes.js';
+import telalakiRoutes from'./routes/telalakiRoutes.js';
 import assignOrderRoutes from './routes/assignOrderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
@@ -92,7 +92,7 @@ app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/prod', addProductRoutes);
 app.use('/api/assign',assignOrderRoutes);
-//app.use('/api/telalaki', telalakiRoutes);
+app.use('/api/telalaki', telalakiRoutes);
 app.use('/api/sellerproduct', sellerProductRoutes);
 
 
