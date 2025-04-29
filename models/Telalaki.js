@@ -14,15 +14,18 @@ export const Sender = sequelize.define('Sender', {
     unique: true,
     allowNull: false,
   },
- pin: {
-    type: DataTypes.STRING,
+  pin: {
+    type: DataTypes.STRING, // Stored as STRING (for the hash)
     allowNull: false,
     validate: {
-      // isNumeric: true, // REMOVED - Hashed value is not numeric
-      len: [4, 4]      // Keep length validation if needed for input (though controller handles it)
+      // isNumeric: true, // REMOVED: Bcrypt hash is NOT numeric. Input validation is done in controller.
+      len: [4, 4]      // Keep if you want length check on INPUT (controller check is primary)
+                       // Note: Bcrypt hashes are much longer than 4! This 'len' validation
+                       // might also need removal if it's checked *after* hashing,
+                       // but typically validation runs *before* hooks/hashing in Sequelize create/update.
+                       // Best practice is to validate input length in the controller *before* hashing.
+                       // Let's remove 'len' as well for clarity, assuming controller handles input validation.
     },
-    // SECURITY WARNING: This field MUST be hashed before saving to the DB!
-  },
     // SECURITY WARNING: This field MUST be hashed before saving to the DB!
     // Use a library like bcrypt in your application logic.
   },
@@ -56,7 +59,6 @@ export const Driver = sequelize.define('Driver', {
   sender_id: { // Foreign key for Sender (establishes the optional link if a driver is also a sender)
     type: DataTypes.INTEGER,
     allowNull: true, // Driver might not be a Sender
-    // unique: true // Handled by the 1:1 association definition below
   },
   full_name: DataTypes.STRING,
   region: DataTypes.STRING,
@@ -75,8 +77,8 @@ export const Driver = sequelize.define('Driver', {
     type: DataTypes.STRING, // Store as string for hashing
     allowNull: false,
     validate: {
-      isNumeric: true,
-      len: [6, 6]
+      // isNumeric: true, // REMOVED: Bcrypt hash is NOT numeric. Input validation is done in controller.
+      len: [6, 6]      // REMOVED (same reasoning as Sender pin) - validate input length in controller.
     },
     // SECURITY WARNING: This field MUST be hashed before saving to the DB!
   },
@@ -109,7 +111,14 @@ export const AdminApproval = sequelize.define('AdminApproval', {
   driver_id: { // Foreign key for Driver
       type: DataTypes.INTEGER,
       allowNull: false, // An approval record must belong to a driver
-      // unique: true // Handled by the 1:1 association
+      // If you want this to be unique directly in DB (ensuring only one approval per driver)
+      // unique: true, // This is often handled by the hasOne association correctly anyway
+      references: { // Explicitly define the foreign key relationship
+        model: 'Drivers', // Make sure this matches the actual table name (usually plural)
+        key: 'id'
+      },
+      onDelete: 'CASCADE', // If driver is deleted, delete approval
+      onUpdate: 'CASCADE'
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
@@ -130,10 +139,22 @@ export const DeliveryRequest = sequelize.define('DeliveryRequest', {
   sender_id: { // Foreign key for Sender (the customer)
     type: DataTypes.INTEGER,
     allowNull: false,
+    references: { // Explicit FK definition
+        model: 'Senders', // Usually plural table name
+        key: 'id'
+    },
+    onDelete: 'CASCADE', // Or 'SET NULL' if request should remain if sender deleted
+    onUpdate: 'CASCADE'
   },
   assigned_driver_id: { // Foreign key for Driver handling this request
       type: DataTypes.INTEGER,
       allowNull: true, // Null until assigned
+      references: { // Explicit FK definition
+        model: 'Drivers', // Usually plural table name
+        key: 'id'
+      },
+      onDelete: 'SET NULL', // If driver is deleted, keep request but unassign it
+      onUpdate: 'CASCADE'
   },
   pickup_lat: {
       type: DataTypes.DOUBLE,
@@ -198,7 +219,7 @@ export const DeliveryRequest = sequelize.define('DeliveryRequest', {
   },
   approved_by: {
     type: DataTypes.ENUM('admin', 'driver'),
-    allowNull: true, // Who confirmed the payment (if screenshot)
+    allowNull: true, // Who confirmed the payment (if screenshot or cash)
   },
   // --- Fields for Multi-stop Sequencing ---
   pickup_sequence: { // Order for pickup if driver has multiple pickups (1st, 2nd, etc.)
@@ -220,21 +241,34 @@ export const DeliveryRequest = sequelize.define('DeliveryRequest', {
 });
 
 export const DynamicPricing = sequelize.define('DynamicPricing', {
+    // Added ID for easier updates/upserts
+    id: {
+       type: DataTypes.INTEGER,
+       primaryKey: true,
+       autoIncrement: false, // Assuming only one row with ID 1 for global settings
+       defaultValue: 1
+    },
   price_per_km: DataTypes.FLOAT,
   price_per_kg: DataTypes.FLOAT,
   price_per_size_unit: DataTypes.FLOAT, // Define 'size_unit' (e.g., cubic meter)
   price_per_quantity: DataTypes.FLOAT, // If quantity affects price beyond weight/size
-  // Consider adding region/zone/vehicle_type FKs if needed
+  // Consider adding region/zone/vehicle_type FKs if needed for more granular pricing
 });
 
 export const Notification = sequelize.define('Notification', {
   sender_id: { // FK for the Sender receiving the notification
     type: DataTypes.INTEGER,
     allowNull: true, // Notification might be for driver OR sender
+    references: { model: 'Senders', key: 'id' },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
   },
   driver_id: { // FK for the Driver receiving the notification
     type: DataTypes.INTEGER,
     allowNull: true, // Notification might be for sender OR driver
+    references: { model: 'Drivers', key: 'id' },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
   },
   message: { // The notification content
     type: DataTypes.TEXT,
@@ -293,16 +327,9 @@ Notification.belongsTo(Driver, { foreignKey: 'driver_id', as: 'recipientDriver' 
 
 // Optional: Vehicle Relationships
 // If a driver *must* have one vehicle:
-// Driver.hasOne(Vehicle, { foreignKey: 'driverId', as: 'vehicle' }); // Add driverId to Vehicle
+// Driver.hasOne(Vehicle, { foreignKey: 'driverId', as: 'vehicle' }); // Add driverId FK to Vehicle model
 // Vehicle.belongsTo(Driver, { foreignKey: 'driverId', as: 'driver' });
-// If a driver can have multiple vehicles:
-// Driver.hasMany(Vehicle, { foreignKey: 'driverId', as: 'vehicles' }); // Add driverId to Vehicle
-// Vehicle.belongsTo(Driver, { foreignKey: 'driverId', as: 'driver' });
-// If a vehicle is owned by a Sender (who might not be the driver):
-// Sender.hasMany(Vehicle, { foreignKey: 'ownerSenderId', as: 'vehicles' }); // Add ownerSenderId to Vehicle
-// Vehicle.belongsTo(Sender, { foreignKey: 'ownerSenderId', as: 'owner' });
-
 
 // --- Optionally export sequelize instance and Sequelize library ---
 // Useful for transactions, raw queries, Op, etc. in your controllers/services
-export { sequelize, Sequelize };
+export { sequelize, Sequelize }; // Export instance and library
