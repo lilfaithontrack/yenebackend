@@ -17,9 +17,7 @@ export const Sender = sequelize.define('Sender', {
   pin: {
     type: DataTypes.STRING, // Stored as STRING (for the hash)
     allowNull: false,
-    validate: {
-      // isNumeric: true, // REMOVED: Bcrypt hash is NOT numeric. Input validation is done in controller.
-      len: [4, 4]      // Keep if you want length check on INPUT (controller check is primary)
+      // Keep if you want length check on INPUT (controller check is primary)
                        // Note: Bcrypt hashes are much longer than 4! This 'len' validation
                        // might also need removal if it's checked *after* hashing,
                        // but typically validation runs *before* hooks/hashing in Sequelize create/update.
