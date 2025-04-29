@@ -14,13 +14,15 @@ export const Sender = sequelize.define('Sender', {
     unique: true,
     allowNull: false,
   },
-  pin: {
+ pin: {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      isNumeric: true,
-      len: [4, 4]
+      // isNumeric: true, // REMOVED - Hashed value is not numeric
+      len: [4, 4]      // Keep length validation if needed for input (though controller handles it)
     },
+    // SECURITY WARNING: This field MUST be hashed before saving to the DB!
+  },
     // SECURITY WARNING: This field MUST be hashed before saving to the DB!
     // Use a library like bcrypt in your application logic.
   },
