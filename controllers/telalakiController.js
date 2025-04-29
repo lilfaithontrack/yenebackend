@@ -44,56 +44,25 @@ const sendErrorResponse = (res, statusCode, message, error = null) => {
 // =============================================
 
 export const registerSender = async (req, res) => {
-    const { full_name, phone, pin } = req.body;
+  try {
+    const { fullName, phoneNumber } = req.body;
 
-    // --- Basic Input Validation ---
-    if (!full_name || !phone || !pin) {
-        return sendErrorResponse(res, 400, 'Full name, phone number, and PIN are required.');
+    const existingSender = await Sender.findOne({ where: { phoneNumber } });
+    if (existingSender) {
+      return res.status(409).json({ message: 'Sender already registered.' });
     }
-    // Add more specific validation (e.g., phone format, PIN format)
-     if (!/^\d{4}$/.test(pin)) { // Basic check for 4 digits
-         return sendErrorResponse(res, 400, 'PIN must be exactly 4 digits.');
-     }
-     // Basic Ethiopian phone number check (Starts with 09, followed by 8 digits) - adjust if needed
-     if (!/^09\d{8}$/.test(phone)) {
-         return sendErrorResponse(res, 400, 'Invalid phone number format. Use 09xxxxxxxx format.');
-     }
 
-    try {
-        // Check if phone number already exists
-        const existingSender = await Sender.findOne({ where: { phone } });
-        if (existingSender) {
-            return sendErrorResponse(res, 409, 'Phone number is already registered.');
-        }
-
-        // Hash the PIN securely
-        const hashedPin = await bcrypt.hash(pin, SALT_ROUNDS);
-
-        // Create the new Sender record
-        const newSender = await Sender.create({
-            full_name,
-            phone,
-            pin: hashedPin // Store the hashed PIN
-        });
-
-        // Exclude PIN from the response
-        const senderData = { ...newSender.toJSON() };
-        delete senderData.pin;
-
-        return res.status(201).json({
-            message: 'Sender registered successfully.',
-            sender: senderData
-        });
-
-    } catch (err) {
-        // Handle potential validation errors from the model
-        if (err.name === 'SequelizeValidationError') {
-            return sendErrorResponse(res, 400, 'Registration failed due to validation errors.', err.errors);
-        }
-        // Generic internal server error
-        return sendErrorResponse(res, 500, 'Sender registration failed due to an internal error.', err);
-    }
+    const sender = await Sender.create({ fullName, phoneNumber });
+    res.status(201).json({ message: 'Sender registered successfully.', sender });
+  } catch (error) {
+    console.error('Registration Error:', error);
+    res.status(500).json({
+      message: 'Sender registration failed due to an internal error.',
+      error: error.message,
+    });
+  }
 };
+
 
 export const loginSender = async (req, res) => {
     const { phone, pin } = req.body;
