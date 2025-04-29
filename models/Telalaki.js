@@ -6,7 +6,6 @@ import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js'; // Assuming dbConnect.js is one level up in 'db'
 
 // --- Define Models directly in the module scope and export them ---
-
 export const Sender = sequelize.define('Sender', {
   full_name: DataTypes.STRING,
   phone: {
@@ -15,22 +14,15 @@ export const Sender = sequelize.define('Sender', {
     allowNull: false,
   },
   pin: {
-    type: DataTypes.STRING, // Stored as STRING (for the hash)
+    type: DataTypes.STRING,
     allowNull: false,
-      // Keep if you want length check on INPUT (controller check is primary)
-                       // Note: Bcrypt hashes are much longer than 4! This 'len' validation
-                       // might also need removal if it's checked *after* hashing,
-                       // but typically validation runs *before* hooks/hashing in Sequelize create/update.
-                       // Best practice is to validate input length in the controller *before* hashing.
-                       // Let's remove 'len' as well for clarity, assuming controller handles input validation.
-    },
-    // SECURITY WARNING: This field MUST be hashed before saving to the DB!
-    // Use a library like bcrypt in your application logic.
-  },
+  }
 }, {
-  // Optional table options like timestamps (default true) or specific table name
-  // tableName: 'Senders'
+  // Optional model/table options
+  tableName: 'Senders',
+  timestamps: true,
 });
+
 
 export const Vehicle = sequelize.define('Vehicle', {
   owner_full_name: DataTypes.STRING,
