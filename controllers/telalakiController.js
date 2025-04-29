@@ -1,6 +1,7 @@
  // Assuming Telalaki.js correctly exports sequelize instance and models
 import { Sequelize } from 'sequelize'; 
-import  { Sender, Vehicle, Driver, AdminApproval, DeliveryRequest, DynamicPricing, Notification } from '..models/Telalaki.js';// Import Sequelize for Op and transaction
+import { Sender, Vehicle, Driver, AdminApproval, DeliveryRequest, DynamicPricing, Notification } from '../models/Telalaki.js';
+// Import Sequelize for Op and transaction
 import bcrypt from 'bcrypt'; // For hashing PINs
 import jwt from 'jsonwebtoken'; // For generating login tokens
 
