@@ -1,195 +1,89 @@
-/**
- * routes/telalakiRoutes.js
- *
- * Defines API routes for the Telalaki application functionalities.
- * Maps routes to controller functions and includes placeholders for
- * authentication, authorization, and validation middleware.
- */
-
+// routes/telalakiRoutes.js
 import express from 'express';
-import {
-    // Import all controller functions
-    registerSender,         // Added
-    loginSender,            // Added
-    registerDriver,
-    updateApproval,
-    createDelivery,
-    submitPaymentProof,
-    adminApprovePayment,
-    driverApproveCash,
-    updatePricing,
-    // --- TODO: Import controllers for fetching data, status updates etc. ---
-    // getDeliveryById,
-    // getMyDeliveries,
-    // updateDeliveryStatus,
-    // updateDriverLocation,
-    // getNotifications,
-    // markNotificationRead,
-    // loginDriver,          // TODO: Add driver login controller import
-    // getAllDeliveries,
-    // getAllDrivers,
-    // getPendingApprovals
-} from '../controllers/telalakiController.js'; // Adjust path if necessary
-
-// --- Optional: Import your actual middleware ---
-// --- Authentication & Authorization ---
-// import { isAuthenticated } from '../middleware/authMiddleware.js'; // General login check
-// import { isAdmin } from '../middleware/authMiddleware.js';        // Check for Admin role
-// import { isDriver } from '../middleware/authMiddleware.js';       // Check for Driver role
-// import { isSender } from '../middleware/authMiddleware.js';       // Check for Sender role (if needed beyond isAuthenticated)
-// import { checkOwnershipOrAdmin } from '../middleware/authMiddleware.js'; // Example for resource access
-
-// --- Validation ---
-// import { validate } from '../middleware/validationMiddleware.js'; // Main validation runner
-// import { senderRegistrationSchema, senderLoginSchema, driverRegistrationSchema, ... } from '../validators/telalakiValidators.js'; // Validation schemas
-
-// -------------------------------------------------
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import * as apiController from '../controllers/telalakiController.js'; // Adjust path
 
 const router = express.Router();
 
-// =============================================
-// Public / Semi-Public Routes (Authentication/Registration)
-// =============================================
+console.log("--- Telalaki API Routes Initializing (WARNING: OPEN ROUTES!) ---");
 
-// POST /api/telalaki/senders/register - Register a new sender
-// Middleware: Input validation
-router.post(
-    '/senders/register',
-    // validate(senderRegistrationSchema), // Example validation middleware
-    registerSender
+// --- START MULTER CONFIGURATION (Integrated into router file) ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, '../uploads/payment_proofs'); // Adjust path relative to this routes file
+
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log(`Created upload directory: ${uploadDir}`);
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) { cb(null, uploadDir); },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const originalNameSafe = file.originalname.replace(/\s+/g, '_');
+        const extension = path.extname(originalNameSafe);
+        cb(null, file.fieldname + '-' + uniqueSuffix + extension);
+    }
+});
+
+const fileFilter = (req, file, cb) => {
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png' || file.mimetype === 'image/jpg') {
+        cb(null, true);
+    } else {
+        cb(new Error('Invalid file type. Only JPEG, JPG, PNG allowed.'), false);
+    }
+};
+
+const uploadPaymentProof = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: { fileSize: 1024 * 1024 * 5 } // 5MB limit
+});
+// --- END MULTER CONFIGURATION ---
+
+
+// --- Authentication ---
+router.post('/auth/register/sender', apiController.registerSender);
+router.post('/auth/login/sender', apiController.loginSender);
+router.post('/auth/register/driver', apiController.registerDriver);
+router.post('/auth/login/driver', apiController.loginDriver);
+
+// --- Drivers ---
+// Uses :driverId URL parameter
+router.put('/drivers/:driverId/location', apiController.updateDriverLocation);
+
+// --- Deliveries ---
+// Requires senderId in body
+router.post('/deliveries', apiController.createDeliveryRequest);
+// Applies multer middleware for file upload named 'paymentProofImage'
+// Requires senderId in body
+router.post('/deliveries/payment-proof',
+    uploadPaymentProof.single('paymentProofImage'), // Apply multer middleware here
+    apiController.submitPaymentProof
 );
+// Requires driverId and deliveryRequestId in body
+router.post('/deliveries/accept', apiController.driverAcceptRequest);
 
-// POST /api/telalaki/senders/login - Log in an existing sender
-// Middleware: Input validation
-router.post(
-    '/senders/login',
-    // validate(senderLoginSchema), // Example validation middleware
-    loginSender
-);
+// --- Admin Functions (Open Routes) ---
+// Requires driver_id, status in body
+router.put('/admin/drivers/approval', apiController.updateApproval);
+// Requires delivery_id in body
+router.post('/admin/payments/approve', apiController.adminApprovePayment);
+// Supports query params for filtering/pagination
+router.get('/admin/deliveries', apiController.getAllDeliveryRequests);
+// Requires deliveryRequestId, driverId in body
+router.post('/admin/deliveries/assign', apiController.adminAssignDriver);
+// Requires deliveryRequestId, radiusKm in body
+router.post('/admin/deliveries/broadcast', apiController.adminBroadcastRequest);
 
-// POST /api/telalaki/drivers/register - Register a new driver (linked to a sender account)
-// Middleware: Input validation
-router.post(
-    '/drivers/register',
-    // validate(driverRegistrationSchema), // Example validation middleware
-    registerDriver
-);
-
-// POST /api/telalaki/drivers/login - Log in an existing driver
-// Middleware: Input validation
-// router.post('/drivers/login', /* validate(driverLoginSchema), */ loginDriver); // TODO: Implement loginDriver controller and uncomment
-
-
-// =============================================
-// Sender Routes (Require Sender Authentication via JWT)
-// =============================================
-
-// POST /api/telalaki/deliveries - Create a new delivery request
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isSender type in JWT), Input validation
-router.post(
-    '/deliveries',
-    // isAuthenticated, // Ensure JWT is valid
-    // isSender,        // Ensure JWT payload indicates 'sender' type
-    // validate(deliverySchema),
-    createDelivery
-);
-
-// PATCH /api/telalaki/payments/proof - Sender submits payment proof for a delivery
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isSender type in JWT), Input validation
-router.patch(
-    '/payments/proof',
-    // isAuthenticated,
-    // isSender,
-    // validate(paymentProofSchema),
-    submitPaymentProof
-);
-
-// GET /api/telalaki/deliveries/my - Get deliveries initiated by the logged-in sender
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isSender type in JWT)
-// router.get('/deliveries/my', /* isAuthenticated, isSender, */ getMyDeliveries); // TODO: Implement getMyDeliveries
-
-// GET /api/telalaki/notifications/my - Get notifications for the logged-in user (sender OR driver)
-// Middleware: Authentication (isAuthenticated -> check JWT)
-// router.get('/notifications/my', /* isAuthenticated, */ getNotifications); // TODO: Implement getNotifications
-
-// PATCH /api/telalaki/notifications/:id/read - Mark a specific notification as read
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (check if notification belongs to user based on JWT)
-// router.patch('/notifications/:id/read', /* isAuthenticated, checkNotificationOwnership, */ markNotificationRead); // TODO: Implement markNotificationRead
-
-
-// =============================================
-// Driver Routes (Require Driver Authentication via JWT)
-// =============================================
-
-// PATCH /api/telalaki/driver/payments/approve-cash - Driver confirms cash payment received
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isDriver type in JWT), Input validation, Authorization (check assignment)
-router.patch(
-    '/driver/payments/approve-cash',
-    // isAuthenticated,
-    // isDriver,
-    // validate(cashApprovalSchema),
-    // checkDeliveryAssignment, // Custom middleware to check if driver (from JWT) is assigned
-    driverApproveCash
-);
-
-// PATCH /api/telalaki/driver/location - Driver updates their current location
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isDriver type in JWT), Input validation
-// router.patch('/driver/location', /* isAuthenticated, isDriver, validateLocationUpdate, */ updateDriverLocation); // TODO: Implement updateDriverLocation
-
-// PATCH /api/telalaki/driver/deliveries/:id/status - Driver updates the status of an assigned delivery
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isDriver type in JWT), Input validation, Authorization (check assignment)
-// router.patch('/driver/deliveries/:id/status', /* isAuthenticated, isDriver, validateStatusUpdate, checkDeliveryAssignment, */ updateDeliveryStatus); // TODO: Implement updateDeliveryStatus
-
-// GET /api/telalaki/driver/deliveries/assigned - Get deliveries assigned to the logged-in driver
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isDriver type in JWT)
-// router.get('/driver/deliveries/assigned', /* isAuthenticated, isDriver, */ getAssignedDeliveries); // TODO: Implement getAssignedDeliveries
-
-
-// =============================================
-// Admin Routes (Require Admin Authentication via JWT)
-// =============================================
-
-// PATCH /api/telalaki/admin/approvals - Admin approves or rejects a driver registration
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isAdmin role in JWT), Input validation
-router.patch(
-    '/admin/approvals',
-    // isAuthenticated,
-    // isAdmin,
-    // validate(approvalSchema),
-    updateApproval
-);
-
-// PATCH /api/telalaki/admin/payments/approve - Admin approves a screenshot payment
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isAdmin role in JWT), Input validation
-router.patch(
-    '/admin/payments/approve',
-    // isAuthenticated,
-    // isAdmin,
-    // validate(paymentApprovalSchema),
-    adminApprovePayment
-);
-
-// PATCH /api/telalaki/admin/pricing - Update dynamic pricing settings
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isAdmin role in JWT), Input validation
-router.patch(
-    '/admin/pricing',
-    // isAuthenticated,
-    // isAdmin,
-    // validate(pricingSchema),
-    updatePricing
-);
-
-// GET /api/telalaki/admin/deliveries - Admin views all deliveries (with filtering/pagination)
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isAdmin role in JWT)
-// router.get('/admin/deliveries', /* isAuthenticated, isAdmin, */ getAllDeliveries); // TODO: Implement getAllDeliveries
-
-// GET /api/telalaki/admin/drivers - Admin views all drivers (with filtering/pagination)
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isAdmin role in JWT)
-// router.get('/admin/drivers', /* isAuthenticated, isAdmin, */ getAllDrivers); // TODO: Implement getAllDrivers
-
-// GET /api/telalaki/admin/approvals/pending - Admin views pending driver approvals
-// Middleware: Authentication (isAuthenticated -> check JWT), Authorization (isAdmin role in JWT)
-// router.get('/admin/approvals/pending', /* isAuthenticated, isAdmin, */ getPendingApprovals); // TODO: Implement getPendingApprovals
-
+// --- Pricing ---
+// Requires pricing params in body
+router.put('/pricing', apiController.setOrUpdatePricing);
+router.get('/pricing', apiController.getPricing);
 
 export default router;
