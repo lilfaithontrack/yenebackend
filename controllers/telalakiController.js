@@ -1,842 +1,851 @@
-// controllers/yourControllerName.js (or wherever this code resides)
+// controllers/telalakiController.js
+// ------------- Unified Controller - INSECURE / OPEN ROUTES -------------
 
-// Import Models and Sequelize instance from Telalaki.js
+// --- Imports ---
 import {
-    Sender,
-    Vehicle,
-    Driver,
-    AdminApproval, // Added import
-    DeliveryRequest,
-    DynamicPricing,
-    Notification,
-    sequelize // Import the instance for transactions
+    Sender, Vehicle, Driver, AdminApproval, DeliveryRequest,
+    DynamicPricing, Notification, sequelize, Sequelize
 } from '../models/Telalaki.js'; // Adjust path as needed
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize'; // Required for complex queries like filtering/bounding box
+import dotenv from 'dotenv';
 
-// Import Sequelize library directly for Op etc.
-import { Sequelize } from 'sequelize';
-import bcrypt from 'bcrypt'; // For hashing PINs
-import jwt from 'jsonwebtoken'; // For generating login tokens
+dotenv.config(); // Ensure JWT_SECRET is loaded
 
-const Op = Sequelize.Op; // Useful for complex queries
+const JWT_SECRET = process.env.JWT_SECRET;
+const SALT_ROUNDS = 10;
+const MAX_ASSIGNMENT_DISTANCE_KM = 50; // Example constant for distance safeguard
 
-const JWT_SECRET = process.env.JWT_SECRET; // Load secret from environment variables
-const SALT_ROUNDS = 10; // Cost factor for bcrypt hashing
+// --- START HELPER FUNCTIONS (Included directly for consolidation) ---
 
-// --- Helper Function for Notifications (No changes needed) ---
+/**
+ * Sends a standardized error response.
+ * @param {object} res - Express response object.
+ * @param {number} statusCode - HTTP status code.
+ * @param {string} message - Error message for the client.
+ * @param {object|array|null} [error=null] - Optional error details (Sequelize errors, etc.).
+ */
+const sendErrorResponse = (res, statusCode, message, error = null) => {
+    console.error(`Error ${statusCode}: ${message}`, error ? error.message || error : ''); // Log the error server-side
+    let details;
+    // Try to extract specific validation errors from Sequelize
+    if (error && error.name === 'SequelizeValidationError' && Array.isArray(error.errors)) {
+         details = error.errors.map(e => ({ field: e.path, message: e.message }));
+    } else if (error && Array.isArray(error) && error.length > 0 && error[0].message) { // Handle other array errors
+        details = error.map(e => ({ field: e.path, message: e.message }));
+    } else if (error && error.message) { // Handle single error object
+         details = error.message;
+    }
+    return res.status(statusCode).json({
+        message: message,
+        error: details || (error ? 'An unexpected error occurred.' : undefined) // Avoid leaking sensitive details
+    });
+};
+
+/**
+ * Creates a notification record in the database.
+ * @param {object} details - Notification details (sender_id OR driver_id, message, type, etc.).
+ * @param {object|null} [transaction=null] - Optional Sequelize transaction object.
+ */
 const createNotification = async (details, transaction = null) => {
-    // details should contain: sender_id OR driver_id, message, type, related_entity_id, related_entity_type
     try {
-        await Notification.create(details, { transaction }); // Pass transaction if provided
-        console.log(`Notification created successfully: ${details.type} for ${details.sender_id ? 'Sender' : 'Driver'} ${details.sender_id || details.driver_id}`);
+        if (!details.message || (!details.sender_id && !details.driver_id)) {
+             console.error("Failed to create notification: Missing message or recipient ID", details);
+             return;
+        }
+        await Notification.create(details, { transaction });
+        console.log(`Notification created: ${details.type || 'general'} for ${details.sender_id ? 'Sender' : 'Driver'} ${details.sender_id || details.driver_id}`);
     } catch (notificationError) {
         // Log the error but don't let notification failure stop the main process
         console.error(`Failed to create notification (${details.type}):`, notificationError);
     }
 };
 
-// --- Helper for Error Responses (No changes needed) ---
-const sendErrorResponse = (res, statusCode, message, error = null) => {
-    console.error(`Error ${statusCode}: ${message}`, error ? error.message || error : ''); // Log the error server-side
-    // Extract specific validation errors if available
-    let details;
-    if (error && Array.isArray(error) && error.length > 0 && error[0].message) {
-        details = error.map(e => ({ field: e.path, message: e.message }));
-    } else if (error && error.message) {
-         details = error.message;
-    }
+/** Converts degrees to radians */
+function deg2rad(deg) {
+  return deg * (Math.PI / 180);
+}
 
-    return res.status(statusCode).json({
-        message: message,
-        error: details || (error ? 'An unexpected error occurred.' : undefined) // Avoid leaking sensitive details in production
-    });
-};
+/** Converts radians to degrees */
+function rad2deg(rad) {
+  return rad * (180 / Math.PI);
+}
+
+/** Calculates the great-circle distance between two points using the Haversine formula. */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Infinity; // Cannot calculate
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in km
+  return distance;
+}
+
+/** Calculates an approximate bounding box for geo-queries. */
+function getBoundingBox(centerLat, centerLng, radiusKm) {
+    const R = 6371;
+    const latRad = deg2rad(centerLat);
+    const latDelta = radiusKm / R;
+    const minLat = rad2deg(latRad - latDelta);
+    const maxLat = rad2deg(latRad + latDelta);
+    if (minLat > -90 && maxLat < 90) {
+        const lonDelta = Math.asin(Math.sin(latDelta) / Math.cos(latRad));
+        const minLng = rad2deg(deg2rad(centerLng) - lonDelta);
+        const maxLng = rad2deg(deg2rad(centerLng) + lonDelta);
+        return { minLat, maxLat, minLng, maxLng };
+    } else {
+        // Handle poles or edge cases
+        return { minLat: Math.max(minLat, -90), maxLat: Math.min(maxLat, 90), minLng: -180, maxLng: 180 };
+    }
+}
+// --- END HELPER FUNCTIONS ---
+
 
 // =============================================
-// Sender Authentication
+// Authentication Functions
 // =============================================
 
 export const registerSender = async (req, res) => {
   try {
-    // Use 'full_name' and 'phone' consistent with Sender model
-    const { full_name, phone, pin } = req.body; // Added pin for direct registration if desired
+    const { full_name, phone, pin } = req.body;
+    // Validation
+    if (!full_name || !phone || !pin) return sendErrorResponse(res, 400, 'Full name, phone number, and 4-digit PIN are required.');
+    if (!/^09\d{8}$/.test(phone)) return sendErrorResponse(res, 400, 'Invalid phone number format. Use 09xxxxxxxx format.');
+    if (!/^\d{4}$/.test(pin)) return sendErrorResponse(res, 400, 'Sender PIN must be exactly 4 digits.');
 
-    // Basic input validation
-    if (!full_name || !phone || !pin) {
-        return sendErrorResponse(res, 400, 'Full name, phone number, and PIN are required.');
-    }
-    if (!/^09\d{8}$/.test(phone)) {
-        return sendErrorResponse(res, 400, 'Invalid phone number format. Use 09xxxxxxxx format.');
-    }
-    if (!/^\d{4}$/.test(pin)) {
-         return sendErrorResponse(res, 400, 'Sender PIN must be exactly 4 digits.');
-    }
+    const existingSender = await Sender.findOne({ where: { phone } });
+    if (existingSender) return sendErrorResponse(res, 409, 'Phone number is already registered.');
 
-    const existingSender = await Sender.findOne({ where: { phone } }); // Use 'phone' from model
-    if (existingSender) {
-      // Use 409 Conflict status code
-      return sendErrorResponse(res, 409, 'Phone number is already registered.');
-    }
-
-    // Hash the PIN before saving
     const hashedPin = await bcrypt.hash(pin, SALT_ROUNDS);
-
-    // Use field names from Sender model ('full_name', 'phone', 'pin')
     const sender = await Sender.create({ full_name, phone, pin: hashedPin });
-
-    // Exclude PIN from the response
     const senderData = { ...sender.toJSON() };
-    delete senderData.pin;
-
+    delete senderData.pin; // Don't send hash back
     res.status(201).json({ message: 'Sender registered successfully.', sender: senderData });
 
   } catch (error) {
-    if (error.name === 'SequelizeValidationError') {
-         return sendErrorResponse(res, 400, 'Registration failed due to validation errors.', error.errors);
+    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+         return sendErrorResponse(res, 400, 'Registration failed: Validation or duplicate entry.', error.errors || error.message);
     }
-    // Log the detailed error server-side
     console.error('Sender Registration Error:', error);
-    // Send generic error response
     sendErrorResponse(res, 500, 'Sender registration failed due to an internal error.');
   }
 };
 
-
 export const loginSender = async (req, res) => {
     const { phone, pin } = req.body;
-
-    // --- Basic Input Validation ---
-    if (!phone || !pin) {
-        return sendErrorResponse(res, 400, 'Phone number and PIN are required.');
-    }
-     // Optional: Basic phone format check on login too
-     if (!/^09\d{8}$/.test(phone)) {
-         return sendErrorResponse(res, 400, 'Invalid phone number format.');
-     }
-     // Pin format check
-     if (!/^\d{4}$/.test(pin)) {
-        return sendErrorResponse(res, 400, 'Invalid PIN format. Must be 4 digits.');
-    }
-
+    // Validation
+    if (!phone || !pin) return sendErrorResponse(res, 400, 'Phone number and PIN are required.');
+    if (!/^09\d{8}$/.test(phone)) return sendErrorResponse(res, 400, 'Invalid phone number format.');
+    if (!/^\d{4}$/.test(pin)) return sendErrorResponse(res, 400, 'Invalid PIN format. Must be 4 digits.');
 
     try {
-        // Find the sender by phone number
-        // Ensure 'pin' attribute is selected (it should be by default unless excluded by scope)
-        const sender = await Sender.findOne({
-             where: { phone },
-             // attributes: ['id', 'full_name', 'phone', 'pin', 'createdAt', 'updatedAt'] // Explicitly list if needed
-        });
-
-        if (!sender) {
-            // Use a generic message to avoid revealing if the phone number exists or not
+        const sender = await Sender.findOne({ where: { phone } });
+        if (!sender || !sender.pin) { // Check if sender exists and has a pin hash
             return sendErrorResponse(res, 401, 'Login failed: Invalid phone number or PIN.');
         }
 
-        // Compare the provided PIN with the stored hash
-        // Ensure sender.pin is not null/undefined before comparing
-        if (!sender.pin) {
-             console.error(`Login Error: Sender ${sender.id} has no PIN hash stored.`);
-             return sendErrorResponse(res, 500, 'Login failed due to a server configuration issue.');
-        }
         const isPinValid = await bcrypt.compare(pin, sender.pin);
-
         if (!isPinValid) {
-            // Generic message again
             return sendErrorResponse(res, 401, 'Login failed: Invalid phone number or PIN.');
         }
 
-        // --- Login Successful - Generate JWT ---
+        // Generate JWT (even though routes are open, login still provides a token)
         if (!JWT_SECRET) {
-             console.error("FATAL ERROR: JWT_SECRET is not defined in environment variables!");
+             console.error("FATAL ERROR: JWT_SECRET is not defined!");
              return sendErrorResponse(res, 500, 'Login failed due to server configuration error.');
         }
-
-        const payload = {
-            id: sender.id,
-            phone: sender.phone,
-            type: 'sender' // Add a type to distinguish tokens
-        };
-
-        const accessToken = jwt.sign(payload, JWT_SECRET, {
-            expiresIn: '1d' // Token expires in 1 day (adjust as needed)
-        });
-
-        // Exclude PIN from the response sender object
+        const payload = { id: sender.id, phone: sender.phone, type: 'sender' };
+        const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
         const senderData = { ...sender.toJSON() };
         delete senderData.pin;
 
-        return res.status(200).json({
-            message: 'Login successful.',
-            accessToken,
-            sender: senderData
-        });
-
+        res.status(200).json({ message: 'Login successful.', accessToken, sender: senderData });
     } catch (err) {
-        // Generic internal server error
-        return sendErrorResponse(res, 500, 'Login failed due to an internal error.', err);
+        console.error("Sender Login Error:", err)
+        sendErrorResponse(res, 500, 'Login failed due to an internal error.', err);
     }
 };
 
-
-// =============================================
-// Driver Registration and Approval
-// =============================================
-
 export const registerDriver = async (req, res) => {
-    // Expecting nested structure or flattened - clarify based on frontend
-    // Assuming flattened for now: sender_full_name, sender_phone, sender_pin, driver_full_name, driver_pin, driver_is_owner, vehicle_...
     const {
-        sender_full_name, sender_phone, sender_pin, // Sender details
-        driver_full_name, driver_pin, driver_phone, driver_email, driver_region, driver_zone, driver_district, driver_house_number, driver_license_photo, identification_photo, is_owner, // Driver details
-        // Vehicle details (only required if is_owner is false)
+        sender_full_name, sender_phone, sender_pin,
+        driver_full_name, driver_pin, driver_phone, driver_email, driver_region, driver_zone, driver_district, driver_house_number, driver_license_photo, identification_photo, is_owner,
         owner_full_name, region: vehicle_region, zone: vehicle_zone, district: vehicle_district, house_number: vehicle_house_number, phone: vehicle_phone, email: vehicle_email, car_type, car_name, manufacture_year, cargo_capacity, license_plate, commercial_license, tin_number, car_license_photo, owner_id_photo, car_photo, owner_photo
      } = req.body;
 
     let transaction;
 
     // --- Basic Input Validation ---
-    if (!sender_full_name || !sender_phone || !sender_pin || !driver_full_name || !driver_pin) {
-        return sendErrorResponse(res, 400, 'Sender (name, phone, 4-digit PIN) and Driver (name, 6-digit PIN) information are required.');
-    }
-    // Sender PIN validation
-     if (!/^\d{4}$/.test(sender_pin)) {
-         return sendErrorResponse(res, 400, 'Sender PIN must be exactly 4 digits.');
-     }
-    // Driver PIN validation
-    if (!/^\d{6}$/.test(driver_pin)) {
-         return sendErrorResponse(res, 400, 'Driver PIN must be exactly 6 digits.');
-     }
-    // Phone validation
-    if (!/^09\d{8}$/.test(sender_phone)) {
-         return sendErrorResponse(res, 400, 'Invalid Sender phone number format. Use 09xxxxxxxx format.');
-    }
-    // Add driver phone format validation if required and unique
-    // if (driver_phone && !/^09\d{8}$/.test(driver_phone)) {
-    //     return sendErrorResponse(res, 400, 'Invalid Driver phone number format.');
-    // }
+    if (!sender_full_name || !sender_phone || !sender_pin || !driver_full_name || !driver_pin) return sendErrorResponse(res, 400, 'Sender (name, phone, 4-digit PIN) and Driver (name, 6-digit PIN) required.');
+    if (!/^\d{4}$/.test(sender_pin)) return sendErrorResponse(res, 400, 'Sender PIN must be 4 digits.');
+    if (!/^\d{6}$/.test(driver_pin)) return sendErrorResponse(res, 400, 'Driver PIN must be 6 digits.');
+    if (!/^09\d{8}$/.test(sender_phone)) return sendErrorResponse(res, 400, 'Invalid Sender phone format.');
+    // Add more specific validation as needed (email, driver phone format if required)
 
-    // Vehicle required check
-    const driverIsOwner = is_owner === true || is_owner === 'true'; // Handle boolean or string 'true'
+    const driverIsOwner = is_owner === true || is_owner === 'true';
     if (!driverIsOwner && (!car_type || !license_plate /* Add other required vehicle fields */)) {
-         return sendErrorResponse(res, 400, 'Complete vehicle information (type, license plate, etc.) is required if the driver is not the owner.');
+        return sendErrorResponse(res, 400, 'Vehicle info required if driver is not owner.');
     }
-    // TODO: Add more specific validation (e.g., email format, photo URLs) using a library like Joi
 
     try {
-        // Use the imported sequelize instance for transaction
         transaction = await sequelize.transaction();
 
-        // Check if sender phone already exists
         const existingSender = await Sender.findOne({ where: { phone: sender_phone }, transaction });
         if (existingSender) {
              await transaction.rollback();
-             return sendErrorResponse(res, 409, 'Sender phone number is already registered.');
+             return sendErrorResponse(res, 409, 'Sender phone number already registered.');
         }
-        // Check if driver phone already exists (if driver phone is unique in your model)
+        // Optional: Check if driver phone exists if it should be unique
         // const existingDriverPhone = await Driver.findOne({ where: { phone: driver_phone }, transaction });
-        // if (driver_phone && existingDriverPhone) {
-        //      await transaction.rollback();
-        //      return sendErrorResponse(res, 409, 'Driver phone number is already registered.');
-        // }
+        // if (driver_phone && existingDriverPhone) { /* rollback, 409 */ }
 
-        // 1. Hash PINs and Create Sender
+        // 1. Create Sender
         const hashedSenderPin = await bcrypt.hash(sender_pin, SALT_ROUNDS);
-        const newSender = await Sender.create({
-             full_name: sender_full_name,
-             phone: sender_phone,
-             pin: hashedSenderPin
-        }, { transaction });
+        const newSender = await Sender.create({ full_name: sender_full_name, phone: sender_phone, pin: hashedSenderPin }, { transaction });
 
-        // 2. Hash Driver PIN and Create Driver, linking to Sender
+        // 2. Create Driver
         const hashedDriverPin = await bcrypt.hash(driver_pin, SALT_ROUNDS);
-        const newDriver = await Driver.create({
-             // Map fields from request body to Driver model
-             full_name: driver_full_name,
-             phone: driver_phone, // Make sure this is collected if needed
-             email: driver_email,
-             region: driver_region,
-             zone: driver_zone,
-             district: driver_district,
-             house_number: driver_house_number,
-             driver_license_photo: driver_license_photo,
-             identification_photo: identification_photo,
-             is_owner: driverIsOwner,
-             pin: hashedDriverPin, // Store hashed driver pin
-             sender_id: newSender.id,
-             // Set initial status? Defaults are handled by model definition
-             // current_status: 'offline',
-             // is_available_for_new: false, // Driver is not available until approved
-        }, { transaction });
+        const driverData = {
+            full_name: driver_full_name, phone: driver_phone, email: driver_email,
+            region: driver_region, zone: driver_zone, district: driver_district, house_number: driver_house_number,
+            driver_license_photo, identification_photo, is_owner: driverIsOwner, pin: hashedDriverPin,
+            sender_id: newSender.id // Link to created Sender
+        };
+        const newDriver = await Driver.create(driverData, { transaction });
 
-        // 3. Create Vehicle (if applicable)
+        // 3. Create Vehicle (if not owner)
         let newVehicle = null;
         if (!driverIsOwner) {
-             newVehicle = await Vehicle.create({
-                 // Map fields from request body to Vehicle model
-                 owner_full_name: owner_full_name,
-                 region: vehicle_region,
-                 zone: vehicle_zone,
-                 district: vehicle_district,
-                 house_number: vehicle_house_number,
-                 phone: vehicle_phone,
-                 email: vehicle_email,
-                 car_type: car_type,
-                 car_name: car_name,
-                 manufacture_year: manufacture_year,
-                 cargo_capacity: cargo_capacity,
-                 license_plate: license_plate,
-                 commercial_license: commercial_license,
-                 tin_number: tin_number,
-                 car_license_photo: car_license_photo,
-                 owner_id_photo: owner_id_photo,
-                 car_photo: car_photo,
-                 owner_photo: owner_photo
-                 // TODO: Consider adding driver_id or sender_id FK to Vehicle model for better association
-                 // driver_id: newDriver.id, // Example if FK is added
-             }, { transaction });
+            const vehicleData = {
+                owner_full_name, region: vehicle_region, zone: vehicle_zone, district: vehicle_district, house_number: vehicle_house_number,
+                phone: vehicle_phone, email: vehicle_email, car_type, car_name, manufacture_year, cargo_capacity, license_plate,
+                commercial_license, tin_number, car_license_photo, owner_id_photo, car_photo, owner_photo
+                // Consider adding driver_id: newDriver.id if you add FK to Vehicle model
+            };
+             newVehicle = await Vehicle.create(vehicleData, { transaction });
         }
 
-        // 4. Create initial AdminApproval record (using imported AdminApproval model)
+        // 4. Create AdminApproval
         await AdminApproval.create({ driver_id: newDriver.id, status: 'pending' }, { transaction });
 
-        // 5. Create Notification for Sender (using helper)
+        // 5. Create Notification
         await createNotification({
-            sender_id: newSender.id,
-            message: `Your driver registration for ${driver_full_name} is submitted and pending approval.`,
-            type: 'driver_registration',
-            related_entity_id: newDriver.id,
-            related_entity_type: 'Driver'
-        }, transaction); // Pass transaction
+            sender_id: newSender.id, message: `Driver registration for ${driver_full_name} submitted, pending approval.`,
+            type: 'driver_registration', related_entity_id: newDriver.id, related_entity_type: 'Driver'
+        }, transaction);
 
-        // If all successful, commit the transaction
         await transaction.commit();
-
-        return res.status(201).json({
-            message: 'Driver registered successfully and pending approval.',
-            driverId: newDriver.id,
-            senderId: newSender.id,
-            vehicleId: newVehicle ? newVehicle.id : null
+        res.status(201).json({
+            message: 'Driver registered successfully, pending approval.',
+            driverId: newDriver.id, senderId: newSender.id, vehicleId: newVehicle ? newVehicle.id : null
         });
 
     } catch (err) {
-        // If transaction was started, roll it back
         if (transaction) await transaction.rollback();
+        if (err.name === 'SequelizeUniqueConstraintError') return sendErrorResponse(res, 409, `Registration failed: Duplicate value for ${err.errors?.[0]?.path || 'field'}.`);
+        if (err.name === 'SequelizeValidationError') return sendErrorResponse(res, 400, 'Registration failed: Validation error.', err.errors);
+        console.error("Driver Registration Error:", err);
+        sendErrorResponse(res, 500, 'Driver registration failed.');
+    }
+};
 
-        // Handle specific errors
-        if (err.name === 'SequelizeUniqueConstraintError') {
-            // Extract field name if possible, otherwise give generic message
-            const field = err.errors && err.errors.length > 0 ? err.errors[0].path : 'field';
-            return sendErrorResponse(res, 409, `Registration failed. The ${field} provided might already be in use.`);
+export const loginDriver = async (req, res) => {
+    const { phone, pin } = req.body;
+    // Validation
+    if (!phone || !pin) return sendErrorResponse(res, 400, 'Driver phone and 6-digit PIN required.');
+    if (!/^09\d{8}$/.test(phone)) return sendErrorResponse(res, 400, 'Invalid phone number format.');
+    if (!/^\d{6}$/.test(pin)) return sendErrorResponse(res, 400, 'Driver PIN must be 6 digits.');
+
+    try {
+        const driver = await Driver.findOne({
+            where: { phone },
+            include: [{ model: AdminApproval, as: 'approvalStatus', attributes: ['status'] }] // Include only status
+        });
+
+        if (!driver) return sendErrorResponse(res, 401, 'Login failed: Invalid credentials.');
+
+        // Check approval status (provide info even if route is open)
+        if (!driver.approvalStatus || driver.approvalStatus.status !== 'approved') {
+             const status = driver.approvalStatus ? driver.approvalStatus.status : 'not processed';
+             return sendErrorResponse(res, 403, `Login failed: Driver account is currently ${status}.`);
         }
-        if (err.name === 'SequelizeValidationError') {
-             return sendErrorResponse(res, 400, 'Registration failed due to validation errors.', err.errors);
+        if (!driver.pin) {
+             console.error(`Login Error: Driver ${driver.id} has no PIN hash.`);
+             return sendErrorResponse(res, 500, 'Login failed: Server configuration error.');
         }
-        // Generic internal server error
-        return sendErrorResponse(res, 500, 'Driver registration failed due to an internal error.', err);
+
+        const isPinValid = await bcrypt.compare(pin, driver.pin);
+        if (!isPinValid) return sendErrorResponse(res, 401, 'Login failed: Invalid credentials.');
+
+        if (!JWT_SECRET) {
+             console.error("FATAL ERROR: JWT_SECRET is not defined!");
+             return sendErrorResponse(res, 500, 'Login failed: Server configuration error.');
+        }
+        const payload = { id: driver.id, phone: driver.phone, type: 'driver' };
+        const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
+        const driverData = { ...driver.toJSON() };
+        delete driverData.pin; // Exclude hash from response
+
+        res.status(200).json({ message: 'Driver login successful.', accessToken, driver: driverData });
+    } catch (err) {
+         console.error("Driver Login Error:", err);
+         sendErrorResponse(res, 500, 'Driver login failed.', err);
     }
 };
 
 // =============================================
-// Driver Approval Management
+// Driver Functions
 // =============================================
-export const updateApproval = async (req, res) => {
-    // --- Authorization ---
-    // TODO: Implement middleware to check if req.user is an admin
-    // const adminId = req.user.id;
-    // if (req.user.role !== 'admin') return sendErrorResponse(res, 403, 'Unauthorized: Admin access required.');
 
-    const { driver_id, status, reason } = req.body;
-    let transaction;
+export const updateDriverLocation = async (req, res) => {
+    // !! INSECURE: driverId comes from URL param !!
+    const { driverId } = req.params;
+    const { latitude, longitude } = req.body;
 
-    // --- Validation ---
-    if (!driver_id || !status) {
-        return sendErrorResponse(res, 400, 'Missing required fields: driver_id and status are required.');
-    }
-    if (!['approved', 'rejected'].includes(status)) {
-         return sendErrorResponse(res, 400, 'Invalid status. Must be "approved" or "rejected".');
-    }
-    if (status === 'rejected' && !reason) {
-        return sendErrorResponse(res, 400, 'Reason is required when rejecting a driver.');
-    }
+    // Validation
+    const drvId = parseInt(driverId, 10);
+    if (isNaN(drvId) || drvId <= 0) return sendErrorResponse(res, 400, 'Invalid Driver ID in URL.');
+    if (latitude === undefined || longitude === undefined) return sendErrorResponse(res, 400, 'Latitude and longitude required.');
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    if (isNaN(lat) || !isFinite(lat) || lat < -90 || lat > 90) return sendErrorResponse(res, 400, 'Invalid latitude.');
+    if (isNaN(lng) || !isFinite(lng) || lng < -180 || lng > 180) return sendErrorResponse(res, 400, 'Invalid longitude.');
 
     try {
-        // Use imported sequelize instance
-        transaction = await sequelize.transaction();
+        const driver = await Driver.findByPk(drvId);
+        if (!driver) return sendErrorResponse(res, 404, `Driver with ID ${drvId} not found.`);
 
-        // Find approval record, including associated Driver and Sender for notification
-        // Uses imported AdminApproval, Driver, Sender models
-        const approval = await AdminApproval.findOne({
-            where: { driver_id },
-            include: [{
-                model: Driver,
-                as: 'driver', // Use alias if defined in telalaki.js associations
-                required: true, // Ensure driver exists
-                include: [{
-                    model: Sender,
-                    as: 'senderAccount', // Use alias if defined
-                    required: true // Ensure sender exists (based on current structure)
-                }]
-            }],
-            transaction // Lock the row during transaction
+        // Update location fields
+        driver.current_lat = lat;
+        driver.current_lng = lng;
+        driver.last_location_update = new Date();
+        await driver.save();
+        res.status(204).send(); // Success, no content
+
+    } catch (err) {
+        console.error(`Error updating location for driver ${drvId}:`, err);
+        sendErrorResponse(res, 500, 'Failed to update driver location.', err);
+    }
+};
+
+// =============================================
+// Delivery Request Functions
+// =============================================
+
+export const createDeliveryRequest = async (req, res) => {
+    // !! INSECURE: senderId comes from request body !!
+    const {
+        senderId, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
+        weight, size, quantity, payment_method,
+    } = req.body;
+
+    // Validation
+    const sId = parseInt(senderId, 10);
+    if (!sId || isNaN(sId) || sId <= 0) return sendErrorResponse(res, 400, 'Valid senderId is required in body.');
+    if (pickup_lat === undefined || pickup_lng === undefined || dropoff_lat === undefined || dropoff_lng === undefined) return sendErrorResponse(res, 400, 'Pickup/Dropoff coordinates required.');
+    const validateCoord = (val, range) => (typeof val === 'number' && isFinite(val) && Math.abs(val) <= range);
+    if (!validateCoord(pickup_lat, 90) || !validateCoord(pickup_lng, 180) || !validateCoord(dropoff_lat, 90) || !validateCoord(dropoff_lng, 180)) return sendErrorResponse(res, 400, 'Invalid coordinates.');
+    if (weight !== undefined && (typeof weight !== 'number' || !isFinite(weight) || weight <= 0)) return sendErrorResponse(res, 400, 'Invalid weight.');
+    if (quantity !== undefined && (!Number.isInteger(quantity) || quantity <= 0)) return sendErrorResponse(res, 400, 'Invalid quantity.');
+
+    let transaction;
+    try {
+        transaction = await sequelize.transaction();
+        // Check Sender existence
+        const senderExists = await Sender.findByPk(sId, { transaction });
+        if (!senderExists) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 404, `Sender with ID ${sId} not found.`);
+        }
+
+        // Fetch Pricing
+        const pricingConfig = await DynamicPricing.findByPk(1, { transaction });
+        if (!pricingConfig || pricingConfig.price_per_km === null || pricingConfig.price_per_km === undefined) {
+             await transaction.rollback();
+             console.warn(`Delivery creation blocked: Pricing not configured.`);
+             return sendErrorResponse(res, 503, 'Service Unavailable: Pricing not configured.');
+        }
+
+        // Calculate Distance (using Haversine - NOTE CAVEAT)
+        const distanceKm = calculateDistance(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng);
+        console.log(`Calculated distance: ${distanceKm.toFixed(2)} km`);
+
+        // Calculate Price
+        let calculatedPrice = distanceKm * pricingConfig.price_per_km;
+        if (weight && typeof pricingConfig.price_per_kg === 'number') calculatedPrice += weight * pricingConfig.price_per_kg;
+        if (quantity && typeof pricingConfig.price_per_quantity === 'number') calculatedPrice += quantity * pricingConfig.price_per_quantity;
+        // Add other pricing factors if needed (size, base_fee, minimum_charge)
+        calculatedPrice = Math.round(calculatedPrice * 100) / 100; // Round to 2 decimal places
+
+        // Prepare Data
+        const deliveryData = {
+            sender_id: sId, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
+            status: 'pending', price: calculatedPrice,
+            ...(weight !== undefined && { weight }), ...(size !== undefined && { size }),
+            ...(quantity !== undefined && { quantity }), ...(payment_method !== undefined && { payment_method }),
+        };
+
+        // Create Record
+        const newDelivery = await DeliveryRequest.create(deliveryData, { transaction });
+
+        // Notification
+        await createNotification({
+            sender_id: sId,
+            message: `Request #${newDelivery.id} created. Distance: ${distanceKm.toFixed(1)} km. Price: ${calculatedPrice.toFixed(2)}. Finding driver...`, // Add currency symbol?
+            type: 'delivery_created', related_entity_id: newDelivery.id, related_entity_type: 'DeliveryRequest'
+        }, transaction);
+
+        // TODO: Trigger driver matching logic asynchronously here
+        console.log(`INFO: Delivery Request ${newDelivery.id} created by Sender ${sId}. Trigger matching (TODO).`);
+
+        await transaction.commit();
+        res.status(201).json(newDelivery);
+
+    } catch (err) {
+        if (transaction) await transaction.rollback();
+        if (err.name === 'SequelizeValidationError') return sendErrorResponse(res, 400, 'Creation failed: Validation.', err.errors);
+        console.error("Error creating delivery request:", err);
+        sendErrorResponse(res, 500, 'Failed to create delivery request.', err);
+    }
+};
+
+export const submitPaymentProof = async (req, res) => {
+    // !! INSECURE: Needs senderId in body !!
+    const { delivery_id, senderId } = req.body;
+    const uploadedFile = req.file; // From multer middleware
+
+    // Validation
+    const reqId = parseInt(delivery_id, 10);
+    const sId = parseInt(senderId, 10);
+    if (!reqId || !sId || isNaN(reqId) || isNaN(sId) || reqId <= 0 || sId <= 0) return sendErrorResponse(res, 400, 'Valid deliveryId and senderId required.');
+    if (!uploadedFile) return sendErrorResponse(res, 400, 'Payment proof image file required.');
+
+    // Construct URL path (ensure static serving is set up correctly in server.js)
+    const filePathUrl = `/uploads/payment_proofs/${uploadedFile.filename}`;
+    let transaction;
+    try {
+        transaction = await sequelize.transaction();
+        const delivery = await DeliveryRequest.findByPk(reqId, { transaction });
+        if (!delivery) {
+            await transaction.rollback();
+            // Consider deleting uploaded file fs.unlink(uploadedFile.path, ...)
+            return sendErrorResponse(res, 404, `Delivery request #${reqId} not found.`);
+        }
+
+        // Ownership Check (using senderId from body)
+        if (delivery.sender_id !== sId) {
+            await transaction.rollback();
+            // Consider deleting uploaded file
+            return sendErrorResponse(res, 403, 'Forbidden: You do not own this request.');
+        }
+        if (delivery.is_payment_approved) {
+            await transaction.rollback();
+             // Consider deleting uploaded file
+            return sendErrorResponse(res, 400, `Payment for #${delivery.id} already approved.`);
+        }
+
+        // Update Record
+        delivery.payment_method = 'screenshot';
+        delivery.payment_proof_url = filePathUrl;
+        delivery.receipt_link = null; // Clear other proof type
+        delivery.is_payment_approved = false; // Pending review
+        delivery.approved_by = null;
+        await delivery.save({ transaction });
+
+        // Notification
+        await createNotification({
+            sender_id: sId, message: `Payment proof image submitted for delivery #${delivery.id}. Pending review.`,
+            type: 'payment_proof_submitted', related_entity_id: delivery.id, related_entity_type: 'DeliveryRequestPayment'
+        }, transaction);
+
+        await transaction.commit();
+        res.status(200).json({ message: 'Payment proof submitted successfully.', filePath: filePathUrl });
+    } catch (err) {
+        if (transaction) await transaction.rollback();
+        // Consider deleting uploaded file on DB error
+        // if (uploadedFile?.path) { try { fs.unlinkSync(uploadedFile.path); } catch(e){...}}
+        console.error(`Error submitting payment proof for Req ${delivery_id}:`, err);
+        sendErrorResponse(res, 500, 'Failed to submit payment proof.', err);
+    }
+};
+
+export const driverAcceptRequest = async (req, res) => {
+    // !! INSECURE: Needs driverId in body !!
+    const { deliveryRequestId, driverId } = req.body;
+
+    // Validation
+    const reqId = parseInt(deliveryRequestId, 10);
+    const drvId = parseInt(driverId, 10);
+    if (!reqId || !drvId || isNaN(reqId) || isNaN(drvId) || reqId <= 0 || drvId <= 0) return sendErrorResponse(res, 400, 'Valid deliveryRequestId and driverId required.');
+
+    let transaction;
+    try {
+        // Attempt high isolation transaction if DB supports it, e.g., PostgreSQL
+        transaction = await sequelize.transaction({
+             // isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.SERIALIZABLE // Example
         });
 
-        if (!approval) {
-            await transaction.rollback(); // Rollback since we didn't find the record
-            return sendErrorResponse(res, 404, `Approval record not found for driver ID ${driver_id}.`);
-        }
+        // Lock rows if using pessimistic locking with DBs like PostgreSQL
+        // const lockOption = { transaction, lock: transaction.LOCK.UPDATE };
+        const lockOption = { transaction }; // Standard transaction lock
 
-        // Avoid redundant updates
-        if (approval.status === status) {
+        // Fetch Request & Sender
+        const deliveryRequest = await DeliveryRequest.findByPk(reqId, {
+            include: [{ model: Sender, as: 'sender', attributes: ['id', 'full_name'] }],
+             ...lockOption // Apply lock
+        });
+
+        if (!deliveryRequest) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 404, `Delivery Request #${reqId} not found.`);
+        }
+        // Check Status - CRITICAL for race condition
+        if (deliveryRequest.status !== 'broadcasting') {
              await transaction.rollback();
-             return res.status(200).json({ message: `Driver status is already ${status}. No changes made.` });
+             const msg = deliveryRequest.assigned_driver_id ? `Request #${reqId} already assigned.` : `Request #${reqId} not available (Status: ${deliveryRequest.status}).`;
+             return sendErrorResponse(res, 409, msg); // Conflict
         }
 
-        const originalStatus = approval.status;
-        const driver = approval.driver; // Access related driver using alias or default name
-        const sender = driver.senderAccount; // Access related sender using alias or default name
+        // Fetch Driver & Check Status/Approval
+        const driver = await Driver.findByPk(drvId, {
+            include: [{ model: AdminApproval, as: 'approvalStatus' }],
+             ...lockOption // Apply lock
+        });
 
-        // Update approval record
+        if (!driver) { await transaction.rollback(); return sendErrorResponse(res, 404, `Driver ${drvId} not found.`); }
+        if (!driver.approvalStatus || driver.approvalStatus.status !== 'approved') { await transaction.rollback(); return sendErrorResponse(res, 403, 'Account not approved.'); }
+        if (!driver.is_available_for_new || driver.current_status !== 'idle') { await transaction.rollback(); return sendErrorResponse(res, 409, `Cannot accept: Your status is ${driver.current_status}.`); }
+
+        // Update Records
+        deliveryRequest.assigned_driver_id = drvId;
+        deliveryRequest.status = 'driver_confirmed';
+        await deliveryRequest.save({ transaction });
+
+        driver.is_available_for_new = false;
+        driver.current_status = 'en_route_pickup';
+        await driver.save({ transaction });
+
+        // Notifications
+        await createNotification({ driver_id: drvId, message: `✅ Accepted Delivery Request #${reqId}. Proceed to pickup.`, type: 'request_accepted_self', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction);
+        if (deliveryRequest.sender) { await createNotification({ sender_id: deliveryRequest.sender.id, message: `Driver ${driver.full_name} accepted Request #${reqId}!`, type: 'request_accepted_sender', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction); }
+        // Optional TODO: Notify other broadcasted drivers
+
+        await transaction.commit();
+        res.status(200).json({ message: `Request #${reqId} accepted successfully.`, deliveryRequest });
+
+    } catch (err) {
+        if (transaction) await transaction.rollback();
+         if (err.name === 'SequelizeTimeoutError' || err.message.includes('lock')) {
+            console.warn(`Lock contention accepting Req ${deliveryRequestId} by Drv ${driverId}:`, err);
+            return sendErrorResponse(res, 503, 'Could not process acceptance now. Please try again.');
+         }
+        console.error(`Error accepting request ${deliveryRequestId} by driver ${driverId}:`, err);
+        sendErrorResponse(res, 500, 'Failed to accept delivery request.', err);
+    }
+};
+
+
+// =============================================
+// Admin Functions (Open Routes)
+// =============================================
+
+export const updateApproval = async (req, res) => {
+    const { driver_id, status, reason } = req.body;
+    // Validation
+    if (!driver_id || !status) return sendErrorResponse(res, 400, 'driver_id and status required.');
+    const drvId = parseInt(driver_id, 10);
+    if (isNaN(drvId) || drvId <= 0) return sendErrorResponse(res, 400, 'Invalid driver_id.');
+    if (!['approved', 'rejected'].includes(status)) return sendErrorResponse(res, 400, 'Invalid status.');
+    if (status === 'rejected' && !reason) return sendErrorResponse(res, 400, 'Reason required for rejection.');
+
+    let transaction;
+    try {
+        transaction = await sequelize.transaction();
+        const approval = await AdminApproval.findOne({
+            where: { driver_id: drvId },
+            include: [{ model: Driver, as: 'driver', include: [{ model: Sender, as: 'senderAccount' }] }],
+            transaction
+        });
+        if (!approval) { await transaction.rollback(); return sendErrorResponse(res, 404, `Approval record not found for driver ${drvId}.`); }
+        if (approval.status === status) { await transaction.rollback(); return res.status(200).json({ message: `Driver status already ${status}.` }); }
+
+        const driver = approval.driver;
+        const sender = driver?.senderAccount;
+        const originalStatus = approval.status;
+
+        // Update Approval
         approval.status = status;
         approval.approved_at = status === 'approved' ? new Date() : null;
         approval.rejected_reason = status === 'rejected' ? reason : null;
         await approval.save({ transaction });
 
-        // --- Optional: Update Driver's status upon approval ---
-        if (status === 'approved' && driver) {
-             driver.current_status = 'idle'; // Set initial status
-             driver.is_available_for_new = true;
-             await driver.save({ transaction });
-        } else if (status === 'rejected' && driver) {
-             // Optionally set driver status if rejected (e.g., back to offline or a specific 'rejected' status)
-             driver.current_status = 'offline';
-             driver.is_available_for_new = false;
+        // Update Driver Status
+        if (driver) {
+             driver.current_status = status === 'approved' ? 'idle' : 'offline';
+             driver.is_available_for_new = status === 'approved';
              await driver.save({ transaction });
         }
-        // ----------------------------------------------------
-
-        // Notify the Sender
+        // Notification
         let notificationMessage = '';
-        if (status === 'approved' && originalStatus !== 'approved') {
-            notificationMessage = `Congratulations! Your driver profile for ${driver.full_name} (ID: ${driver_id}) has been approved. They can now receive delivery requests.`;
-        } else if (status === 'rejected' && originalStatus !== 'rejected') {
-            notificationMessage = `Your driver profile for ${driver.full_name} (ID: ${driver_id}) registration was rejected. Reason: ${reason}`;
-        }
+         if (status === 'approved' && originalStatus !== 'approved') notificationMessage = `Driver profile for ${driver?.full_name} approved.`;
+         else if (status === 'rejected' && originalStatus !== 'rejected') notificationMessage = `Driver profile for ${driver?.full_name} rejected. Reason: ${reason}`;
 
         if (notificationMessage && sender) {
-            await createNotification({
-                sender_id: sender.id,
-                message: notificationMessage,
-                type: 'driver_approval_update', // More specific type
-                related_entity_id: driver_id,
-                related_entity_type: 'DriverApproval' // Use a consistent type name
-            }, transaction);
-        } else if (!sender) {
-             console.warn(`Could not send approval notification: Sender not found for Driver ID ${driver_id}`);
+            await createNotification({ sender_id: sender.id, message: notificationMessage, type: 'driver_approval_update', related_entity_id: drvId, related_entity_type: 'DriverApproval'}, transaction);
+        } else if (!sender && driver) {
+             console.warn(`Could not send approval notification: Sender not found for Driver ID ${drvId}`);
         }
 
         await transaction.commit();
-
-        res.status(200).json({ message: `Driver status successfully updated to ${status}.` });
-
+        res.status(200).json({ message: `Driver ${drvId} status updated to ${status}.` });
     } catch (err) {
         if (transaction) await transaction.rollback();
-        return sendErrorResponse(res, 500, 'Failed to update driver approval status.', err);
+        console.error(`Error updating approval for driver ${driver_id}:`, err);
+        sendErrorResponse(res, 500, 'Failed to update driver approval.', err);
     }
-};
-
-
-// =============================================
-// Payment Handling
-// =============================================
-
-export const submitPaymentProof = async (req, res) => {
-    const { delivery_id, payment_proof_url, receipt_link } = req.body;
-    // --- Authorization ---
-    // TODO: Get sender ID from authenticated user (req.user.id)
-    const senderId = req.user?.id; // Example: Use optional chaining from auth middleware
-    // if (!senderId || req.user.type !== 'sender') return sendErrorResponse(res, 403, 'Unauthorized: Sender access required.');
-
-    // --- Validation ---
-     if (!delivery_id) {
-         return sendErrorResponse(res, 400, 'Delivery ID is required.');
-     }
-     if (!payment_proof_url && !receipt_link) {
-        return sendErrorResponse(res, 400, 'Either a payment_proof_url (screenshot) or receipt_link is required.');
-     }
-     // TODO: Validate URL formats if needed
-
-     let transaction;
-     try {
-         // Use imported sequelize instance
-         transaction = await sequelize.transaction();
-
-         // Use imported DeliveryRequest and Sender models
-         const delivery = await DeliveryRequest.findByPk(delivery_id, {
-              include: [{ model: Sender, as: 'sender' }], // Use alias if defined
-              transaction // Lock row
-         });
-
-         if (!delivery) {
-              await transaction.rollback();
-              return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
-         }
-
-         // --- Authorization Check ---
-         // TODO: Uncomment and use actual sender ID from auth
-         // if (delivery.sender_id !== senderId) {
-         //      await transaction.rollback();
-         //      return sendErrorResponse(res, 403, 'Unauthorized: You can only submit proof for your own delivery requests.');
-         // }
-         // --------------------------
-
-         // Check if payment can be submitted based on status (e.g., only after delivered?)
-         // Example: Allow submission anytime after creation until approved.
-         if (delivery.is_payment_approved) {
-              await transaction.rollback();
-              return sendErrorResponse(res, 400, `Payment for delivery #${delivery.id} has already been approved.`);
-         }
-
-
-         // Update delivery record
-         delivery.payment_method = payment_proof_url ? 'screenshot' : 'cash'; // Re-evaluate if receipt_link implies a different method
-         delivery.payment_proof_url = payment_proof_url || null;
-         delivery.receipt_link = receipt_link || null;
-         delivery.is_payment_approved = false; // Ensure it's pending approval
-         delivery.approved_by = null; // Clear previous approver if re-submitting
-
-         await delivery.save({ transaction });
-
-         // Notify Sender of submission success
-         await createNotification({
-             sender_id: delivery.sender_id, // Use sender_id from the delivery record
-             message: `Payment proof for delivery #${delivery.id} submitted successfully. It is now pending review.`,
-             type: 'payment_proof_submitted',
-             related_entity_id: delivery.id,
-             related_entity_type: 'DeliveryRequestPayment'
-         }, transaction);
-
-         // Optionally notify Admin pool here
-
-         await transaction.commit();
-
-         res.status(200).json({ message: 'Payment information submitted successfully. Waiting for approval.' });
-
-     } catch (err) {
-         if (transaction) await transaction.rollback();
-         return sendErrorResponse(res, 500, 'Failed to submit payment information.', err);
-     }
 };
 
 export const adminApprovePayment = async (req, res) => {
-      // --- Authorization ---
-     // TODO: Implement middleware to check if req.user is an admin
-     // const adminId = req.user.id;
-     // if (req.user.role !== 'admin') return sendErrorResponse(res, 403, 'Unauthorized: Admin access required.');
+    const { delivery_id } = req.body;
+    // Validation
+    if (!delivery_id) return sendErrorResponse(res, 400, 'Delivery ID required.');
+    const reqId = parseInt(delivery_id, 10);
+    if (isNaN(reqId) || reqId <= 0) return sendErrorResponse(res, 400, 'Invalid Delivery ID.');
 
-     const { delivery_id } = req.body;
-     // --- Validation ---
-     if (!delivery_id) {
-         return sendErrorResponse(res, 400, 'Delivery ID is required.');
-     }
-
-     let transaction;
-     try {
-         // Use imported sequelize instance
-          transaction = await sequelize.transaction();
-
-          // Use imported DeliveryRequest and Sender models
-          const delivery = await DeliveryRequest.findByPk(delivery_id, {
-               include: [{ model: Sender, as: 'sender' }], // Use alias if defined
-               transaction
-          });
-
-          if (!delivery) {
-               await transaction.rollback();
-               return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
-          }
-
-          // --- Business Logic Checks ---
-          if (delivery.payment_method !== 'screenshot') { // Assuming admin only approves screenshots
-               await transaction.rollback();
-               return sendErrorResponse(res, 400, 'Payment method is not "screenshot". Admin approval is typically for screenshot proofs.');
-          }
-           if (!delivery.payment_proof_url && !delivery.receipt_link) { // Check if there's proof to review
-               await transaction.rollback();
-               return sendErrorResponse(res, 400, 'No payment proof (screenshot URL or receipt link) found for this delivery.');
-           }
-          if (delivery.is_payment_approved) {
-               await transaction.rollback();
-               // Check who approved it to give a more specific message
-               const approver = delivery.approved_by || 'unknown';
-               return sendErrorResponse(res, 409, `Payment for delivery #${delivery.id} has already been approved by ${approver}.`);
-          }
-          // --------------------------
-
-          delivery.is_payment_approved = true;
-          delivery.approved_by = 'admin'; // Mark as approved by admin
-          await delivery.save({ transaction });
-
-          // Notify Sender (using helper)
-          await createNotification({
-              sender_id: delivery.sender_id,
-              message: `Admin has approved the payment for your delivery #${delivery.id}.`,
-              type: 'payment_approved_admin',
-              related_entity_id: delivery.id,
-              related_entity_type: 'DeliveryRequestPayment'
-          }, transaction);
-
-          await transaction.commit();
-
-          res.status(200).json({ message: `Payment for delivery #${delivery.id} approved by admin.` });
-
-     } catch (err) {
-         if (transaction) await transaction.rollback();
-         return sendErrorResponse(res, 500, 'Failed to approve payment by admin.', err);
-     }
-};
-
-export const driverApproveCash = async (req, res) => {
-    // --- Authorization ---
-    // TODO: Get driver ID from authenticated user (req.user.id)
-    const driverId = req.user?.id; // Example from auth middleware
-    const { delivery_id } = req.body; // Only need delivery_id from body
-    // if (!driverId || req.user.type !== 'driver') return sendErrorResponse(res, 403, 'Unauthorized: Driver access required.');
-
-    // --- Validation ---
-     if (!delivery_id) {
-         return sendErrorResponse(res, 400, 'Delivery ID is required.');
-     }
-     // Remove driverId validation once using JWT
-     // if (!driverId) {
-     //     return sendErrorResponse(res, 400, 'Driver ID missing from authentication.');
-     // }
-
-     let transaction;
-     try {
-         // Use imported sequelize instance
-         transaction = await sequelize.transaction();
-
-         // Use imported DeliveryRequest and Sender models
-         const delivery = await DeliveryRequest.findByPk(delivery_id, {
-              include: [{ model: Sender, as: 'sender' }], // Use alias if defined
-              transaction
-         });
-
-         if (!delivery) {
-              await transaction.rollback();
-              return sendErrorResponse(res, 404, `Delivery request with ID ${delivery_id} not found.`);
-         }
-
-         // --- Authorization & Business Logic Checks ---
-         // Use authenticated driverId from JWT (req.user.id)
-         if (delivery.assigned_driver_id !== driverId) {
-              await transaction.rollback();
-              return sendErrorResponse(res, 403, 'Unauthorized: You are not the assigned driver for this delivery request.');
-         }
-         if (delivery.payment_method !== 'cash') {
-              await transaction.rollback();
-              return sendErrorResponse(res, 400, 'Payment method is not "cash". Driver can only confirm cash payments.');
-         }
-          // Allow approval only at specific stages, e.g., upon delivery
-          if (!['at_dropoff', 'delivered'].includes(delivery.status)) {
-               await transaction.rollback();
-               return sendErrorResponse(res, 400, `Cash payment cannot be confirmed while delivery status is ${delivery.status}. Usually confirmed at dropoff or after delivery.`);
-          }
-         if (delivery.is_payment_approved) {
-              await transaction.rollback();
-              const approver = delivery.approved_by || 'unknown';
-              return sendErrorResponse(res, 409, `Payment for delivery #${delivery.id} has already been approved by ${approver}.`);
-         }
-         // -------------------------------------------
-
-         delivery.is_payment_approved = true;
-         delivery.approved_by = 'driver'; // Mark as approved by driver
-         await delivery.save({ transaction });
-
-         // Notify Sender (using helper)
-         await createNotification({
-             sender_id: delivery.sender_id,
-             message: `The driver has confirmed receiving cash payment for your delivery #${delivery.id}.`,
-             type: 'payment_approved_driver',
-             related_entity_id: delivery.id,
-             related_entity_type: 'DeliveryRequestPayment'
-         }, transaction);
-
-         await transaction.commit();
-
-         res.status(200).json({ message: `Cash payment for delivery #${delivery.id} confirmed by driver.` });
-
-     } catch (err) {
-         if (transaction) await transaction.rollback();
-         return sendErrorResponse(res, 500, 'Failed to confirm cash payment by driver.', err);
-     }
-};
-
-
-// =============================================
-// Delivery Request Management
-// =============================================
-
-export const createDelivery = async (req, res) => {
-  // --- Get sender ID from req.user (set by authentication middleware) ---
-  const senderId = req.user?.id; // Use optional chaining just in case
-
-  // --- Check if senderId was actually found ---
-  if (!senderId) {
-      // This means authentication failed or middleware didn't attach user correctly
-      console.error("Error creating delivery: req.user.id not found. Check authentication middleware.");
-      // Use your error response helper
-      return sendErrorResponse(res, 401, 'Authentication failed or user ID not found in token.');
-  }
-
-  // Get the rest of the data from the request body
-  const { pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, ...deliveryData } = req.body;
-
-  // --- Validation for coordinates etc. ---
-  if (!pickup_lat || !pickup_lng || !dropoff_lat || !dropoff_lng) {
-      return sendErrorResponse(res, 400, 'Pickup and Dropoff coordinates (lat, lng) are required.');
-  }
-  // Add other necessary validations here
-
-  let transaction;
-  try {
-      transaction = await sequelize.transaction();
-
-      // *** Use the extracted senderId here ***
-      const newDelivery = await DeliveryRequest.create({
-          sender_id: senderId, // Make sure this line uses the senderId from req.user.id
-          pickup_lat,
-          pickup_lng,
-          dropoff_lat,
-          dropoff_lng,
-          ...deliveryData, // Spread remaining optional fields
-          status: 'pending' // Ensure initial status
-      }, { transaction });
-
-      // Notify Sender (using helper)
-      await createNotification({
-          sender_id: newDelivery.sender_id, // Use ID from the newly created record
-          message: `Your delivery request #${newDelivery.id} has been created. We are finding a driver.`,
-          type: 'delivery_created',
-          related_entity_id: newDelivery.id,
-          related_entity_type: 'DeliveryRequest'
-      }, transaction);
-
-      // TODO: Trigger driver matching logic (async)
-
-      await transaction.commit();
-
-      res.status(201).json(newDelivery); // Return the created delivery
-
-  } catch (err) {
-      if (transaction) await transaction.rollback();
-      // Check if it's a Sequelize validation error (though it shouldn't be for sender_id if code above is right)
-       if (err.name === 'SequelizeValidationError') {
-            return sendErrorResponse(res, 400, 'Delivery creation failed due to validation errors.', err.errors);
-       }
-       // Log the detailed error and send a generic response
-       console.error("Error in createDelivery controller:", err);
-      return sendErrorResponse(res, 500, 'Failed to create delivery request due to an internal error.', err);
-  }
-};
-
-// =============================================
-// Pricing Management
-// =============================================
-
-export const updatePricing = async (req, res) => {
-      // --- Authorization ---
-      // TODO: Implement middleware to check if req.user is an admin
-      // const adminId = req.user.id;
-      // if (req.user.role !== 'admin') return sendErrorResponse(res, 403, 'Unauthorized: Admin access required.');
-
-      // Only include fields defined in the DynamicPricing model
-      const { price_per_km, price_per_kg, price_per_size_unit, price_per_quantity } = req.body;
-
-      // --- Validation ---
-      // Basic check if any valid data is provided
-      const updateData = {};
-      if (price_per_km !== undefined && !isNaN(parseFloat(price_per_km))) updateData.price_per_km = parseFloat(price_per_km);
-      if (price_per_kg !== undefined && !isNaN(parseFloat(price_per_kg))) updateData.price_per_kg = parseFloat(price_per_kg);
-      if (price_per_size_unit !== undefined && !isNaN(parseFloat(price_per_size_unit))) updateData.price_per_size_unit = parseFloat(price_per_size_unit);
-      if (price_per_quantity !== undefined && !isNaN(parseFloat(price_per_quantity))) updateData.price_per_quantity = parseFloat(price_per_quantity);
-
-      if (Object.keys(updateData).length === 0) {
-           return sendErrorResponse(res, 400, 'At least one valid pricing parameter (numeric) must be provided.');
-      }
-
-      try {
-          // Assuming a single, global pricing config stored with ID 1
-          // Upsert ensures it's created if it doesn't exist, or updated if it does.
-          // Use imported DynamicPricing model
-          const [pricing, created] = await DynamicPricing.upsert(
-               {
-                    id: 1, // Target the specific row (ensure your DB has this row or handle creation)
-                    ...updateData // Only include validated fields
-               },
-               { returning: true } // Return the created/updated record
-          );
-
-          res.status(200).json({
-               message: `Dynamic pricing configuration ${created ? 'created' : 'updated'}.`,
-               pricing: pricing // Send back the updated pricing object
-          });
-
-      } catch (err) {
-           if (err.name === 'SequelizeValidationError') {
-                return sendErrorResponse(res, 400, 'Pricing update failed due to validation errors.', err.errors);
-           }
-          return sendErrorResponse(res, 500, 'Failed to update dynamic pricing.', err);
-      }
-};
-
-// --- TODO: Add Driver Login Controller ---
-/*
-export const loginDriver = async (req, res) => {
-    const { phone, pin } = req.body; // Driver phone and 6-digit PIN
-
-    // 1. Validate input (phone format, 6-digit PIN)
-    if (!phone || !pin || !/^\d{6}$/.test(pin) // Add phone format check) {
-       return sendErrorResponse(res, 400, 'Driver phone and 6-digit PIN are required.');
-    }
-
+    let transaction;
     try {
-        // 2. Find Driver by phone (make sure phone is unique or handle multiple)
-        const driver = await Driver.findOne({ where: { phone } }); // Ensure 'pin' is selected
+        transaction = await sequelize.transaction();
+        const delivery = await DeliveryRequest.findByPk(reqId, { include: [{ model: Sender, as: 'sender' }], transaction });
+        if (!delivery) { await transaction.rollback(); return sendErrorResponse(res, 404, `Delivery request #${reqId} not found.`); }
 
-        if (!driver) {
-            return sendErrorResponse(res, 401, 'Login failed: Invalid driver phone or PIN.');
+        // Business Checks
+        if (delivery.payment_method !== 'screenshot') { await transaction.rollback(); return sendErrorResponse(res, 400, 'Admin approval only applicable for screenshot payments.'); }
+        if (!delivery.payment_proof_url) { await transaction.rollback(); return sendErrorResponse(res, 400, 'No payment proof URL found for this delivery.'); }
+        if (delivery.is_payment_approved) { await transaction.rollback(); return sendErrorResponse(res, 409, `Payment for #${delivery.id} already approved by ${delivery.approved_by || 'N/A'}.`); }
+
+        // Update Record
+        delivery.is_payment_approved = true;
+        delivery.approved_by = 'admin';
+        await delivery.save({ transaction });
+
+        // Notification
+        await createNotification({ sender_id: delivery.sender_id, message: `Admin approved payment for delivery #${delivery.id}.`, type: 'payment_approved_admin', related_entity_id: delivery.id, related_entity_type: 'DeliveryRequestPayment'}, transaction);
+
+        await transaction.commit();
+        res.status(200).json({ message: `Payment for delivery #${reqId} approved by admin.` });
+    } catch (err) {
+        if (transaction) await transaction.rollback();
+        console.error(`Error admin approving payment for Req ${delivery_id}:`, err);
+        sendErrorResponse(res, 500, 'Failed to approve payment.', err);
+    }
+};
+
+export const getAllDeliveryRequests = async (req, res) => {
+    try {
+        // Pagination
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const offset = (page - 1) * limit;
+
+        // Filtering
+        const whereClause = {};
+        if (req.query.status) whereClause.status = { [Op.in]: req.query.status.split(',').map(s => s.trim()) };
+        if (req.query.senderId) whereClause.sender_id = parseInt(req.query.senderId, 10);
+        if (req.query.driverId) whereClause.assigned_driver_id = parseInt(req.query.driverId, 10);
+        // Add date range filters etc. if needed
+
+        // Sorting
+        const sortBy = req.query.sortBy || 'createdAt';
+        const sortOrder = req.query.sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        const orderClause = [[sortBy, sortOrder]];
+
+        // Fetch Data
+        const { count, rows } = await DeliveryRequest.findAndCountAll({
+            where: whereClause,
+            include: [
+                { model: Sender, as: 'sender', attributes: ['id', 'full_name', 'phone'] },
+                { model: Driver, as: 'assignedDriver', attributes: ['id', 'full_name', 'phone', 'current_lat', 'current_lng'] }
+            ],
+            order: orderClause,
+            limit: limit,
+            offset: offset,
+            distinct: true,
+        });
+
+        // Prepare Response
+        const totalPages = Math.ceil(count / limit);
+        res.status(200).json({
+            message: "Delivery requests retrieved.",
+            data: rows,
+            pagination: { totalItems: count, totalPages, currentPage: page, limit }
+        });
+    } catch (err) {
+        if (err instanceof TypeError || err instanceof Error && err.message.includes("parseInt")) {
+             return sendErrorResponse(res, 400, 'Invalid query parameter format.', err);
+        }
+        console.error("Error fetching delivery requests:", err);
+        sendErrorResponse(res, 500, 'Failed to retrieve delivery requests.', err);
+    }
+};
+
+export const adminAssignDriver = async (req, res) => {
+    const { deliveryRequestId, driverId } = req.body;
+    // Validation
+    if (!deliveryRequestId || !driverId) return sendErrorResponse(res, 400, 'deliveryRequestId and driverId required.');
+    const reqId = parseInt(deliveryRequestId, 10);
+    const drvId = parseInt(driverId, 10);
+    if (isNaN(reqId) || isNaN(drvId) || reqId <= 0 || drvId <= 0) return sendErrorResponse(res, 400, 'Invalid IDs.');
+
+    let transaction;
+    try {
+        transaction = await sequelize.transaction();
+
+        // Fetch Request
+        const deliveryRequest = await DeliveryRequest.findByPk(reqId, { include: [{ model: Sender, as: 'sender' }], transaction });
+        if (!deliveryRequest) { await transaction.rollback(); return sendErrorResponse(res, 404, `Request #${reqId} not found.`); }
+        if (deliveryRequest.status !== 'pending') { await transaction.rollback(); return sendErrorResponse(res, 400, `Request #${reqId} status is not 'pending'.`); }
+
+        // Fetch Driver & Checks
+        const driver = await Driver.findByPk(drvId, { include: [{ model: AdminApproval, as: 'approvalStatus' }], transaction });
+        if (!driver) { await transaction.rollback(); return sendErrorResponse(res, 404, `Driver ${drvId} not found.`); }
+        if (!driver.approvalStatus || driver.approvalStatus.status !== 'approved') { await transaction.rollback(); return sendErrorResponse(res, 400, `Driver ${drvId} not approved.`); }
+        if (!['idle', 'offline'].includes(driver.current_status) || !driver.is_available_for_new) { await transaction.rollback(); return sendErrorResponse(res, 400, `Driver ${drvId} not available.`); }
+
+        // Optional Distance Check
+        if (driver.current_lat && deliveryRequest.pickup_lat) {
+            const distance = calculateDistance(driver.current_lat, driver.current_lng, deliveryRequest.pickup_lat, deliveryRequest.pickup_lng);
+            console.log(`AdminAssign: Dist Drv ${drvId} to Req ${reqId} Pickup: ${distance.toFixed(1)}km`);
+            if (distance > MAX_ASSIGNMENT_DISTANCE_KM) {
+                await transaction.rollback();
+                return sendErrorResponse(res, 400, `Assignment failed safeguard: Driver ${distance.toFixed(1)} km away.`);
+            }
         }
 
-         // Check if driver is approved
-         const approval = await AdminApproval.findOne({ where: { driver_id: driver.id } });
-         if (!approval || approval.status !== 'approved') {
-             return sendErrorResponse(res, 403, `Login failed: Driver account is ${approval ? approval.status : 'not processed'}.`);
-         }
+        // Update Records
+        deliveryRequest.assigned_driver_id = drvId;
+        deliveryRequest.status = 'assigned';
+        await deliveryRequest.save({ transaction });
+        driver.is_available_for_new = false;
+        driver.current_status = 'assigned';
+        await driver.save({ transaction });
 
+        // Notifications
+        await createNotification({ driver_id: drvId, message: `Admin assigned you Delivery #${reqId}.`, type: 'assignment_admin', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction);
+        if (deliveryRequest.sender) { await createNotification({ sender_id: deliveryRequest.sender.id, message: `Admin assigned Driver ${driver.full_name} to Request #${reqId}.`, type: 'driver_assigned', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction); }
 
-        // 3. Compare hashed PIN
-        if (!driver.pin) { ... handle missing pin hash ... }
-        const isPinValid = await bcrypt.compare(pin, driver.pin);
+        await transaction.commit();
+        res.status(200).json({ message: `Driver ${drvId} assigned to Request ${reqId}.`, deliveryRequest });
+    } catch (err) {
+        if (transaction) await transaction.rollback();
+        console.error(`Error admin assigning driver ${driverId} to request ${deliveryRequestId}:`, err);
+        sendErrorResponse(res, 500, 'Failed to assign driver.', err);
+    }
+};
 
-        if (!isPinValid) {
-            return sendErrorResponse(res, 401, 'Login failed: Invalid driver phone or PIN.');
-        }
+export const adminBroadcastRequest = async (req, res) => {
+    const { deliveryRequestId, radiusKm } = req.body;
+    // Validation
+    if (!deliveryRequestId || !radiusKm) return sendErrorResponse(res, 400, 'deliveryRequestId and radiusKm required.');
+    const reqId = parseInt(deliveryRequestId, 10);
+    const radius = parseFloat(radiusKm);
+    if (isNaN(reqId) || isNaN(radius) || reqId <= 0 || radius <= 0) return sendErrorResponse(res, 400, 'Invalid ID or radius.');
 
-        // 4. Generate JWT
-        if (!JWT_SECRET) { ... handle missing secret ... }
-        const payload = { id: driver.id, phone: driver.phone, type: 'driver' };
-        const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
+    let transaction;
+    try {
+        transaction = await sequelize.transaction();
 
-        // 5. Return success response (excluding PIN)
-        const driverData = { ...driver.toJSON() };
-        delete driverData.pin;
+        // Fetch Request
+        const deliveryRequest = await DeliveryRequest.findByPk(reqId, { transaction });
+        if (!deliveryRequest) { await transaction.rollback(); return sendErrorResponse(res, 404, `Request #${reqId} not found.`); }
+        if (deliveryRequest.status !== 'pending') { await transaction.rollback(); return sendErrorResponse(res, 400, `Cannot broadcast: Request status is '${deliveryRequest.status}'.`); }
+        if (!deliveryRequest.pickup_lat || !deliveryRequest.pickup_lng) { await transaction.rollback(); return sendErrorResponse(res, 400, `Request #${reqId} missing pickup coordinates.`); }
 
-        res.status(200).json({ message: 'Driver login successful.', accessToken, driver: driverData });
+        // Find Eligible Drivers
+        const { pickup_lat, pickup_lng } = deliveryRequest;
+        const boundingBox = getBoundingBox(pickup_lat, pickup_lng, radius);
+        const potentialDrivers = await Driver.findAll({
+            where: {
+                is_available_for_new: true, current_status: 'idle',
+                current_lat: { [Op.between]: [boundingBox.minLat, boundingBox.maxLat] },
+                current_lng: { [Op.between]: [boundingBox.minLng, boundingBox.maxLng] },
+            },
+            include: [{ model: AdminApproval, as: 'approvalStatus', where: { status: 'approved' }, required: true }],
+            attributes: ['id', 'full_name', 'current_lat', 'current_lng'],
+            transaction
+        });
+        const driversInRadius = potentialDrivers.filter(driver => {
+            if (!driver.current_lat || !driver.current_lng) return false;
+            const distance = calculateDistance(pickup_lat, pickup_lng, driver.current_lat, driver.current_lng);
+            return distance <= radius;
+        });
+        if (driversInRadius.length === 0) { await transaction.rollback(); return sendErrorResponse(res, 404, `No available drivers found within ${radius} km.`); }
+
+        // Update Request Status
+        deliveryRequest.status = 'broadcasting';
+        await deliveryRequest.save({ transaction });
+
+        // Create Notifications
+        const notificationPromises = driversInRadius.map(driver => {
+            const distance = calculateDistance(pickup_lat, pickup_lng, driver.current_lat, driver.current_lng);
+            return createNotification({
+                driver_id: driver.id, message: `New Delivery #${reqId} available approx ${distance.toFixed(1)} km away. Accept Now!`,
+                type: 'broadcast_request', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'
+            }, transaction);
+        });
+        await Promise.all(notificationPromises);
+
+        await transaction.commit();
+        res.status(200).json({ message: `Request #${reqId} broadcasted to ${driversInRadius.length} drivers.`, broadcastedTo: driversInRadius.map(d => d.id) });
 
     } catch (err) {
-        sendErrorResponse(res, 500, 'Driver login failed.', err);
+        if (transaction) await transaction.rollback();
+        console.error(`Error broadcasting request ${deliveryRequestId}:`, err);
+        sendErrorResponse(res, 500, 'Failed to broadcast request.', err);
     }
 };
-*/
 
-// TODO: Add other controllers as previously mentioned (getDeliveries, updateDeliveryStatus, updateDriverLocation, getNotifications etc.)
+// =============================================
+// Pricing Functions (Open Routes)
+// =============================================
+
+export const setOrUpdatePricing = async (req, res) => {
+    // Validation
+    const { price_per_km, price_per_kg, price_per_size_unit, price_per_quantity } = req.body;
+    const updateData = {};
+    if (price_per_km !== undefined && !isNaN(parseFloat(price_per_km)) && isFinite(price_per_km)) updateData.price_per_km = parseFloat(price_per_km);
+    if (price_per_kg !== undefined && !isNaN(parseFloat(price_per_kg)) && isFinite(price_per_kg)) updateData.price_per_kg = parseFloat(price_per_kg);
+    if (price_per_size_unit !== undefined && !isNaN(parseFloat(price_per_size_unit)) && isFinite(price_per_size_unit)) updateData.price_per_size_unit = parseFloat(price_per_size_unit);
+    if (price_per_quantity !== undefined && !isNaN(parseFloat(price_per_quantity)) && isFinite(price_per_quantity)) updateData.price_per_quantity = parseFloat(price_per_quantity);
+
+    if (Object.keys(updateData).length === 0) return sendErrorResponse(res, 400, 'At least one valid pricing parameter required.');
+
+    try {
+        // Upsert the single pricing row (ID 1)
+        const [pricing, created] = await DynamicPricing.upsert({ id: 1, ...updateData }, { returning: true });
+        res.status(200).json({ message: `Pricing config ${created ? 'created' : 'updated'}.`, pricing });
+    } catch (err) {
+        if (err.name === 'SequelizeValidationError') return sendErrorResponse(res, 400, 'Pricing update failed: Validation.', err.errors);
+        console.error("Error updating pricing:", err);
+        sendErrorResponse(res, 500, 'Failed to update pricing.', err);
+    }
+};
+
+export const getPricing = async (req, res) => {
+    try {
+        const pricing = await DynamicPricing.findByPk(1); // Assumes ID 1 for global config
+        if (!pricing) return sendErrorResponse(res, 404, 'Pricing configuration not found.');
+
+        const pricingData = { ...pricing.toJSON() };
+        delete pricingData.id; // Hide internal ID
+        res.status(200).json({ message: "Pricing configuration retrieved.", pricing: pricingData });
+    } catch (err) {
+        console.error("Error getting pricing:", err);
+        sendErrorResponse(res, 500, 'Failed to retrieve pricing.', err);
+    }
+};
