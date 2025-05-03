@@ -179,9 +179,9 @@ export const DynamicPricing = sequelize.define('DynamicPricing', {
     },
   // Added Default Values
   price_per_km: { type: DataTypes.FLOAT, defaultValue: 15.0 },
-  price_per_kg: { type: DataTypes.FLOAT, defaultValue: 0.0 },
-  price_per_size_unit: { type: DataTypes.FLOAT, defaultValue: 0.0 },
-  price_per_quantity: { type: DataTypes.FLOAT, defaultValue: 0.0 },
+  price_per_kg: { type: DataTypes.FLOAT, defaultValue: 12.0 },
+  price_per_size_unit: { type: DataTypes.FLOAT, defaultValue: 12.0 },
+  price_per_quantity: { type: DataTypes.FLOAT, defaultValue: 3.0 },
   // base_fee: { type: DataTypes.FLOAT, defaultValue: 50.0 }, // Example
   // minimum_charge: { type: DataTypes.FLOAT, defaultValue: 75.0 } // Example
 }, { tableName: 'DynamicPricing', timestamps: false }); // Timestamps likely not needed
