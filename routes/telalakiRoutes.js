@@ -52,7 +52,10 @@ router.post('/auth/register/sender', apiController.registerSender);
 router.post('/auth/login/sender', apiController.loginSender);
 router.post('/auth/register/driver', apiController.registerDriver);
 router.post('/auth/login/driver', apiController.loginDriver);
-
+router.get(
+    '/senders/:senderId/notifications',
+    apiController.getMyNotifications
+);
 // --- Drivers ---
 // Uses :driverId URL parameter
 router.put('/drivers/:driverId/location', apiController.updateDriverLocation);
