@@ -342,7 +342,7 @@ export const createDeliveryRequest = async (req, res) => {
     // !! INSECURE: senderId comes from request body !!
     const {
         senderId, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-        weight, size, quantity, payment_method,
+        weight, size, quantity, vehicle, payment_method,
     } = req.body;
 
     // Validation
