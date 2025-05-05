@@ -1,73 +1,71 @@
+// Example: middleware/authMiddleware.js
+
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js'; // Adjust the import according to your model
+import { Sender } from '../models/Telalaki.js'; // Adjust path to your models file
+// Import your error response helper if you have one
+// import { sendErrorResponse } from '../controllers/helpers.js'; // Adjust path
 
-export const authenticateUser = (requiredRoles = []) => {
-  return async (req, res, next) => {
-    // Get token from Authorization header
-    const token = req.headers['authorization'];
+// Make sure JWT_SECRET is loaded from environment variables
+const JWT_SECRET = process.env.JWT_SECRET;
 
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access denied. No token provided.',
-      });
-    }
+// Helper function (if not imported)
+const sendErrorResponse = (res, statusCode, message) => {
+    console.error(`Error ${statusCode}: ${message}`);
+    res.status(statusCode).json({ message });
+};
 
-    // Ensure token is in the format "Bearer <token>"
-    if (!token.startsWith('Bearer ')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid token format. Token must start with "Bearer "',
-      });
-    }
 
+export const protectSender = async (req, res, next) => {
+  let token;
+  console.log('>>> Protect Middleware: Checking authentication...'); // Debug log
+
+  // 1. Check for Authorization header and Bearer token format
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
-      // Verify token
-      const decoded = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET);
-      req.user = decoded; // Attach user info from token
+      // 2. Extract token from "Bearer <token>"
+      token = req.headers.authorization.split(' ')[1];
+      console.log('>>> Protect Middleware: Token found.'); // Debug log
 
-      // Check if the user exists in the database
-      const user = await User.findByPk(req.user.id); // Assuming the user ID is in the token
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not found.',
-        });
+      // 3. Verify the token using your secret key
+      // This checks signature and expiration
+      const decoded = jwt.verify(token, JWT_SECRET);
+      console.log('>>> Protect Middleware: Token verified, decoded payload:', decoded); // Debug log
+
+      // 4. Use ID from token payload to find the sender in the database
+      //    The property name in 'decoded' (e.g., 'id', 'senderId') depends on
+      //    what you put in the payload when you *created* the token during login.
+      //    IMPORTANT: Exclude sensitive fields like the PIN!
+      const loggedInSender = await Sender.findByPk(decoded.id, { // Assuming payload has 'id'
+        attributes: { exclude: ['pin'] } // Exclude sensitive data
+      });
+
+      if (!loggedInSender) {
+         console.error('>>> Protect Middleware: Sender not found for ID in token:', decoded.id);
+         // Changed from sendErrorResponse to just calling next() without attaching user
+         // This allows the controller to potentially handle 'user not found' differently if needed,
+         // or you can send the 401 directly here. If sending 401, use 'return'.
+         // return sendErrorResponse(res, 401, 'Not authorized, user associated with token not found.');
+         // Calling next() without req.sender will cause the controller check to fail with "User context not found"
+         return next();
       }
 
-      // Check for role authorization if required roles are specified
-      if (requiredRoles.length && !requiredRoles.includes(user.role)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Forbidden: You do not have permission to perform this action.',
-        });
-      }
+      // 5. Attach the fetched sender object to the request object
+      //    Controllers downstream can now access req.sender
+      req.sender = loggedInSender;
+      console.log('>>> Protect Middleware: Sender context attached to req.sender.'); // Debug log
 
-      next(); // Proceed to the next middleware or route handler
+      next(); // Token is valid, user found, proceed to the next middleware/controller
+
     } catch (error) {
-      console.error('Authentication error:', error); // Log the error for debugging
-      if (error instanceof jwt.JsonWebTokenError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid token or token expired.',
-        });
-      } else if (error instanceof jwt.NotBeforeError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Token is not active yet.',
-        });
-      } else if (error instanceof jwt.TokenExpiredError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Token has expired.',
-        });
-      } else {
-        // Handle any other unforeseen errors
-        return res.status(500).json({
-          success: false,
-          message: 'Server error during token verification.',
-        });
-      }
+      // Handle errors during token verification (expired, invalid signature etc.)
+      console.error('>>> Protect Middleware: Token verification failed!', error.message);
+      return sendErrorResponse(res, 401, 'Not authorized, token failed or expired.');
     }
-  };
+  }
+
+  // If the header is missing or not in 'Bearer <token>' format
+  if (!token) {
+    console.log('>>> Protect Middleware: No valid Bearer token found in header.');
+    return sendErrorResponse(res, 401, 'Not authorized, no token provided.');
+  }
 };
