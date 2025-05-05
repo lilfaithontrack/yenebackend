@@ -53,7 +53,7 @@ router.post('/auth/login/sender', apiController.loginSender);
 router.post('/auth/register/driver', apiController.registerDriver);
 router.post('/auth/login/driver', apiController.loginDriver);
 router.get(
-    '/senders/:senderId/notifications',
+    '/notifications/my',
     apiController.getMyNotifications
 );
 // --- Drivers ---
