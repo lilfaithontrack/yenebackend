@@ -255,67 +255,55 @@ export const registerDriver = async (req, res) => {
     }
 };
 export const getMyNotifications = async (req, res) => {
-    // --- 1. Get Sender ID from URL Parameter ---
-    // !! INSECURE !! This allows anyone to potentially query anyone else's notifications.
-    // A middleware should verify the JWT and ensure the authenticated user's ID matches senderId param.
-    const { senderId } = req.params;
-    const sId = parseInt(senderId, 10);
+  // --- 1. Get Sender ID from Authenticated Request ---
+  // Assumes authentication middleware populates req.sender.id or req.user.id
+  const senderId = req.sender?.id || req.user?.id;
 
-    if (!Number.isInteger(sId) || sId <= 0) {
-        return sendErrorResponse(res, 400, 'Invalid Sender ID provided in URL.');
-    }
+  console.log(`getMyNotifications - Authenticated senderId: ${senderId}`);
 
-    // --- 2. Handle Pagination Query Parameters ---
-    const defaultLimit = 20; // Default number of notifications per page
+  // --- 2. Validate Sender ID (from authentication) ---
+  if (!senderId) {
+    // If ID is missing here, authentication failed or middleware isn't working
+    return sendErrorResponse(res, 401, 'Authentication failed: User context not found.');
+  }
+
+  // --- 3. Handle Optional Pagination Query Parameters ---
+    const defaultLimit = 20;
     let page = parseInt(req.query.page, 10);
     let limit = parseInt(req.query.limit, 10);
-
-    // Validate page and limit, provide defaults
-    if (isNaN(page) || page < 1) {
-        page = 1; // Default to page 1
-    }
-    if (isNaN(limit) || limit < 1) {
-        limit = defaultLimit;
-    }
-    // Optional: Set a maximum limit
-    // if (limit > 100) { limit = 100; }
-
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = defaultLimit;
     const offset = (page - 1) * limit;
 
-    // --- 3. Fetch Notifications from Database ---
-    try {
-        // Optional: Verify sender exists (could be skipped if auth guarantees it)
-        // const senderExists = await Sender.findByPk(sId);
-        // if (!senderExists) {
-        //     return sendErrorResponse(res, 404, `Sender with ID ${sId} not found.`);
-        // }
 
-        const { count, rows } = await Notification.findAndCountAll({
-            where: {
-                sender_id: sId // Filter by the sender ID from the URL param
-            },
-            order: [
-                ['createdAt', 'DESC'] // Order by creation date, newest first
-            ],
-            limit: limit,
-            offset: offset,
-            // Select specific attributes if desired
-            // attributes: ['id', 'message', 'type', 'is_read', 'createdAt', 'related_entity_type', 'related_entity_id']
-        });
+  // --- 4. Fetch Notifications from Database ---
+  try {
+    const { count, rows } = await Notification.findAndCountAll({
+      where: {
+        sender_id: senderId // Filter using the ID from the authenticated user
+      },
+      order: [
+        ['createdAt', 'DESC']
+      ],
+      limit: limit,
+      offset: offset,
+    });
 
-        // --- 4. Send Successful Response ---
-        res.status(200).json({
-            totalItems: count,                  // Total number of notifications for this user
-            totalPages: Math.ceil(count / limit), // Total number of pages
-            currentPage: page,                  // The current page number
-            limit: limit,                       // The number of items per page requested
-            notifications: rows                 // The array of notification objects for the current page
-        });
+    // --- 5. Send Response ---
+    res.status(200).json({
+      message: "Notifications retrieved successfully.",
+      totalItems: count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      limit: limit,
+      notifications: rows
+    });
 
-    } catch (err) {
-        console.error(`Error fetching notifications for sender ${sId}:`, err);
-        sendErrorResponse(res, 500, 'Failed to retrieve notifications due to a server error.');
-    }
+  } catch (err) {
+    // --- 6. Handle Errors ---
+    console.error(`Error fetching notifications for authenticated sender ${senderId}:`, err);
+    sendErrorResponse(res, 500, 'Failed to retrieve notifications.', err);
+  }
 };
 export const loginDriver = async (req, res) => {
     const { phone, pin } = req.body;
