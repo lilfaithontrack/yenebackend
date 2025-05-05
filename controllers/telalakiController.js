@@ -256,53 +256,59 @@ export const registerDriver = async (req, res) => {
 };
 export const getMyNotifications = async (req, res) => {
   // --- 1. Get Sender ID from Authenticated Request ---
-  // Assumes authentication middleware populates req.sender.id or req.user.id
-  const senderId = req.sender?.id || req.user?.id;
+  // Relies on authentication middleware populating req.sender.id or req.user.id
+  const senderId = req.sender?.id || req.user?.id; // Adjust based on your auth middleware
 
-  console.log(`getMyNotifications - Authenticated senderId: ${senderId}`);
+  // Log the ID found (or not found) by the middleware
+  console.log(`getMyNotifications - Authenticated senderId from middleware: ${senderId}`);
 
-  // --- 2. Validate Sender ID (from authentication) ---
+  // --- 2. Validate Sender ID (crucial check) ---
   if (!senderId) {
-    // If ID is missing here, authentication failed or middleware isn't working
+    // If senderId is missing, it means the auth middleware failed or didn't attach user info
+    console.error("getMyNotifications Error: req.sender.id or req.user.id was not found. Check protectSender middleware.");
     return sendErrorResponse(res, 401, 'Authentication failed: User context not found.');
   }
 
   // --- 3. Handle Optional Pagination Query Parameters ---
-    const defaultLimit = 20;
+    const defaultLimit = 20; // How many notifications per page
     let page = parseInt(req.query.page, 10);
     let limit = parseInt(req.query.limit, 10);
+    // Default values if parameters are missing or invalid
     if (isNaN(page) || page < 1) page = 1;
     if (isNaN(limit) || limit < 1) limit = defaultLimit;
-    const offset = (page - 1) * limit;
-
+    const offset = (page - 1) * limit; // Calculate database offset
 
   // --- 4. Fetch Notifications from Database ---
   try {
+    console.log(`Workspaceing notifications for sender ${senderId}, page ${page}, limit ${limit}`);
+    // Use findAndCountAll for pagination info
     const { count, rows } = await Notification.findAndCountAll({
       where: {
-        sender_id: senderId // Filter using the ID from the authenticated user
+        sender_id: senderId // Filter notifications for the authenticated sender
       },
       order: [
-        ['createdAt', 'DESC']
+        ['createdAt', 'DESC'] // Show newest first
       ],
-      limit: limit,
-      offset: offset,
+      limit: limit,  // Apply limit for pagination
+      offset: offset, // Apply offset for pagination
     });
 
-    // --- 5. Send Response ---
+    console.log(`Found ${count} total notifications, returning ${rows.length} for page ${page}.`);
+
+    // --- 5. Send Successful Response ---
     res.status(200).json({
       message: "Notifications retrieved successfully.",
-      totalItems: count,
-      totalPages: Math.ceil(count / limit),
-      currentPage: page,
-      limit: limit,
-      notifications: rows
+      totalItems: count,                     // Total notifications for this sender
+      totalPages: Math.ceil(count / limit),  // Total pages available
+      currentPage: page,                   // Current page number
+      limit: limit,                        // Limit used for this request
+      notifications: rows                  // Array of notifications for the current page
     });
 
   } catch (err) {
-    // --- 6. Handle Errors ---
-    console.error(`Error fetching notifications for authenticated sender ${senderId}:`, err);
-    sendErrorResponse(res, 500, 'Failed to retrieve notifications.', err);
+    // --- 6. Handle Database or Other Server Errors ---
+    console.error(`Database error fetching notifications for sender ${senderId}:`, err);
+    sendErrorResponse(res, 500, 'Failed to retrieve notifications due to a server error.', err);
   }
 };
 export const loginDriver = async (req, res) => {
