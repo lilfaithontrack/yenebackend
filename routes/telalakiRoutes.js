@@ -4,7 +4,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import * as apiController from '../controllers/telalakiController.js'; // Adjust path
+import * as apiController from '../controllers/telalakiController.js'; 
+// Adjust path
 
 const router = express.Router();
 
