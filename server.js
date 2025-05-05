@@ -42,7 +42,7 @@ import Payment from './models/Payment.js';
 import Shopper from './models/Shopper.js';
 import DeliveryBoy from './models/DeliveryBoy.js';
 import AssignOrder from './models/AssignOrder.js';
-import { protectSender } from './middlewares/authMiddleware.js';
+
 import sellerProductRoutes from './routes/sellerProductsRoutes.js';
 // Define __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -93,7 +93,7 @@ app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/prod', addProductRoutes);
 app.use('/api/assign',assignOrderRoutes);
-app.use('/api/telalaki', protectSender, telalakiRoutes);
+app.use('/api/telalaki', telalakiRoutes);
 app.use('/api/sellerproduct', sellerProductRoutes);
 
 
