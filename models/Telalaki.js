@@ -164,7 +164,9 @@ export const DeliveryRequest = sequelize.define('DeliveryRequest', {
   is_payment_approved: { type: DataTypes.BOOLEAN, defaultValue: false },
   vehicle: {type: DataTypes.STRING, allowNull: false},
   approved_by: { type: DataTypes.ENUM('admin', 'driver'), allowNull: true },
-  // Optional fields
+  receiver_name:{type: DataTypes.STRING, allowNull: true},
+  receiver_phone:{type: DataTypes.STRING, allowNull: true},
+  
   pickup_sequence: { type: DataTypes.INTEGER, allowNull: true },
   dropoff_sequence: { type: DataTypes.INTEGER, allowNull: true },
   estimated_pickup_time: { type: DataTypes.DATE, allowNull: true },
