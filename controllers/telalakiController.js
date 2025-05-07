@@ -395,17 +395,25 @@ export const updateDriverLocation = async (req, res) => {
 // =============================================
 
 export const createDeliveryRequest = async (req, res) => {
-    // 1. Destructure 'vehicle' (expecting the NAME from frontend)
+    // 1. Destructure expected and optional fields from req.body
     const {
         senderId, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
         weight, size, quantity,
-        vehicle, // <--- Expect 'vehicle' key containing the name
-        payment_method,
+        vehicle, // Expect 'vehicle' key containing the name (string)
+        payment_method, // ENUM: 'screenshot', 'cash'
+        bank_account,   // ENUM: 'Cbe','Telebirr','Abyssinia'
+        receiver_name,
+        receiver_phone,
+        // Fields not typically set at creation by user:
+        // status (defaults to 'pending'), price (calculated),
+        // assigned_driver_id, delivery_time, payment_proof_url, receipt_link,
+        // is_payment_approved, approved_by, pickup_sequence, dropoff_sequence,
+        // estimated_pickup_time, estimated_dropoff_time
     } = req.body;
 
     // --- Basic Input Validation ---
 
-    // Sender ID Validation (slightly improved)
+    // Sender ID Validation
     const sId = parseInt(senderId, 10);
     if (!Number.isInteger(sId) || sId <= 0) {
         return sendErrorResponse(res, 400, 'Valid senderId (positive integer) is required in body.');
@@ -417,35 +425,93 @@ export const createDeliveryRequest = async (req, res) => {
     }
 
     // Coordinate Type/Range Validation
-    const validateCoord = (val, range) => (typeof val === 'number' && isFinite(val) && Math.abs(val) <= range);
-    if (!validateCoord(pickup_lat, 90) || !validateCoord(pickup_lng, 180) || !validateCoord(dropoff_lat, 90) || !validateCoord(dropoff_lng, 180)) {
-        return sendErrorResponse(res, 400, 'Invalid coordinate values or range.');
+    const validateCoord = (val, coordName, range) => {
+        if (typeof val !== 'number' || !isFinite(val)) {
+            return `${coordName} must be a finite number.`;
+        }
+        if (Math.abs(val) > range) {
+            return `${coordName} is out of valid range (-${range} to ${range}).`;
+        }
+        return null; // No error
+    };
+
+    const latErrorMargin = 90;
+    const lngErrorMargin = 180;
+    let coordError = validateCoord(pickup_lat, 'pickup_lat', latErrorMargin) ||
+                     validateCoord(pickup_lng, 'pickup_lng', lngErrorMargin) ||
+                     validateCoord(dropoff_lat, 'dropoff_lat', latErrorMargin) ||
+                     validateCoord(dropoff_lng, 'dropoff_lng', lngErrorMargin);
+
+    if (coordError) {
+        return sendErrorResponse(res, 400, coordError);
     }
 
-    // Vehicle Name Validation (assuming required)
+
+    // Vehicle Name Validation (required as per model `allowNull: false`)
     if (!vehicle || typeof vehicle !== 'string' || vehicle.trim() === '') {
         return sendErrorResponse(res, 400, 'Vehicle name is required and must be a non-empty string.');
     }
-     // Optional: Add a length check for vehicle name if needed
-     // if (vehicle.length > 255) { // Example length limit
-     //    return sendErrorResponse(res, 400, 'Vehicle name exceeds maximum length.');
-     // }
-
-
-    // Optional Fields Validation
-    if (weight !== undefined && (typeof weight !== 'number' || !isFinite(weight) || weight <= 0)) {
-        return sendErrorResponse(res, 400, 'If provided, weight must be a positive number.');
+    if (vehicle.length > 255) { // Example length limit, adjust if necessary
+        return sendErrorResponse(res, 400, 'Vehicle name exceeds maximum length of 255 characters.');
     }
-    if (size !== undefined && (typeof size !== 'string' || size.trim() === '')) {
-         return sendErrorResponse(res, 400, 'If provided, size must be a non-empty string.');
-     }
-    if (quantity !== undefined && (!Number.isInteger(quantity) || quantity <= 0)) {
-        return sendErrorResponse(res, 400, 'If provided, quantity must be a positive integer.');
-    }
-     if (payment_method !== undefined && (typeof payment_method !== 'string' || payment_method.trim() === '')) {
-         return sendErrorResponse(res, 400, 'If provided, payment_method must be a non-empty string.');
-     }
 
+    // --- Optional Fields Validation ---
+
+    if (weight !== undefined) {
+        if (typeof weight !== 'number' || !isFinite(weight) || weight <= 0) {
+            return sendErrorResponse(res, 400, 'If provided, weight must be a positive number.');
+        }
+    }
+
+    if (size !== undefined) {
+        if (typeof size !== 'string' || size.trim() === '') {
+            return sendErrorResponse(res, 400, 'If provided, size must be a non-empty string.');
+        }
+        if (size.length > 255) { // Example length limit
+             return sendErrorResponse(res, 400, 'Size string exceeds maximum length of 255 characters.');
+        }
+    }
+
+    if (quantity !== undefined) {
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+            return sendErrorResponse(res, 400, 'If provided, quantity must be a positive integer.');
+        }
+    }
+
+    // Payment Method Validation (ENUM: 'screenshot', 'cash')
+    const validPaymentMethods = ['screenshot', 'cash'];
+    if (payment_method !== undefined) {
+        if (typeof payment_method !== 'string' || payment_method.trim() === '' || !validPaymentMethods.includes(payment_method)) {
+            return sendErrorResponse(res, 400, `If provided, payment_method must be one of: ${validPaymentMethods.join(', ')}.`);
+        }
+    }
+
+    // Bank Account Validation (ENUM: 'Cbe','Telebirr','Abyssinia')
+    const validBankAccounts = ['Cbe', 'Telebirr', 'Abyssinia'];
+    if (bank_account !== undefined) {
+        if (typeof bank_account !== 'string' || bank_account.trim() === '' || !validBankAccounts.includes(bank_account)) {
+             return sendErrorResponse(res, 400, `If provided, bank_account must be one of: ${validBankAccounts.join(', ')}.`);
+        }
+    }
+
+    if (receiver_name !== undefined) {
+        if (typeof receiver_name !== 'string' || receiver_name.trim() === '') {
+            return sendErrorResponse(res, 400, 'If provided, receiver_name must be a non-empty string.');
+        }
+        if (receiver_name.length > 255) {
+            return sendErrorResponse(res, 400, 'Receiver name exceeds maximum length of 255 characters.');
+        }
+    }
+
+    if (receiver_phone !== undefined) {
+        if (typeof receiver_phone !== 'string' || receiver_phone.trim() === '') {
+            return sendErrorResponse(res, 400, 'If provided, receiver_phone must be a non-empty string.');
+        }
+        // Add more specific phone validation if needed (e.g., regex for Ethiopian phone numbers)
+        if (receiver_phone.length > 50) { // Example length limit
+            return sendErrorResponse(res, 400, 'Receiver phone exceeds maximum length of 50 characters.');
+        }
+    }
 
     // --- Database Operations ---
     let transaction;
@@ -456,68 +522,58 @@ export const createDeliveryRequest = async (req, res) => {
         const senderExists = await Sender.findByPk(sId, { transaction });
         if (!senderExists) {
             await transaction.rollback();
-            // Use 404 Not Found for non-existent resource
             return sendErrorResponse(res, 404, `Sender with ID ${sId} not found.`);
         }
 
-        // Fetch Pricing (Consider caching this if it rarely changes)
+        // Fetch Pricing
         const pricingConfig = await DynamicPricing.findByPk(1, { transaction }); // Assuming PK is 1
-        // Check more thoroughly if pricing is usable
         if (!pricingConfig || typeof pricingConfig.price_per_km !== 'number' || !isFinite(pricingConfig.price_per_km) || pricingConfig.price_per_km < 0) {
             await transaction.rollback();
             console.warn(`Delivery creation blocked for Sender ${sId}: Pricing configuration invalid or missing.`);
-            // Use 503 Service Unavailable if a core config is missing/bad
             return sendErrorResponse(res, 503, 'Service Unavailable: Pricing configuration error.');
         }
 
-        // Calculate Distance (using Haversine)
+        // Calculate Distance
         const distanceKm = calculateDistance(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng);
         console.log(`Calculated distance for Sender ${sId}: ${distanceKm.toFixed(2)} km`);
-        // Basic check for extremely short distances if needed
-        // if (distanceKm < 0.01) { // e.g., less than 10 meters
-        //     console.warn(`Potential issue: Very short distance calculated (${distanceKm} km)`);
-        // }
-
 
         // Calculate Price (Server-side calculation is authoritative)
         let calculatedPrice = distanceKm * pricingConfig.price_per_km;
-        // Apply other factors safely checking type and value
         if (weight && typeof pricingConfig.price_per_kg === 'number' && isFinite(pricingConfig.price_per_kg)) {
             calculatedPrice += weight * pricingConfig.price_per_kg;
         }
         if (quantity && typeof pricingConfig.price_per_quantity === 'number' && isFinite(pricingConfig.price_per_quantity)) {
-             calculatedPrice += quantity * pricingConfig.price_per_quantity;
+            calculatedPrice += quantity * pricingConfig.price_per_quantity;
         }
-        // Example: Add base fee if configured
         if (typeof pricingConfig.base_fee === 'number' && isFinite(pricingConfig.base_fee)) {
-             calculatedPrice += pricingConfig.base_fee;
+            calculatedPrice += pricingConfig.base_fee;
         }
-        // Example: Apply minimum charge if configured
-         if (typeof pricingConfig.minimum_charge === 'number' && isFinite(pricingConfig.minimum_charge) && calculatedPrice < pricingConfig.minimum_charge) {
-             calculatedPrice = pricingConfig.minimum_charge;
-         }
-        // Ensure price is non-negative and round
-        calculatedPrice = Math.max(0, calculatedPrice);
-        calculatedPrice = Math.round(calculatedPrice * 100) / 100; // Round to 2 decimal places
+        if (typeof pricingConfig.minimum_charge === 'number' && isFinite(pricingConfig.minimum_charge) && calculatedPrice < pricingConfig.minimum_charge) {
+            calculatedPrice = pricingConfig.minimum_charge;
+        }
+        calculatedPrice = Math.max(0, Math.round(calculatedPrice * 100) / 100);
 
-
-        // Prepare Data object for creation
-        // Ensure keys match EXACTLY with your Sequelize model definition and DB columns
+        // Prepare Data object for creation, aligning with model fields
         const deliveryData = {
             sender_id: sId,
             pickup_lat: pickup_lat,
             pickup_lng: pickup_lng,
             dropoff_lat: dropoff_lat,
             dropoff_lng: dropoff_lng,
-            status: 'pending', // Initial status
-            price: calculatedPrice, // Use server-calculated price
-            vehicle: vehicle, // Add the vehicle name (assuming required)
+            status: 'pending', // Default as per model, can be explicit
+            price: calculatedPrice,
+            vehicle: vehicle.trim(), // Store trimmed vehicle name
 
             // Add optional fields only if they were provided and valid
+            // Model defaults will apply if not provided (e.g. payment_method defaults to 'cash')
             ...(weight !== undefined && { weight: weight }),
-            ...(size !== undefined && { size: size }), // Assuming 'size' is the correct field name
+            ...(size !== undefined && size.trim() !== '' && { size: size.trim() }),
             ...(quantity !== undefined && { quantity: quantity }),
-            ...(payment_method !== undefined && { payment_method: payment_method }),
+            ...(payment_method !== undefined && { payment_method: payment_method }), // Will use model default 'cash' if not provided
+            ...(bank_account !== undefined && bank_account.trim() !== '' && { bank_account: bank_account.trim() }),
+            ...(receiver_name !== undefined && receiver_name.trim() !== '' && { receiver_name: receiver_name.trim() }),
+            ...(receiver_phone !== undefined && receiver_phone.trim() !== '' && { receiver_phone: receiver_phone.trim() }),
+            // is_payment_approved defaults to false in model
         };
 
         // Create the DeliveryRequest record
@@ -527,33 +583,28 @@ export const createDeliveryRequest = async (req, res) => {
         // Create associated Notification
         try {
             await createNotification({
-                sender_id: sId, // Link notification to the sender
-                 message: `Request #${newDelivery.id} created successfully. Price: ${calculatedPrice.toFixed(2)} ETB. Searching for drivers...`, // Consider adding currency
-                 type: 'delivery_created',
-                 related_entity_id: newDelivery.id,
-                 related_entity_type: 'DeliveryRequest'
-             }, transaction);
+                sender_id: sId,
+                message: `Request #${newDelivery.id} created successfully. Price: ${calculatedPrice.toFixed(2)} ETB. Searching for drivers...`,
+                type: 'delivery_created',
+                related_entity_id: newDelivery.id,
+                related_entity_type: 'DeliveryRequest'
+            }, transaction);
         } catch (notificationError) {
-            // Decide if notification failure should rollback the delivery creation
-            // For now, just log it but proceed with delivery creation success
             console.error(`Failed to create notification for delivery ${newDelivery.id}:`, notificationError);
-            // Optionally: await transaction.rollback(); throw notificationError;
+            // Decide if this should be a critical failure
+            // For now, we log and proceed. If critical:
+            // await transaction.rollback();
+            // throw notificationError; // or return specific error response
         }
 
-
         // TODO: Trigger driver matching logic (asynchronously is best)
-        // Example: dispatchDriverMatching(newDelivery.id); // Your async function
         console.log(`INFO: Delivery Request ${newDelivery.id} created by Sender ${sId}. Driver matching needs implementation.`);
+        // Example: dispatchDriverMatching(newDelivery.id);
 
-        // Commit transaction if all steps successful
         await transaction.commit();
-
-        // Return the created delivery object
-        // Ensure sensitive data is not exposed if necessary (e.g., via model scopes)
         res.status(201).json(newDelivery);
 
     } catch (err) {
-        // Rollback transaction on any error
         if (transaction) {
             try {
                 await transaction.rollback();
@@ -562,20 +613,22 @@ export const createDeliveryRequest = async (req, res) => {
             }
         }
 
-        // Handle specific errors
         if (err.name === 'SequelizeValidationError') {
             console.error("Sequelize Validation Error details:", err.errors);
-            // Provide more specific validation feedback if possible
-            return sendErrorResponse(res, 400, 'Creation failed: Validation error(s).', err.errors);
+            return sendErrorResponse(res, 400, 'Creation failed: Validation error(s).', err.errors.map(e => ({ message: e.message, path: e.path })));
         }
         if (err.name === 'SequelizeForeignKeyConstraintError') {
-             console.error("Foreign Key Constraint Error:", err);
-             return sendErrorResponse(res, 400, 'Invalid reference provided (e.g., sender ID).');
-         }
+            console.error("Foreign Key Constraint Error:", err);
+            return sendErrorResponse(res, 400, `Invalid reference provided (e.g., sender ID, or other foreign key). Field: ${err.fields ? err.fields.join(', ') : 'unknown'}`);
+        }
+        // Catch specific error if createNotification was made critical and re-thrown
+        if (err.message.includes("notification")) { // Example check
+             return sendErrorResponse(res, 500, 'Delivery created, but failed to send notification.');
+        }
 
-        // Generic internal server error for other cases
-        console.error(`FATAL: Error creating delivery request for sender ${sId}:`, err);
-        sendErrorResponse(res, 500, 'An unexpected error occurred while creating the delivery request.', err); // Avoid sending raw error in production
+        console.error(`FATAL: Error creating delivery request for sender ${sId || 'unknown'}:`, err);
+        // Avoid sending raw error details in production for generic errors
+        sendErrorResponse(res, 500, 'An unexpected error occurred while creating the delivery request.');
     }
 };
 
