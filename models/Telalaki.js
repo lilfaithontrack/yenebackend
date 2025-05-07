@@ -153,6 +153,7 @@ export const DeliveryRequest = sequelize.define('DeliveryRequest', {
     defaultValue: 'pending',
     allowNull: false,
   },
+  bank_account:{type: DataTypes.ENUM('Cbe','Telebirr','Abyssinia')},
   delivery_time: { type: DataTypes.DATE, allowNull: true }, // Actual completion time
   weight: { type: DataTypes.FLOAT, allowNull: true },
   size: { type: DataTypes.STRING, allowNull: true },
