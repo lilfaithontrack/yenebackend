@@ -389,7 +389,6 @@ export const createDeliveryRequest = async (req, res) => {
     let {
         senderId, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
         weight, size, quantity,
-        vehicle,
         payment_method, // የክፍያ ዘዴ ከጥያቄው መምጣት አለበት
         bank_account,
         receiver_name,
@@ -443,13 +442,6 @@ export const createDeliveryRequest = async (req, res) => {
 
     if (coordError) {
         return sendErrorResponse(res, 400, coordError);
-    }
-
-    if (!vehicle || typeof vehicle !== 'string' || vehicle.trim() === '') {
-        return sendErrorResponse(res, 400, 'Vehicle name is required and must be a non-empty string.');
-    }
-    if (vehicle.length > 255) {
-        return sendErrorResponse(res, 400, 'Vehicle name exceeds maximum length of 255 characters.');
     }
 
     // የክፍያ ዘዴ ማረጋገጫ
@@ -573,7 +565,6 @@ export const createDeliveryRequest = async (req, res) => {
             dropoff_lng: parsedDropoffLng,
             status: 'pending',
             price: calculatedPrice,
-            vehicle: String(vehicle).trim(),
             payment_method: currentPaymentMethod, // የተረጋገጠውን የክፍያ ዘዴ ይጠቀሙ
             // is_payment_approved በሞዴል default ወደ false መሆን አለበት
         };
