@@ -4,105 +4,123 @@
 // --- Imports ---
 import {
     Sender, Vehicle, Driver, AdminApproval, DeliveryRequest,
-    DynamicPricing, Notification, sequelize, Sequelize
-} from '../models/Telalaki.js'; // Adjust path as needed
+    DynamicPricing, Notification, sequelize, Sequelize // Sequelize በካፒታል 'S' ለትራንዛክሽን ደረጃዎች
+} from '../models/Telalaki.js'; // እንደአስፈላጊነቱ የፋይል ዱካውን ያስተካክሉ
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { Op } from 'sequelize'; // Required for complex queries like filtering/bounding box
+import { Op } from 'sequelize'; // እንደ ማጣሪያ/ወሰን ሳጥን ላሉ ውስብስብ ጥያቄዎች ያስፈልጋል
 import dotenv from 'dotenv';
 
-dotenv.config(); // Ensure JWT_SECRET is loaded
+dotenv.config(); // JWT_SECRET መጫኑን ያረጋግጡ
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const SALT_ROUNDS = 10;
-const MAX_ASSIGNMENT_DISTANCE_KM = 50; // Example constant for distance safeguard
+const MAX_ASSIGNMENT_DISTANCE_KM = 50; // ለርቀት ጥበቃ የናሙና ቋሚ
 
 // --- START HELPER FUNCTIONS (Included directly for consolidation) ---
 
 /**
- * Sends a standardized error response.
+ * ደረጃውን የጠበቀ የስህተት ምላሽ ይልካል።
  * @param {object} res - Express response object.
  * @param {number} statusCode - HTTP status code.
- * @param {string} message - Error message for the client.
- * @param {object|array|null} [error=null] - Optional error details (Sequelize errors, etc.).
+ * @param {string} message - ለደንበኛው የሚታይ የስህተት መልዕክት።
+ * @param {object|array|null} [error=null] - አማራጭ የስህተት ዝርዝሮች (Sequelize errors, etc.).
  */
 const sendErrorResponse = (res, statusCode, message, error = null) => {
-    console.error(`Error ${statusCode}: ${message}`, error ? error.message || error : ''); // Log the error server-side
+    console.error(`Error ${statusCode}: ${message}`, error ? error.message || error : ''); // ስህተቱን በአገልጋይ በኩል ይመዝግቡ
     let details;
-    // Try to extract specific validation errors from Sequelize
+    // ከ Sequelize የተለዩ የማረጋገጫ ስህተቶችን ለማውጣት ይሞክሩ
     if (error && error.name === 'SequelizeValidationError' && Array.isArray(error.errors)) {
-         details = error.errors.map(e => ({ field: e.path, message: e.message }));
-    } else if (error && Array.isArray(error) && error.length > 0 && error[0].message) { // Handle other array errors
-        details = error.map(e => ({ field: e.path, message: e.message }));
-    } else if (error && error.message) { // Handle single error object
-         details = error.message;
+        details = error.errors.map(e => ({ field: e.path, message: e.message }));
+    } else if (error && Array.isArray(error) && error.length > 0 && error[0]?.message) { // ሌሎች የድርድር ስህተቶችን ያስተናግዱ
+        details = error.map(e => ({ field: e.path || 'general', message: e.message }));
+    } else if (error && error.message) { // ነጠላ የስህተት ኦብጀክትን ያስተናግዱ
+        details = error.message;
     }
     return res.status(statusCode).json({
         message: message,
-        error: details || (error ? 'An unexpected error occurred.' : undefined) // Avoid leaking sensitive details
+        error: details || (error ? 'An unexpected error occurred.' : undefined) // ሚስጥራዊ ዝርዝሮችን ከማሳየት ይቆጠቡ
     });
 };
 
 /**
- * Creates a notification record in the database.
- * @param {object} details - Notification details (sender_id OR driver_id, message, type, etc.).
- * @param {object|null} [transaction=null] - Optional Sequelize transaction object.
+ * በዳታቤዝ ውስጥ የኖቲፊኬሽን መዝገብ ይፈጥራል።
+ * @param {object} details - የኖቲፊኬሽን ዝርዝሮች (sender_id ወይም driver_id, message, type, etc.).
+ * @param {object|null} [transaction=null] - አማራጭ የ Sequelize ትራንዛክሽን ኦብጀክት።
  */
 const createNotification = async (details, transaction = null) => {
     try {
         if (!details.message || (!details.sender_id && !details.driver_id)) {
-             console.error("Failed to create notification: Missing message or recipient ID", details);
-             return;
+            console.error("Failed to create notification: Missing message or recipient ID", details);
+            return; // ወሳኝ ካልሆነ ይመለሱ
         }
         await Notification.create(details, { transaction });
         console.log(`Notification created: ${details.type || 'general'} for ${details.sender_id ? 'Sender' : 'Driver'} ${details.sender_id || details.driver_id}`);
     } catch (notificationError) {
-        // Log the error but don't let notification failure stop the main process
-        console.error(`Failed to create notification (${details.type}):`, notificationError);
+        // ስህተቱን ይመዝግቡ ነገር ግን የኖቲፊኬሽን ስህተት ዋናውን ሂደት እንዳያቆም ያድርጉ
+        console.error(`Failed to create notification (${details.type}):`, notificationError.message);
     }
 };
 
-/** Converts degrees to radians */
+/** ዲግሪ ወደ ራዲያን ይቀይራል */
 function deg2rad(deg) {
-  return deg * (Math.PI / 180);
+    return deg * (Math.PI / 180);
 }
 
-/** Converts radians to degrees */
+/** ራዲያን ወደ ዲግሪ ይቀይራል */
 function rad2deg(rad) {
-  return rad * (180 / Math.PI);
+    return rad * (180 / Math.PI);
 }
 
-/** Calculates the great-circle distance between two points using the Haversine formula. */
+/** የሁለት ነጥቦች መካከል ያለውን ትልቅ-ክበብ ርቀት በ Haversine ቀመር ያሰላል። */
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Infinity; // Cannot calculate
-  const R = 6371; // Radius of the Earth in kilometers
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // Distance in km
-  return distance;
+    if (lat1 == null || lon1 == null || lat2 == null || lon2 == null ||
+        !isFinite(lat1) || !isFinite(lon1) || !isFinite(lat2) || !isFinite(lon2)) {
+        console.warn("calculateDistance: Invalid or missing coordinates provided.", {lat1, lon1, lat2, lon2});
+        return Infinity; // ማስላት አይቻልም ወይም ልክ ያልሆኑ ግቤቶች
+    }
+    const R = 6371; // የምድር ራዲየስ በኪሎሜትር
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // ርቀት በኪ.ሜ.
+    return distance;
 }
 
-/** Calculates an approximate bounding box for geo-queries. */
+/** ለጂኦ-ጥያቄዎች ግምታዊ የወሰን ሳጥን ያሰላል። */
 function getBoundingBox(centerLat, centerLng, radiusKm) {
-    const R = 6371;
+    const R = 6371; // የምድር ራዲየስ በኪ.ሜ.
     const latRad = deg2rad(centerLat);
-    const latDelta = radiusKm / R;
-    const minLat = rad2deg(latRad - latDelta);
-    const maxLat = rad2deg(latRad + latDelta);
+
+    // ራዲያን ለላቲቲዩድ ለውጥ
+    const latDeltaRad = radiusKm / R;
+
+    const minLat = rad2deg(latRad - latDeltaRad);
+    const maxLat = rad2deg(latRad + latDeltaRad);
+
+    let minLng, maxLng;
+
+    // ለዋልታዎች እና ለዳርቻ ሁኔታዎች ጥንቃቄ ያድርጉ
     if (minLat > -90 && maxLat < 90) {
-        const lonDelta = Math.asin(Math.sin(latDelta) / Math.cos(latRad));
-        const minLng = rad2deg(deg2rad(centerLng) - lonDelta);
-        const maxLng = rad2deg(deg2rad(centerLng) + lonDelta);
-        return { minLat, maxLat, minLng, maxLng };
+        // ራዲያን ለሎንጊቲዩድ ለውጥ
+        const lonDeltaRad = Math.asin(Math.sin(latDeltaRad) / Math.cos(latRad));
+        minLng = rad2deg(deg2rad(centerLng) - lonDeltaRad);
+        maxLng = rad2deg(deg2rad(centerLng) + lonDeltaRad);
     } else {
-        // Handle poles or edge cases
-        return { minLat: Math.max(minLat, -90), maxLat: Math.min(maxLat, 90), minLng: -180, maxLng: 180 };
+        // በዋልታዎች ላይ ወይም ሲያልፍ፣ ሎንጊቲዩድ ሙሉውን ክልል ይሸፍናል
+        minLng = -180;
+        maxLng = 180;
     }
+    return {
+        minLat: Math.max(minLat, -90), // ከ -90 በታች እንዳይሆን ያረጋግጡ
+        maxLat: Math.min(maxLat, 90),   // ከ 90 በላይ እንዳይሆን ያረጋግጡ
+        minLng: minLng,
+        maxLng: maxLng
+    };
 }
 // --- END HELPER FUNCTIONS ---
 
@@ -112,29 +130,29 @@ function getBoundingBox(centerLat, centerLng, radiusKm) {
 // =============================================
 
 export const registerSender = async (req, res) => {
-  try {
-    const { full_name, phone, pin } = req.body;
-    // Validation
-    if (!full_name || !phone || !pin) return sendErrorResponse(res, 400, 'Full name, phone number, and 4-digit PIN are required.');
-    if (!/^09\d{8}$/.test(phone)) return sendErrorResponse(res, 400, 'Invalid phone number format. Use 09xxxxxxxx format.');
-    if (!/^\d{4}$/.test(pin)) return sendErrorResponse(res, 400, 'Sender PIN must be exactly 4 digits.');
+    try {
+        const { full_name, phone, pin } = req.body;
+        // Validation
+        if (!full_name || !phone || !pin) return sendErrorResponse(res, 400, 'Full name, phone number, and 4-digit PIN are required.');
+        if (!/^09\d{8}$/.test(phone)) return sendErrorResponse(res, 400, 'Invalid phone number format. Use 09xxxxxxxx format.');
+        if (!/^\d{4}$/.test(pin)) return sendErrorResponse(res, 400, 'Sender PIN must be exactly 4 digits.');
 
-    const existingSender = await Sender.findOne({ where: { phone } });
-    if (existingSender) return sendErrorResponse(res, 409, 'Phone number is already registered.');
+        const existingSender = await Sender.findOne({ where: { phone } });
+        if (existingSender) return sendErrorResponse(res, 409, 'Phone number is already registered.');
 
-    const hashedPin = await bcrypt.hash(pin, SALT_ROUNDS);
-    const sender = await Sender.create({ full_name, phone, pin: hashedPin });
-    const senderData = { ...sender.toJSON() };
-    delete senderData.pin; // Don't send hash back
-    res.status(201).json({ message: 'Sender registered successfully.', sender: senderData });
+        const hashedPin = await bcrypt.hash(pin, SALT_ROUNDS);
+        const sender = await Sender.create({ full_name, phone, pin: hashedPin });
+        const senderData = { ...sender.toJSON() };
+        delete senderData.pin; // ሃሽ መልሰው አይላኩ
+        res.status(201).json({ message: 'Sender registered successfully.', sender: senderData });
 
-  } catch (error) {
-    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-         return sendErrorResponse(res, 400, 'Registration failed: Validation or duplicate entry.', error.errors || error.message);
+    } catch (error) {
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+            return sendErrorResponse(res, 400, 'Registration failed: Validation or duplicate entry.', error);
+        }
+        console.error('Sender Registration Error:', error);
+        sendErrorResponse(res, 500, 'Sender registration failed due to an internal error.');
     }
-    console.error('Sender Registration Error:', error);
-    sendErrorResponse(res, 500, 'Sender registration failed due to an internal error.');
-  }
 };
 
 export const loginSender = async (req, res) => {
@@ -146,7 +164,7 @@ export const loginSender = async (req, res) => {
 
     try {
         const sender = await Sender.findOne({ where: { phone } });
-        if (!sender || !sender.pin) { // Check if sender exists and has a pin hash
+        if (!sender || !sender.pin) {
             return sendErrorResponse(res, 401, 'Login failed: Invalid phone number or PIN.');
         }
 
@@ -155,10 +173,9 @@ export const loginSender = async (req, res) => {
             return sendErrorResponse(res, 401, 'Login failed: Invalid phone number or PIN.');
         }
 
-        // Generate JWT (even though routes are open, login still provides a token)
         if (!JWT_SECRET) {
-             console.error("FATAL ERROR: JWT_SECRET is not defined!");
-             return sendErrorResponse(res, 500, 'Login failed due to server configuration error.');
+            console.error("FATAL ERROR: JWT_SECRET is not defined!");
+            return sendErrorResponse(res, 500, 'Login failed due to server configuration error.');
         }
         const payload = { id: sender.id, phone: sender.phone, type: 'sender' };
         const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
@@ -177,19 +194,17 @@ export const registerDriver = async (req, res) => {
         sender_full_name, sender_phone, sender_pin,
         driver_full_name, driver_pin, driver_phone, driver_email, driver_region, driver_zone, driver_district, driver_house_number, driver_license_photo, identification_photo, is_owner,
         owner_full_name, region: vehicle_region, zone: vehicle_zone, district: vehicle_district, house_number: vehicle_house_number, phone: vehicle_phone, email: vehicle_email, car_type, car_name, manufacture_year, cargo_capacity, license_plate, commercial_license, tin_number, car_license_photo, owner_id_photo, car_photo, owner_photo
-     } = req.body;
+    } = req.body;
 
     let transaction;
 
-    // --- Basic Input Validation ---
     if (!sender_full_name || !sender_phone || !sender_pin || !driver_full_name || !driver_pin) return sendErrorResponse(res, 400, 'Sender (name, phone, 4-digit PIN) and Driver (name, 6-digit PIN) required.');
     if (!/^\d{4}$/.test(sender_pin)) return sendErrorResponse(res, 400, 'Sender PIN must be 4 digits.');
     if (!/^\d{6}$/.test(driver_pin)) return sendErrorResponse(res, 400, 'Driver PIN must be 6 digits.');
     if (!/^09\d{8}$/.test(sender_phone)) return sendErrorResponse(res, 400, 'Invalid Sender phone format.');
-    // Add more specific validation as needed (email, driver phone format if required)
 
-    const driverIsOwner = is_owner === true || is_owner === 'true';
-    if (!driverIsOwner && (!car_type || !license_plate /* Add other required vehicle fields */)) {
+    const driverIsOwner = is_owner === true || String(is_owner).toLowerCase() === 'true';
+    if (!driverIsOwner && (!car_type || !license_plate )) { // አስፈላጊ የተሽከርካሪ መስኮችን ይጨምሩ
         return sendErrorResponse(res, 400, 'Vehicle info required if driver is not owner.');
     }
 
@@ -198,43 +213,35 @@ export const registerDriver = async (req, res) => {
 
         const existingSender = await Sender.findOne({ where: { phone: sender_phone }, transaction });
         if (existingSender) {
-             await transaction.rollback();
-             return sendErrorResponse(res, 409, 'Sender phone number already registered.');
+            await transaction.rollback();
+            return sendErrorResponse(res, 409, 'Sender phone number already registered.');
         }
-        // Optional: Check if driver phone exists if it should be unique
-        // const existingDriverPhone = await Driver.findOne({ where: { phone: driver_phone }, transaction });
-        // if (driver_phone && existingDriverPhone) { /* rollback, 409 */ }
 
-        // 1. Create Sender
         const hashedSenderPin = await bcrypt.hash(sender_pin, SALT_ROUNDS);
         const newSender = await Sender.create({ full_name: sender_full_name, phone: sender_phone, pin: hashedSenderPin }, { transaction });
 
-        // 2. Create Driver
         const hashedDriverPin = await bcrypt.hash(driver_pin, SALT_ROUNDS);
         const driverData = {
             full_name: driver_full_name, phone: driver_phone, email: driver_email,
             region: driver_region, zone: driver_zone, district: driver_district, house_number: driver_house_number,
             driver_license_photo, identification_photo, is_owner: driverIsOwner, pin: hashedDriverPin,
-            sender_id: newSender.id // Link to created Sender
+            sender_id: newSender.id
         };
         const newDriver = await Driver.create(driverData, { transaction });
 
-        // 3. Create Vehicle (if not owner)
         let newVehicle = null;
         if (!driverIsOwner) {
             const vehicleData = {
                 owner_full_name, region: vehicle_region, zone: vehicle_zone, district: vehicle_district, house_number: vehicle_house_number,
                 phone: vehicle_phone, email: vehicle_email, car_type, car_name, manufacture_year, cargo_capacity, license_plate,
-                commercial_license, tin_number, car_license_photo, owner_id_photo, car_photo, owner_photo
-                // Consider adding driver_id: newDriver.id if you add FK to Vehicle model
+                commercial_license, tin_number, car_license_photo, owner_id_photo, car_photo, owner_photo,
+                // driver_id: newDriver.id, // በ Vehicle ሞዴል ላይ FK ካከሉ ይህንን ግምት ውስጥ ያስገቡ
             };
-             newVehicle = await Vehicle.create(vehicleData, { transaction });
+            newVehicle = await Vehicle.create(vehicleData, { transaction });
         }
 
-        // 4. Create AdminApproval
         await AdminApproval.create({ driver_id: newDriver.id, status: 'pending' }, { transaction });
 
-        // 5. Create Notification
         await createNotification({
             sender_id: newSender.id, message: `Driver registration for ${driver_full_name} submitted, pending approval.`,
             type: 'driver_registration', related_entity_id: newDriver.id, related_entity_type: 'Driver'
@@ -248,72 +255,54 @@ export const registerDriver = async (req, res) => {
 
     } catch (err) {
         if (transaction) await transaction.rollback();
-        if (err.name === 'SequelizeUniqueConstraintError') return sendErrorResponse(res, 409, `Registration failed: Duplicate value for ${err.errors?.[0]?.path || 'field'}.`);
-        if (err.name === 'SequelizeValidationError') return sendErrorResponse(res, 400, 'Registration failed: Validation error.', err.errors);
+        if (err.name === 'SequelizeUniqueConstraintError') return sendErrorResponse(res, 409, `Registration failed: Duplicate value for ${err.errors?.[0]?.path || 'field'}.`, err);
+        if (err.name === 'SequelizeValidationError') return sendErrorResponse(res, 400, 'Registration failed: Validation error.', err);
         console.error("Driver Registration Error:", err);
         sendErrorResponse(res, 500, 'Driver registration failed.');
     }
 };
+
 export const getMyNotifications = async (req, res) => {
-  // --- 1. Get Sender ID from Authenticated Request ---
-  // Relies on authentication middleware populating req.sender.id or req.user.id
-  const senderId = req.sender?.id || req.user?.id; // Adjust based on your auth middleware
+    const senderId = req.sender?.id || req.user?.id;
+    console.log(`getMyNotifications - Authenticated senderId from middleware: ${senderId}`);
 
-  // Log the ID found (or not found) by the middleware
-  console.log(`getMyNotifications - Authenticated senderId from middleware: ${senderId}`);
+    if (!senderId) {
+        console.error("getMyNotifications Error: req.sender.id or req.user.id was not found. Check protectSender middleware.");
+        return sendErrorResponse(res, 401, 'Authentication failed: User context not found.');
+    }
 
-  // --- 2. Validate Sender ID (crucial check) ---
-  if (!senderId) {
-    // If senderId is missing, it means the auth middleware failed or didn't attach user info
-    console.error("getMyNotifications Error: req.sender.id or req.user.id was not found. Check protectSender middleware.");
-    return sendErrorResponse(res, 401, 'Authentication failed: User context not found.');
-  }
-
-  // --- 3. Handle Optional Pagination Query Parameters ---
-    const defaultLimit = 20; // How many notifications per page
+    const defaultLimit = 20;
     let page = parseInt(req.query.page, 10);
     let limit = parseInt(req.query.limit, 10);
-    // Default values if parameters are missing or invalid
     if (isNaN(page) || page < 1) page = 1;
     if (isNaN(limit) || limit < 1) limit = defaultLimit;
-    const offset = (page - 1) * limit; // Calculate database offset
+    const offset = (page - 1) * limit;
 
-  // --- 4. Fetch Notifications from Database ---
-  try {
-    console.log(`Workspaceing notifications for sender ${senderId}, page ${page}, limit ${limit}`);
-    // Use findAndCountAll for pagination info
-    const { count, rows } = await Notification.findAndCountAll({
-      where: {
-        sender_id: senderId // Filter notifications for the authenticated sender
-      },
-      order: [
-        ['createdAt', 'DESC'] // Show newest first
-      ],
-      limit: limit,  // Apply limit for pagination
-      offset: offset, // Apply offset for pagination
-    });
-
-    console.log(`Found ${count} total notifications, returning ${rows.length} for page ${page}.`);
-
-    // --- 5. Send Successful Response ---
-    res.status(200).json({
-      message: "Notifications retrieved successfully.",
-      totalItems: count,                     // Total notifications for this sender
-      totalPages: Math.ceil(count / limit),  // Total pages available
-      currentPage: page,                   // Current page number
-      limit: limit,                        // Limit used for this request
-      notifications: rows                  // Array of notifications for the current page
-    });
-
-  } catch (err) {
-    // --- 6. Handle Database or Other Server Errors ---
-    console.error(`Database error fetching notifications for sender ${senderId}:`, err);
-    sendErrorResponse(res, 500, 'Failed to retrieve notifications due to a server error.', err);
-  }
+    try {
+        console.log(`Workspaceing notifications for sender ${senderId}, page ${page}, limit ${limit}`);
+        const { count, rows } = await Notification.findAndCountAll({
+            where: { sender_id: senderId },
+            order: [['createdAt', 'DESC']],
+            limit: limit,
+            offset: offset,
+        });
+        console.log(`Found ${count} total notifications, returning ${rows.length} for page ${page}.`);
+        res.status(200).json({
+            message: "Notifications retrieved successfully.",
+            totalItems: count,
+            totalPages: Math.ceil(count / limit),
+            currentPage: page,
+            limit: limit,
+            notifications: rows
+        });
+    } catch (err) {
+        console.error(`Database error fetching notifications for sender ${senderId}:`, err);
+        sendErrorResponse(res, 500, 'Failed to retrieve notifications due to a server error.', err);
+    }
 };
+
 export const loginDriver = async (req, res) => {
     const { phone, pin } = req.body;
-    // Validation
     if (!phone || !pin) return sendErrorResponse(res, 400, 'Driver phone and 6-digit PIN required.');
     if (!/^09\d{8}$/.test(phone)) return sendErrorResponse(res, 400, 'Invalid phone number format.');
     if (!/^\d{6}$/.test(pin)) return sendErrorResponse(res, 400, 'Driver PIN must be 6 digits.');
@@ -321,37 +310,35 @@ export const loginDriver = async (req, res) => {
     try {
         const driver = await Driver.findOne({
             where: { phone },
-            include: [{ model: AdminApproval, as: 'approvalStatus', attributes: ['status'] }] // Include only status
+            include: [{ model: AdminApproval, as: 'approvalStatus', attributes: ['status'] }]
         });
 
         if (!driver) return sendErrorResponse(res, 401, 'Login failed: Invalid credentials.');
-
-        // Check approval status (provide info even if route is open)
         if (!driver.approvalStatus || driver.approvalStatus.status !== 'approved') {
-             const status = driver.approvalStatus ? driver.approvalStatus.status : 'not processed';
-             return sendErrorResponse(res, 403, `Login failed: Driver account is currently ${status}.`);
+            const status = driver.approvalStatus ? driver.approvalStatus.status : 'not processed';
+            return sendErrorResponse(res, 403, `Login failed: Driver account is currently ${status}.`);
         }
         if (!driver.pin) {
-             console.error(`Login Error: Driver ${driver.id} has no PIN hash.`);
-             return sendErrorResponse(res, 500, 'Login failed: Server configuration error.');
+            console.error(`Login Error: Driver ${driver.id} has no PIN hash.`);
+            return sendErrorResponse(res, 500, 'Login failed: Server configuration error.');
         }
 
         const isPinValid = await bcrypt.compare(pin, driver.pin);
         if (!isPinValid) return sendErrorResponse(res, 401, 'Login failed: Invalid credentials.');
 
         if (!JWT_SECRET) {
-             console.error("FATAL ERROR: JWT_SECRET is not defined!");
-             return sendErrorResponse(res, 500, 'Login failed: Server configuration error.');
+            console.error("FATAL ERROR: JWT_SECRET is not defined!");
+            return sendErrorResponse(res, 500, 'Login failed: Server configuration error.');
         }
         const payload = { id: driver.id, phone: driver.phone, type: 'driver' };
         const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
         const driverData = { ...driver.toJSON() };
-        delete driverData.pin; // Exclude hash from response
+        delete driverData.pin;
 
         res.status(200).json({ message: 'Driver login successful.', accessToken, driver: driverData });
     } catch (err) {
-         console.error("Driver Login Error:", err);
-         sendErrorResponse(res, 500, 'Driver login failed.', err);
+        console.error("Driver Login Error:", err);
+        sendErrorResponse(res, 500, 'Driver login failed.', err);
     }
 };
 
@@ -360,29 +347,32 @@ export const loginDriver = async (req, res) => {
 // =============================================
 
 export const updateDriverLocation = async (req, res) => {
-    // !! INSECURE: driverId comes from URL param !!
-    const { driverId } = req.params;
+    const { driverId } = req.params; // !! INSECURE: driverId ከ URL ፓራም ይመጣል !!
     const { latitude, longitude } = req.body;
 
-    // Validation
     const drvId = parseInt(driverId, 10);
     if (isNaN(drvId) || drvId <= 0) return sendErrorResponse(res, 400, 'Invalid Driver ID in URL.');
     if (latitude === undefined || longitude === undefined) return sendErrorResponse(res, 400, 'Latitude and longitude required.');
+
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
-    if (isNaN(lat) || !isFinite(lat) || lat < -90 || lat > 90) return sendErrorResponse(res, 400, 'Invalid latitude.');
-    if (isNaN(lng) || !isFinite(lng) || lng < -180 || lng > 180) return sendErrorResponse(res, 400, 'Invalid longitude.');
+
+    if (typeof lat !== 'number' || !isFinite(lat) || lat < -90 || lat > 90) {
+        return sendErrorResponse(res, 400, `Invalid latitude. Received: '${latitude}'`);
+    }
+    if (typeof lng !== 'number' || !isFinite(lng) || lng < -180 || lng > 180) {
+        return sendErrorResponse(res, 400, `Invalid longitude. Received: '${longitude}'`);
+    }
 
     try {
         const driver = await Driver.findByPk(drvId);
         if (!driver) return sendErrorResponse(res, 404, `Driver with ID ${drvId} not found.`);
 
-        // Update location fields
         driver.current_lat = lat;
         driver.current_lng = lng;
         driver.last_location_update = new Date();
         await driver.save();
-        res.status(204).send(); // Success, no content
+        res.status(204).send();
 
     } catch (err) {
         console.error(`Error updating location for driver ${drvId}:`, err);
@@ -394,29 +384,7 @@ export const updateDriverLocation = async (req, res) => {
 // Delivery Request Functions
 // =============================================
 
-
-
-export const submitPaymentProof = async (req, res) => {
-    // !! INSECURE: Needs senderId in body !!
-    const { delivery_id, senderId } = req.body;
-    const uploadedFile = req.file; // From multer middleware
-
-    // Validation
-    const reqId = parseInt(delivery_id, 10);
-    const sId = parseInt(senderId, 10);
-    if (!reqId || !sId || isNaN(reqId) || isNaN(sId) || reqId <= 0 || sId <= 0) return sendErrorResponse(res, 400, 'Valid deliveryId and senderId required.');
-    if (!uploadedFile) return sendErrorResponse(res, 400, 'Payment proof image file required.');
-
-    // Construct URL path (ensure static serving is set up correctly in server.js)
-    const filePathUrl = `/uploads/payment_proofs/${uploadedFile.filename}`;
-    let transaction;
-    try {
-        transaction = await sequelize.transaction();
-        const delivery = await DeliveryRequest.findByPk(reqId, { transaction });
-        if (!delivery) {
-            await transaction.rollback();
-            // Consider deleting uploaded file fs.unlink(uploadedFile.path, ...)
-            reexport const createDeliveryRequest = async (req, res) => {
+export const createDeliveryRequest = async (req, res) => {
     // 1. ከ req.body የሚጠበቁ እና አማራጭ የሆኑ መስኮችን ማውጣት
     // (እሴቶቹ መጀመሪያ ላይ እንደ ጽሑፍ ሊሆኑ ይችላሉ ከ multipart/form-data ሲመጡ)
     let {
@@ -430,7 +398,6 @@ export const submitPaymentProof = async (req, res) => {
     } = req.body;
 
     // --- የቁጥር መስኮችን ወደ ቁጥር አይነት መቀየር (Type Conversion for Numeric Fields) ---
-    // ይህ ማረጋገጫ (validation) ከመደረጉ በፊት መከናወን አለበት
     const parsedSenderId = parseInt(senderId, 10);
     const parsedPickupLat = parseFloat(pickup_lat);
     const parsedPickupLng = parseFloat(pickup_lng);
@@ -438,38 +405,35 @@ export const submitPaymentProof = async (req, res) => {
     const parsedDropoffLng = parseFloat(dropoff_lng);
 
     let parsedWeight;
-    if (weight !== undefined && weight !== null && weight !== '') { // ክብደት መኖሩን እና ባዶ አለመሆኑን ማረጋገጥ
+    // ክብደት ከተሰጠ እና ባዶ ካልሆነ ብቻ ወደ ቁጥር ይቀይሩ
+    if (weight !== undefined && weight !== null && String(weight).trim() !== '') {
         parsedWeight = parseFloat(weight);
     }
 
     let parsedQuantity;
-    if (quantity !== undefined && quantity !== null && quantity !== '') { // ብዛት መኖሩን እና ባዶ አለመሆኑን ማረጋገጥ
+    // ብዛት ከተሰጠ እና ባዶ ካልሆነ ብቻ ወደ ቁጥር ይቀይሩ
+    if (quantity !== undefined && quantity !== null && String(quantity).trim() !== '') {
         parsedQuantity = parseInt(quantity, 10);
     }
 
     // --- መሰረታዊ የግቤት ማረጋገጫ (Basic Input Validation) ---
 
-    // የላኪ መለያ (Sender ID) ማረጋገጫ
     if (!Number.isInteger(parsedSenderId) || parsedSenderId <= 0) {
         return sendErrorResponse(res, 400, 'Valid senderId (positive integer) is required.');
     }
 
-    // የመጋጠሚያዎች መኖር ማረጋገጫ (Coordinate Presence Validation)
-    // (የመጀመሪያዎቹ የጽሑፍ እሴቶች undefined መሆናቸውን ማረጋገጥ)
     if (pickup_lat === undefined || pickup_lng === undefined || dropoff_lat === undefined || dropoff_lng === undefined) {
         return sendErrorResponse(res, 400, 'Pickup and Dropoff coordinates (latitude, longitude) are required.');
     }
 
-    // የመጋጠሚያ አይነት/ክልል ማረጋገጫ (Coordinate Type/Range Validation)
     const validateCoord = (val, coordName, originalVal, range) => {
-        // 'val' አሁን የ parseFloat ውጤት ነው (ቁጥር ወይም NaN)
-        if (typeof val !== 'number' || !isFinite(val)) {
+        if (typeof val !== 'number' || !isFinite(val)) { // isFinite() NaN ንም ይይዛል
             return `${coordName} must be a finite number. Received: '${originalVal}'`;
         }
         if (Math.abs(val) > range) {
-            return `${coordName} (${val}) is out of valid range (-${range} to ${range}).`;
+            return `${coordName} (${val.toFixed(6)}) is out of valid range (-${range} to ${range}).`;
         }
-        return null; // ስህተት የለም
+        return null;
     };
 
     const latErrorMargin = 90;
@@ -483,7 +447,6 @@ export const submitPaymentProof = async (req, res) => {
         return sendErrorResponse(res, 400, coordError);
     }
 
-    // የተሽከርካሪ ስም ማረጋገጫ (Vehicle Name Validation)
     if (!vehicle || typeof vehicle !== 'string' || vehicle.trim() === '') {
         return sendErrorResponse(res, 400, 'Vehicle name is required and must be a non-empty string.');
     }
@@ -492,70 +455,71 @@ export const submitPaymentProof = async (req, res) => {
     }
 
     // --- የአማራጭ መስኮች ማረጋገጫ (Optional Fields Validation) ---
-
-    if (weight !== undefined && weight !== null && weight !== '') {
-        // parsedWeight ቁጥር ወይም NaN ይሆናል
+    if (weight !== undefined && weight !== null && String(weight).trim() !== '') {
         if (typeof parsedWeight !== 'number' || !isFinite(parsedWeight) || parsedWeight <= 0) {
             return sendErrorResponse(res, 400, `If provided, weight must be a positive finite number. Received: '${weight}'`);
         }
     }
 
-    if (size !== undefined && size !== null) { // መጠን (size) እንደ ጽሑፍ ይቆያል
-        if (typeof size !== 'string' || size.trim() === '') {
+    if (size !== undefined && size !== null) {
+        if (typeof size !== 'string' || String(size).trim() === '') { // size እንደ ጽሑፍ ነው የሚጠበቀው
             return sendErrorResponse(res, 400, 'If provided, size must be a non-empty string.');
         }
-        if (size.length > 255) {
+        if (String(size).length > 255) {
             return sendErrorResponse(res, 400, 'Size string exceeds maximum length of 255 characters.');
         }
     }
 
-    if (quantity !== undefined && quantity !== null && quantity !== '') {
-        // parsedQuantity ሙሉ ቁጥር ወይም NaN ይሆናል
+    if (quantity !== undefined && quantity !== null && String(quantity).trim() !== '') {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
             return sendErrorResponse(res, 400, `If provided, quantity must be a positive integer. Received: '${quantity}'`);
         }
     }
 
-    // የክፍያ ዘዴ ማረጋገጫ (Payment Method Validation)
     const validPaymentMethods = ['screenshot', 'cash'];
-    if (payment_method !== undefined && payment_method !== null) {
-        if (typeof payment_method !== 'string' || payment_method.trim() === '' || !validPaymentMethods.includes(payment_method)) {
-            return sendErrorResponse(res, 400, `If provided, payment_method must be one of: ${validPaymentMethods.join(', ')}.`);
+    // የክፍያ ዘዴ ከተሰጠ ብቻ ያረጋግጡ፤ ካልሆነ ሞዴሉ ነባሪውን ይጠቀማል
+    if (payment_method !== undefined && payment_method !== null && String(payment_method).trim() !== '') {
+        if (typeof payment_method !== 'string' || !validPaymentMethods.includes(String(payment_method).trim())) {
+            return sendErrorResponse(res, 400, `Payment_method must be one of: ${validPaymentMethods.join(', ')}.`);
         }
     }
 
-    // የባንክ አካውንት ማረጋገጫ (Bank Account Validation)
+
     const validBankAccounts = ['Cbe', 'Telebirr', 'Abyssinia'];
-    if (bank_account !== undefined && bank_account !== null) {
-        if (payment_method === 'screenshot' && (typeof bank_account !== 'string' || bank_account.trim() === '' || !validBankAccounts.includes(bank_account))) {
-            return sendErrorResponse(res, 400, `If payment method is 'screenshot', bank_account must be one of: ${validBankAccounts.join(', ')}.`);
-        } else if (payment_method !== 'screenshot' && bank_account.trim() !== '') {
-             // ባንክ አካውንት የተሰጠው 'screenshot' ላልሆነ የክፍያ አይነት ከሆነ ችላ ማለት ወይም ስህተት መመለስ ይቻላል
+    const currentPaymentMethod = (payment_method !== undefined && payment_method !== null && String(payment_method).trim() !== '') ? String(payment_method).trim() : DeliveryRequest.rawAttributes.payment_method.defaultValue; // ከሞዴል ነባሪውን ይውሰዱ
+
+    if (currentPaymentMethod === 'screenshot') {
+        if (bank_account === undefined || bank_account === null || String(bank_account).trim() === '' || !validBankAccounts.includes(String(bank_account).trim())) {
+            return sendErrorResponse(res, 400, `If payment method is 'screenshot', a valid bank_account (one of: ${validBankAccounts.join(', ')}) is required.`);
         }
-    } else if (payment_method === 'screenshot' && (bank_account === undefined || bank_account === null || bank_account.trim() === '')) {
-        return sendErrorResponse(res, 400, `If payment method is 'screenshot', bank_account is required.`);
+    } else {
+        // 'screenshot' ካልሆነ የባንክ አካውንት መሰጠት የለበትም ወይም ችላ ይባላል
+        if (bank_account !== undefined && bank_account !== null && String(bank_account).trim() !== '') {
+            // አማራጭ፡ ስህተት ይመልሱ ወይም ችላ ይበሉ
+            // return sendErrorResponse(res, 400, 'Bank account should not be provided for non-screenshot payments.');
+            console.log("Bank account provided for non-screenshot payment, will be ignored.");
+        }
     }
 
 
     if (receiver_name !== undefined && receiver_name !== null) {
-        if (typeof receiver_name !== 'string' || receiver_name.trim() === '') {
+        if (typeof receiver_name !== 'string' || String(receiver_name).trim() === '') {
             return sendErrorResponse(res, 400, 'If provided, receiver_name must be a non-empty string.');
         }
-        if (receiver_name.length > 255) {
+        if (String(receiver_name).length > 255) {
             return sendErrorResponse(res, 400, 'Receiver name exceeds maximum length of 255 characters.');
         }
     }
 
     if (receiver_phone !== undefined && receiver_phone !== null) {
-        if (typeof receiver_phone !== 'string' || receiver_phone.trim() === '') {
+        if (typeof receiver_phone !== 'string' || String(receiver_phone).trim() === '') {
             return sendErrorResponse(res, 400, 'If provided, receiver_phone must be a non-empty string.');
         }
-        if (receiver_phone.length > 50) {
+        if (String(receiver_phone).length > 50) { // ለምሳሌ ርዝመት ገደብ
             return sendErrorResponse(res, 400, 'Receiver phone exceeds maximum length of 50 characters.');
         }
     }
 
-    // --- የዳታቤዝ ክንውኖች (Database Operations) ---
     let transaction;
     try {
         transaction = await sequelize.transaction();
@@ -566,21 +530,26 @@ export const submitPaymentProof = async (req, res) => {
             return sendErrorResponse(res, 404, `Sender with ID ${parsedSenderId} not found.`);
         }
 
-        const pricingConfig = await DynamicPricing.findByPk(1, { transaction }); // PK 1 ነው ብለን እናስብ
-        if (!pricingConfig || typeof pricingConfig.price_per_km !== 'number' || !isFinite(pricingConfig.price_per_km) || pricingConfig.price_per_km < 0) {
+        const pricingConfigResult = await DynamicPricing.findByPk(1, { transaction });
+        if (!pricingConfigResult || typeof pricingConfigResult.price_per_km !== 'number' || !isFinite(pricingConfigResult.price_per_km) || pricingConfigResult.price_per_km < 0) {
             await transaction.rollback();
             console.warn(`Delivery creation blocked for Sender ${parsedSenderId}: Pricing configuration invalid or missing.`);
             return sendErrorResponse(res, 503, 'Service Unavailable: Pricing configuration error.');
         }
+        const pricingConfig = pricingConfigResult.toJSON(); // ወደ plain object ይቀይሩ
 
         const distanceKm = calculateDistance(parsedPickupLat, parsedPickupLng, parsedDropoffLat, parsedDropoffLng);
+        if (!isFinite(distanceKm)) { // ርቀት ማስላት ካልተቻለ
+            await transaction.rollback();
+            return sendErrorResponse(res, 400, 'Could not calculate distance. Please check coordinates.');
+        }
         console.log(`Calculated distance for Sender ${parsedSenderId}: ${distanceKm.toFixed(2)} km`);
 
         let calculatedPrice = distanceKm * pricingConfig.price_per_km;
-        if (parsedWeight && typeof pricingConfig.price_per_kg === 'number' && isFinite(pricingConfig.price_per_kg)) {
+        if (isFinite(parsedWeight) && parsedWeight > 0 && typeof pricingConfig.price_per_kg === 'number' && isFinite(pricingConfig.price_per_kg)) {
             calculatedPrice += parsedWeight * pricingConfig.price_per_kg;
         }
-        if (parsedQuantity && typeof pricingConfig.price_per_quantity === 'number' && isFinite(pricingConfig.price_per_quantity)) {
+        if (Number.isInteger(parsedQuantity) && parsedQuantity > 0 && typeof pricingConfig.price_per_quantity === 'number' && isFinite(pricingConfig.price_per_quantity)) {
             calculatedPrice += parsedQuantity * pricingConfig.price_per_quantity;
         }
         if (typeof pricingConfig.base_fee === 'number' && isFinite(pricingConfig.base_fee)) {
@@ -599,88 +568,95 @@ export const submitPaymentProof = async (req, res) => {
             dropoff_lng: parsedDropoffLng,
             status: 'pending',
             price: calculatedPrice,
-            vehicle: vehicle.trim(), // የተስተካከለ የተሽከርካሪ ስም
-
-            // አማራጭ መስኮችን የተሰጡና ትክክለኛ ከሆኑ ብቻ መጨመር
-            ...(parsedWeight !== undefined && isFinite(parsedWeight) && { weight: parsedWeight }),
-            ...(size !== undefined && size !== null && size.trim() !== '' && { size: size.trim() }),
-            ...(parsedQuantity !== undefined && Number.isInteger(parsedQuantity) && { quantity: parsedQuantity }),
-            ...(payment_method !== undefined && payment_method !== null && { payment_method: payment_method }),
-            ...(bank_account !== undefined && bank_account !== null && bank_account.trim() !== '' && payment_method === 'screenshot' && { bank_account: bank_account.trim() }),
-            ...(receiver_name !== undefined && receiver_name !== null && receiver_name.trim() !== '' && { receiver_name: receiver_name.trim() }),
-            ...(receiver_phone !== undefined && receiver_phone !== null && receiver_phone.trim() !== '' && { receiver_phone: receiver_phone.trim() }),
+            vehicle: String(vehicle).trim(),
         };
+
+        if (isFinite(parsedWeight) && parsedWeight > 0) deliveryData.weight = parsedWeight;
+        if (size !== undefined && size !== null && String(size).trim() !== '') deliveryData.size = String(size).trim();
+        if (Number.isInteger(parsedQuantity) && parsedQuantity > 0) deliveryData.quantity = parsedQuantity;
+        if (currentPaymentMethod) deliveryData.payment_method = currentPaymentMethod;
+
+        if (currentPaymentMethod === 'screenshot' && bank_account !== undefined && bank_account !== null && String(bank_account).trim() !== '') {
+            deliveryData.bank_account = String(bank_account).trim();
+        }
+
+        if (receiver_name !== undefined && receiver_name !== null && String(receiver_name).trim() !== '') deliveryData.receiver_name = String(receiver_name).trim();
+        if (receiver_phone !== undefined && receiver_phone !== null && String(receiver_phone).trim() !== '') deliveryData.receiver_phone = String(receiver_phone).trim();
+
 
         console.log("Attempting to create DeliveryRequest with data:", deliveryData);
         const newDelivery = await DeliveryRequest.create(deliveryData, { transaction });
 
-        try {
-            await createNotification({
-                sender_id: parsedSenderId, // ወይም newDelivery.sender_id መጠቀም ይቻላል
-                message: `Request #${newDelivery.id} created successfully. Price: ${calculatedPrice.toFixed(2)} ETB. Searching for drivers...`,
-                type: 'delivery_created',
-                related_entity_id: newDelivery.id,
-                related_entity_type: 'DeliveryRequest'
-            }, transaction);
-        } catch (notificationError) {
-            console.error(`Failed to create notification for delivery ${newDelivery.id}:`, notificationError);
-            // ይህ ወሳኝ ስህተት መሆን አለመሆኑን መወሰን
-        }
+        await createNotification({
+            sender_id: parsedSenderId,
+            message: `Request #${newDelivery.id} created. Price: ${calculatedPrice.toFixed(2)} ETB. Searching...`,
+            type: 'delivery_created', related_entity_id: newDelivery.id, related_entity_type: 'DeliveryRequest'
+        }, transaction);
 
-        // TODO: የአሽከርካሪ መፈለጊያ ሎጂክን ማስጀመር (asynchronously ቢሆን ይመረጣል)
-        console.log(`INFO: Delivery Request ${newDelivery.id} created by Sender ${parsedSenderId}. Driver matching needs implementation.`);
+        console.log(`INFO: Delivery Request ${newDelivery.id} created by Sender ${parsedSenderId}.`);
+        // TODO: የአሽከርካሪ መፈለጊያ ሎጂክ እዚህ ጋር ያስገቡ
 
         await transaction.commit();
         res.status(201).json(newDelivery);
 
     } catch (err) {
         if (transaction) {
-            try {
-                await transaction.rollback();
-            } catch (rollbackError) {
-                console.error("Error rolling back transaction:", rollbackError);
-            }
+            try { await transaction.rollback(); }
+            catch (rollbackError) { console.error("Error rolling back transaction:", rollbackError); }
         }
 
         if (err.name === 'SequelizeValidationError') {
             console.error("Sequelize Validation Error details:", err.errors);
-            return sendErrorResponse(res, 400, 'Creation failed: Validation error(s).', err.errors.map(e => ({ message: e.message, path: e.path })));
+            return sendErrorResponse(res, 400, 'Creation failed: Validation error(s).', err);
         }
         if (err.name === 'SequelizeForeignKeyConstraintError') {
             console.error("Foreign Key Constraint Error:", err);
-            return sendErrorResponse(res, 400, `Invalid reference provided (e.g., sender ID). Field: ${err.fields ? err.fields.join(', ') : 'unknown'}`);
+            return sendErrorResponse(res, 400, `Invalid reference provided (e.g., sender ID). Field: ${err.fields ? err.fields.join(', ') : 'unknown'}`, err);
         }
-        if (err.message && err.message.includes("notification")) {
-             return sendErrorResponse(res, 500, 'Delivery created, but failed to send notification.');
-        }
-
-        console.error(`FATAL: Error creating delivery request for sender ${parsedSenderId || 'unknown'}:`, err);
-        sendErrorResponse(res, 500, 'An unexpected error occurred while creating the delivery request.');
+        console.error(`FATAL: Error creating delivery request for sender ${parsedSenderId || senderId || 'unknown'}:`, err);
+        sendErrorResponse(res, 500, 'An unexpected error occurred while creating the delivery request.', err);
     }
-};turn sendErrorResponse(res, 404, `Delivery request #${reqId} not found.`);
+};
+
+
+export const submitPaymentProof = async (req, res) => {
+    // !! INSECURE: senderId ከ body መምጣት አለበት !! (ወይም ከ authenticated user)
+    const { delivery_id, senderId } = req.body;
+    const uploadedFile = req.file; // ከ multer middleware
+
+    const reqId = parseInt(delivery_id, 10);
+    const sId = parseInt(senderId, 10); // ይህ ከ authenticated user መምጣት አለበት
+    if (!reqId || !sId || isNaN(reqId) || isNaN(sId) || reqId <= 0 || sId <= 0) return sendErrorResponse(res, 400, 'Valid deliveryId and senderId required.');
+    if (!uploadedFile) return sendErrorResponse(res, 400, 'Payment proof image file required.');
+
+    const filePathUrl = `/uploads/payment_proofs/${uploadedFile.filename}`; // የፋይል ዱካ URL
+    let transaction;
+    try {
+        transaction = await sequelize.transaction();
+        const delivery = await DeliveryRequest.findByPk(reqId, { transaction });
+        if (!delivery) {
+            await transaction.rollback();
+            // fs.unlink(uploadedFile.path, ...) // የተሰቀለውን ፋይል መሰረዝ ያስቡበት
+            return sendErrorResponse(res, 404, `Delivery request #${reqId} not found.`);
         }
 
-        // Ownership Check (using senderId from body)
-        if (delivery.sender_id !== sId) {
+        // የባለቤትነት ማረጋገጫ (senderId ከ body መምጣቱ ደህንነቱ ያልተጠበቀ ነው)
+        if (delivery.sender_id !== sId) { // sId ከ authenticated user መሆን አለበት
             await transaction.rollback();
-            // Consider deleting uploaded file
             return sendErrorResponse(res, 403, 'Forbidden: You do not own this request.');
         }
         if (delivery.is_payment_approved) {
             await transaction.rollback();
-             // Consider deleting uploaded file
             return sendErrorResponse(res, 400, `Payment for #${delivery.id} already approved.`);
         }
 
-        // Update Record
-        delivery.payment_method = 'screenshot';
+        delivery.payment_method = 'screenshot'; // የክፍያ ዘዴን ያረጋግጡ ወይም ያዘምኑ
         delivery.payment_proof_url = filePathUrl;
-        delivery.receipt_link = null; // Clear other proof type
-        delivery.is_payment_approved = false; // Pending review
+        delivery.receipt_link = null; // ሌላ የማረጋገጫ አይነት ያጽዱ
+        delivery.is_payment_approved = false; // ግምገማ በመጠባበቅ ላይ
         delivery.approved_by = null;
         await delivery.save({ transaction });
 
-        // Notification
         await createNotification({
             sender_id: sId, message: `Payment proof image submitted for delivery #${delivery.id}. Pending review.`,
             type: 'payment_proof_submitted', related_entity_id: delivery.id, related_entity_type: 'DeliveryRequestPayment'
@@ -690,83 +666,71 @@ export const submitPaymentProof = async (req, res) => {
         res.status(200).json({ message: 'Payment proof submitted successfully.', filePath: filePathUrl });
     } catch (err) {
         if (transaction) await transaction.rollback();
-        // Consider deleting uploaded file on DB error
-        // if (uploadedFile?.path) { try { fs.unlinkSync(uploadedFile.path); } catch(e){...}}
+        // if (uploadedFile?.path) { try { fs.unlinkSync(uploadedFile.path); } catch(e){...}} // በDB ስህተት ጊዜ ፋይልን መሰረዝ
         console.error(`Error submitting payment proof for Req ${delivery_id}:`, err);
         sendErrorResponse(res, 500, 'Failed to submit payment proof.', err);
     }
 };
 
 export const driverAcceptRequest = async (req, res) => {
-    // !! INSECURE: Needs driverId in body !!
+    // !! INSECURE: driverId ከ body መምጣት አለበት !! (ወይም ከ authenticated user)
     const { deliveryRequestId, driverId } = req.body;
 
-    // Validation
     const reqId = parseInt(deliveryRequestId, 10);
-    const drvId = parseInt(driverId, 10);
+    const drvId = parseInt(driverId, 10); // ይህ ከ authenticated user መምጣት አለበት
     if (!reqId || !drvId || isNaN(reqId) || isNaN(drvId) || reqId <= 0 || drvId <= 0) return sendErrorResponse(res, 400, 'Valid deliveryRequestId and driverId required.');
 
     let transaction;
     try {
-        // Attempt high isolation transaction if DB supports it, e.g., PostgreSQL
         transaction = await sequelize.transaction({
-             // isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.SERIALIZABLE // Example
+            // isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.SERIALIZABLE // ለምሳሌ PostgreSQL
         });
+        const lockOption = { transaction, lock: transaction.LOCK.UPDATE }; // ለ PostgreSQL
 
-        // Lock rows if using pessimistic locking with DBs like PostgreSQL
-        // const lockOption = { transaction, lock: transaction.LOCK.UPDATE };
-        const lockOption = { transaction }; // Standard transaction lock
-
-        // Fetch Request & Sender
         const deliveryRequest = await DeliveryRequest.findByPk(reqId, {
             include: [{ model: Sender, as: 'sender', attributes: ['id', 'full_name'] }],
-             ...lockOption // Apply lock
+            ...lockOption
         });
 
         if (!deliveryRequest) {
             await transaction.rollback();
             return sendErrorResponse(res, 404, `Delivery Request #${reqId} not found.`);
         }
-        // Check Status - CRITICAL for race condition
-        if (deliveryRequest.status !== 'broadcasting') {
-             await transaction.rollback();
-             const msg = deliveryRequest.assigned_driver_id ? `Request #${reqId} already assigned.` : `Request #${reqId} not available (Status: ${deliveryRequest.status}).`;
-             return sendErrorResponse(res, 409, msg); // Conflict
+        if (deliveryRequest.status !== 'broadcasting') { // 'broadcasting' ወይም 'pending' ሊሆን ይችላል
+            await transaction.rollback();
+            const msg = deliveryRequest.assigned_driver_id ? `Request #${reqId} already assigned.` : `Request #${reqId} not available (Status: ${deliveryRequest.status}).`;
+            return sendErrorResponse(res, 409, msg);
         }
 
-        // Fetch Driver & Check Status/Approval
         const driver = await Driver.findByPk(drvId, {
             include: [{ model: AdminApproval, as: 'approvalStatus' }],
-             ...lockOption // Apply lock
+            ...lockOption
         });
 
         if (!driver) { await transaction.rollback(); return sendErrorResponse(res, 404, `Driver ${drvId} not found.`); }
         if (!driver.approvalStatus || driver.approvalStatus.status !== 'approved') { await transaction.rollback(); return sendErrorResponse(res, 403, 'Account not approved.'); }
         if (!driver.is_available_for_new || driver.current_status !== 'idle') { await transaction.rollback(); return sendErrorResponse(res, 409, `Cannot accept: Your status is ${driver.current_status}.`); }
 
-        // Update Records
         deliveryRequest.assigned_driver_id = drvId;
-        deliveryRequest.status = 'driver_confirmed';
+        deliveryRequest.status = 'driver_confirmed'; // ወይም 'assigned'
         await deliveryRequest.save({ transaction });
 
         driver.is_available_for_new = false;
         driver.current_status = 'en_route_pickup';
         await driver.save({ transaction });
 
-        // Notifications
         await createNotification({ driver_id: drvId, message: `✅ Accepted Delivery Request #${reqId}. Proceed to pickup.`, type: 'request_accepted_self', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction);
         if (deliveryRequest.sender) { await createNotification({ sender_id: deliveryRequest.sender.id, message: `Driver ${driver.full_name} accepted Request #${reqId}!`, type: 'request_accepted_sender', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction); }
-        // Optional TODO: Notify other broadcasted drivers
 
         await transaction.commit();
         res.status(200).json({ message: `Request #${reqId} accepted successfully.`, deliveryRequest });
 
     } catch (err) {
         if (transaction) await transaction.rollback();
-         if (err.name === 'SequelizeTimeoutError' || err.message.includes('lock')) {
+        if (err.name === 'SequelizeTimeoutError' || (err.original && err.original.message.includes('lock'))) { // ለተለያዩ የDB lock ስህተቶች ማስተካከል
             console.warn(`Lock contention accepting Req ${deliveryRequestId} by Drv ${driverId}:`, err);
             return sendErrorResponse(res, 503, 'Could not process acceptance now. Please try again.');
-         }
+        }
         console.error(`Error accepting request ${deliveryRequestId} by driver ${driverId}:`, err);
         sendErrorResponse(res, 500, 'Failed to accept delivery request.', err);
     }
@@ -774,55 +738,56 @@ export const driverAcceptRequest = async (req, res) => {
 
 
 // =============================================
-// Admin Functions (Open Routes)
+// Admin Functions (Open Routes - !! ደህንነታቸውን ያረጋግጡ !!)
 // =============================================
 
 export const updateApproval = async (req, res) => {
+    // !! ADMIN ROUTE - ደህንነቱን ያረጋግጡ !!
     const { driver_id, status, reason } = req.body;
-    // Validation
     if (!driver_id || !status) return sendErrorResponse(res, 400, 'driver_id and status required.');
     const drvId = parseInt(driver_id, 10);
     if (isNaN(drvId) || drvId <= 0) return sendErrorResponse(res, 400, 'Invalid driver_id.');
-    if (!['approved', 'rejected'].includes(status)) return sendErrorResponse(res, 400, 'Invalid status.');
-    if (status === 'rejected' && !reason) return sendErrorResponse(res, 400, 'Reason required for rejection.');
+    if (!['approved', 'rejected', 'pending'].includes(status)) return sendErrorResponse(res, 400, 'Invalid status. Must be approved, rejected, or pending.');
+    if (status === 'rejected' && (!reason || String(reason).trim() === '')) return sendErrorResponse(res, 400, 'Reason required for rejection.');
 
     let transaction;
     try {
         transaction = await sequelize.transaction();
         const approval = await AdminApproval.findOne({
             where: { driver_id: drvId },
-            include: [{ model: Driver, as: 'driver', include: [{ model: Sender, as: 'senderAccount' }] }],
+            include: [{ model: Driver, as: 'driver', include: [{ model: Sender, as: 'senderAccount' }] }], // senderAccount ሞዴልዎ ላይ መኖሩን ያረጋግጡ
             transaction
         });
-        if (!approval) { await transaction.rollback(); return sendErrorResponse(res, 404, `Approval record not found for driver ${drvId}.`); }
+        if (!approval) { await transaction.rollback(); return sendErrorResponse(res, 404, `Approval record not found for driver ${drvId}. Create one if needed.`); }
         if (approval.status === status) { await transaction.rollback(); return res.status(200).json({ message: `Driver status already ${status}.` }); }
 
         const driver = approval.driver;
-        const sender = driver?.senderAccount;
+        const sender = driver?.senderAccount; // senderAccount በ Driver ሞዴልዎ ላይ መኖር አለበት
         const originalStatus = approval.status;
 
-        // Update Approval
         approval.status = status;
         approval.approved_at = status === 'approved' ? new Date() : null;
-        approval.rejected_reason = status === 'rejected' ? reason : null;
+        approval.rejected_reason = status === 'rejected' ? String(reason).trim() : null;
+        // approval.approved_by = req.admin.id; // አስተዳዳሪው ከ authenticated request መምጣት አለበት
         await approval.save({ transaction });
 
-        // Update Driver Status
         if (driver) {
-             driver.current_status = status === 'approved' ? 'idle' : 'offline';
-             driver.is_available_for_new = status === 'approved';
-             await driver.save({ transaction });
+            driver.current_status = status === 'approved' ? 'idle' : 'offline';
+            driver.is_available_for_new = status === 'approved';
+            await driver.save({ transaction });
         }
-        // Notification
         let notificationMessage = '';
-         if (status === 'approved' && originalStatus !== 'approved') notificationMessage = `Driver profile for ${driver?.full_name} approved.`;
-         else if (status === 'rejected' && originalStatus !== 'rejected') notificationMessage = `Driver profile for ${driver?.full_name} rejected. Reason: ${reason}`;
+        if (status === 'approved' && originalStatus !== 'approved') notificationMessage = `Driver profile for ${driver?.full_name || 'ID: '+drvId} approved.`;
+        else if (status === 'rejected' && originalStatus !== 'rejected') notificationMessage = `Driver profile for ${driver?.full_name || 'ID: '+drvId} rejected. Reason: ${String(reason).trim()}`;
 
-        if (notificationMessage && sender) {
+        if (notificationMessage && sender) { // sender መኖሩን ያረጋግጡ
             await createNotification({ sender_id: sender.id, message: notificationMessage, type: 'driver_approval_update', related_entity_id: drvId, related_entity_type: 'DriverApproval'}, transaction);
-        } else if (!sender && driver) {
-             console.warn(`Could not send approval notification: Sender not found for Driver ID ${drvId}`);
+        } else if (notificationMessage && !sender && driver) {
+            console.warn(`Could not send approval notification to Sender: Sender not found for Driver ID ${drvId}`);
+            // አማራጭ፡ ለአሽከርካሪው በቀጥታ ማሳወቂያ ይላኩ
+             await createNotification({ driver_id: drvId, message: notificationMessage, type: 'driver_approval_update_self', related_entity_id: drvId, related_entity_type: 'DriverApproval'}, transaction);
         }
+
 
         await transaction.commit();
         res.status(200).json({ message: `Driver ${drvId} status updated to ${status}.` });
@@ -834,8 +799,10 @@ export const updateApproval = async (req, res) => {
 };
 
 export const adminApprovePayment = async (req, res) => {
-    const { delivery_id } = req.body;
-    // Validation
+    // !! ADMIN ROUTE - ደህንነቱን ያረጋግጡ !!
+    const { delivery_id } = req.body; // approved_by ከ authenticated admin መምጣት አለበት
+    // const adminId = req.admin.id; // ለምሳሌ
+
     if (!delivery_id) return sendErrorResponse(res, 400, 'Delivery ID required.');
     const reqId = parseInt(delivery_id, 10);
     if (isNaN(reqId) || reqId <= 0) return sendErrorResponse(res, 400, 'Invalid Delivery ID.');
@@ -846,17 +813,14 @@ export const adminApprovePayment = async (req, res) => {
         const delivery = await DeliveryRequest.findByPk(reqId, { include: [{ model: Sender, as: 'sender' }], transaction });
         if (!delivery) { await transaction.rollback(); return sendErrorResponse(res, 404, `Delivery request #${reqId} not found.`); }
 
-        // Business Checks
         if (delivery.payment_method !== 'screenshot') { await transaction.rollback(); return sendErrorResponse(res, 400, 'Admin approval only applicable for screenshot payments.'); }
         if (!delivery.payment_proof_url) { await transaction.rollback(); return sendErrorResponse(res, 400, 'No payment proof URL found for this delivery.'); }
         if (delivery.is_payment_approved) { await transaction.rollback(); return sendErrorResponse(res, 409, `Payment for #${delivery.id} already approved by ${delivery.approved_by || 'N/A'}.`); }
 
-        // Update Record
         delivery.is_payment_approved = true;
-        delivery.approved_by = 'admin';
+        delivery.approved_by = 'admin'; // ወይም adminId ይጠቀሙ
         await delivery.save({ transaction });
 
-        // Notification
         await createNotification({ sender_id: delivery.sender_id, message: `Admin approved payment for delivery #${delivery.id}.`, type: 'payment_approved_admin', related_entity_id: delivery.id, related_entity_type: 'DeliveryRequestPayment'}, transaction);
 
         await transaction.commit();
@@ -869,25 +833,23 @@ export const adminApprovePayment = async (req, res) => {
 };
 
 export const getAllDeliveryRequests = async (req, res) => {
+    // !! ADMIN ROUTE - ደህንነቱን ያረጋግጡ !!
     try {
-        // Pagination
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 20;
         const offset = (page - 1) * limit;
 
-        // Filtering
         const whereClause = {};
-        if (req.query.status) whereClause.status = { [Op.in]: req.query.status.split(',').map(s => s.trim()) };
-        if (req.query.senderId) whereClause.sender_id = parseInt(req.query.senderId, 10);
-        if (req.query.driverId) whereClause.assigned_driver_id = parseInt(req.query.driverId, 10);
-        // Add date range filters etc. if needed
+        if (req.query.status) whereClause.status = { [Op.in]: String(req.query.status).split(',').map(s => s.trim()) };
+        if (req.query.senderId && !isNaN(parseInt(req.query.senderId,10))) whereClause.sender_id = parseInt(req.query.senderId, 10);
+        if (req.query.driverId && !isNaN(parseInt(req.query.driverId,10))) whereClause.assigned_driver_id = parseInt(req.query.driverId, 10);
+        // TODO: የቀን ክልል ማጣሪያዎችን ወዘተ ይጨምሩ
 
-        // Sorting
         const sortBy = req.query.sortBy || 'createdAt';
-        const sortOrder = req.query.sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        const sortOrder = String(req.query.sortOrder)?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
         const orderClause = [[sortBy, sortOrder]];
+        if (sortBy !== 'createdAt') orderClause.push(['createdAt', 'DESC']); // ሁለተኛ ደረጃ መደርደሪያ
 
-        // Fetch Data
         const { count, rows } = await DeliveryRequest.findAndCountAll({
             where: whereClause,
             include: [
@@ -897,10 +859,9 @@ export const getAllDeliveryRequests = async (req, res) => {
             order: orderClause,
             limit: limit,
             offset: offset,
-            distinct: true,
+            distinct: true, // ለ include እና limit ትክክለኛ ቆጠራ
         });
 
-        // Prepare Response
         const totalPages = Math.ceil(count / limit);
         res.status(200).json({
             message: "Delivery requests retrieved.",
@@ -908,8 +869,8 @@ export const getAllDeliveryRequests = async (req, res) => {
             pagination: { totalItems: count, totalPages, currentPage: page, limit }
         });
     } catch (err) {
-        if (err instanceof TypeError || err instanceof Error && err.message.includes("parseInt")) {
-             return sendErrorResponse(res, 400, 'Invalid query parameter format.', err);
+        if (err instanceof TypeError || (err instanceof Error && err.message.includes("parseInt"))) {
+            return sendErrorResponse(res, 400, 'Invalid query parameter format.', err);
         }
         console.error("Error fetching delivery requests:", err);
         sendErrorResponse(res, 500, 'Failed to retrieve delivery requests.', err);
@@ -917,8 +878,8 @@ export const getAllDeliveryRequests = async (req, res) => {
 };
 
 export const adminAssignDriver = async (req, res) => {
+    // !! ADMIN ROUTE - ደህንነቱን ያረጋግጡ !!
     const { deliveryRequestId, driverId } = req.body;
-    // Validation
     if (!deliveryRequestId || !driverId) return sendErrorResponse(res, 400, 'deliveryRequestId and driverId required.');
     const reqId = parseInt(deliveryRequestId, 10);
     const drvId = parseInt(driverId, 10);
@@ -928,38 +889,45 @@ export const adminAssignDriver = async (req, res) => {
     try {
         transaction = await sequelize.transaction();
 
-        // Fetch Request
         const deliveryRequest = await DeliveryRequest.findByPk(reqId, { include: [{ model: Sender, as: 'sender' }], transaction });
         if (!deliveryRequest) { await transaction.rollback(); return sendErrorResponse(res, 404, `Request #${reqId} not found.`); }
-        if (deliveryRequest.status !== 'pending') { await transaction.rollback(); return sendErrorResponse(res, 400, `Request #${reqId} status is not 'pending'.`); }
+        // ጥያቄው 'pending' ወይም 'broadcasting' ሊሆን ይችላል፤ 'assigned' ከሆነ ቀድሞ ተመድቧል
+        if (!['pending', 'broadcasting'].includes(deliveryRequest.status)) {
+             await transaction.rollback();
+             return sendErrorResponse(res, 400, `Request #${reqId} status is '${deliveryRequest.status}', cannot manually assign.`);
+        }
 
-        // Fetch Driver & Checks
+
         const driver = await Driver.findByPk(drvId, { include: [{ model: AdminApproval, as: 'approvalStatus' }], transaction });
         if (!driver) { await transaction.rollback(); return sendErrorResponse(res, 404, `Driver ${drvId} not found.`); }
         if (!driver.approvalStatus || driver.approvalStatus.status !== 'approved') { await transaction.rollback(); return sendErrorResponse(res, 400, `Driver ${drvId} not approved.`); }
-        if (!['idle', 'offline'].includes(driver.current_status) || !driver.is_available_for_new) { await transaction.rollback(); return sendErrorResponse(res, 400, `Driver ${drvId} not available.`); }
+        // አስተዳዳሪ በሚመድብበት ጊዜ የአሽከርካሪው 'idle' ወይም 'offline' መሆን ላያስፈልግ ይችላል፤ ነገር ግን ማረጋገጡ ጥሩ ነው
+        if (!['idle', 'offline'].includes(driver.current_status) && !driver.is_available_for_new ) { // is_available_for_new ንም ያረጋግጡ
+             console.warn(`Admin assigning driver ${drvId} who is currently ${driver.current_status} and availability is ${driver.is_available_for_new}`);
+             // await transaction.rollback(); return sendErrorResponse(res, 400, `Driver ${drvId} not available (Status: ${driver.current_status}).`);
+        }
 
-        // Optional Distance Check
-        if (driver.current_lat && deliveryRequest.pickup_lat) {
+
+        if (driver.current_lat != null && driver.current_lng != null && deliveryRequest.pickup_lat != null && deliveryRequest.pickup_lng != null) {
             const distance = calculateDistance(driver.current_lat, driver.current_lng, deliveryRequest.pickup_lat, deliveryRequest.pickup_lng);
             console.log(`AdminAssign: Dist Drv ${drvId} to Req ${reqId} Pickup: ${distance.toFixed(1)}km`);
-            if (distance > MAX_ASSIGNMENT_DISTANCE_KM) {
-                await transaction.rollback();
-                return sendErrorResponse(res, 400, `Assignment failed safeguard: Driver ${distance.toFixed(1)} km away.`);
+            if (distance > MAX_ASSIGNMENT_DISTANCE_KM) { // MAX_ASSIGNMENT_DISTANCE_KM ከላይ ይገለጻል
+                // await transaction.rollback(); // አስተዳዳሪ ከፈለገ ከርቀት መመደብ ይችላል
+                // return sendErrorResponse(res, 400, `Assignment failed safeguard: Driver ${distance.toFixed(1)} km away. Override if necessary.`);
+                 console.warn(`Admin assigning driver ${drvId} who is ${distance.toFixed(1)}km away (exceeds ${MAX_ASSIGNMENT_DISTANCE_KM}km safeguard).`);
             }
         }
 
-        // Update Records
         deliveryRequest.assigned_driver_id = drvId;
-        deliveryRequest.status = 'assigned';
+        deliveryRequest.status = 'assigned'; // ወይም 'driver_confirmed' እንደ ፍሰትዎ
         await deliveryRequest.save({ transaction });
-        driver.is_available_for_new = false;
-        driver.current_status = 'assigned';
+
+        driver.is_available_for_new = false; // አዲስ ጥያቄ መቀበል አይችልም
+        driver.current_status = 'assigned'; // ወይም 'en_route_pickup'
         await driver.save({ transaction });
 
-        // Notifications
-        await createNotification({ driver_id: drvId, message: `Admin assigned you Delivery #${reqId}.`, type: 'assignment_admin', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction);
-        if (deliveryRequest.sender) { await createNotification({ sender_id: deliveryRequest.sender.id, message: `Admin assigned Driver ${driver.full_name} to Request #${reqId}.`, type: 'driver_assigned', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction); }
+        await createNotification({ driver_id: drvId, message: `Admin assigned you Delivery #${reqId}.`, type: 'assignment_admin_self', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction);
+        if (deliveryRequest.sender) { await createNotification({ sender_id: deliveryRequest.sender.id, message: `Admin assigned Driver ${driver.full_name} to Request #${reqId}.`, type: 'driver_assigned_admin', related_entity_id: reqId, related_entity_type: 'DeliveryRequest'}, transaction); }
 
         await transaction.commit();
         res.status(200).json({ message: `Driver ${drvId} assigned to Request ${reqId}.`, deliveryRequest });
@@ -971,24 +939,30 @@ export const adminAssignDriver = async (req, res) => {
 };
 
 export const adminBroadcastRequest = async (req, res) => {
+    // !! ADMIN ROUTE - ደህንነቱን ያረጋግጡ !!
     const { deliveryRequestId, radiusKm } = req.body;
-    // Validation
-    if (!deliveryRequestId || !radiusKm) return sendErrorResponse(res, 400, 'deliveryRequestId and radiusKm required.');
+    if (!deliveryRequestId || radiusKm === undefined) return sendErrorResponse(res, 400, 'deliveryRequestId and radiusKm required.');
     const reqId = parseInt(deliveryRequestId, 10);
     const radius = parseFloat(radiusKm);
-    if (isNaN(reqId) || isNaN(radius) || reqId <= 0 || radius <= 0) return sendErrorResponse(res, 400, 'Invalid ID or radius.');
+    if (isNaN(reqId) || isNaN(radius) || reqId <= 0 || radius < 0) return sendErrorResponse(res, 400, 'Invalid ID or radius (must be non-negative).');
 
     let transaction;
     try {
         transaction = await sequelize.transaction();
 
-        // Fetch Request
         const deliveryRequest = await DeliveryRequest.findByPk(reqId, { transaction });
         if (!deliveryRequest) { await transaction.rollback(); return sendErrorResponse(res, 404, `Request #${reqId} not found.`); }
-        if (deliveryRequest.status !== 'pending') { await transaction.rollback(); return sendErrorResponse(res, 400, `Cannot broadcast: Request status is '${deliveryRequest.status}'.`); }
-        if (!deliveryRequest.pickup_lat || !deliveryRequest.pickup_lng) { await transaction.rollback(); return sendErrorResponse(res, 400, `Request #${reqId} missing pickup coordinates.`); }
+        // 'pending' ለሆኑ ጥያቄዎች ብቻ ብሮድካስት ያድርጉ
+        if (deliveryRequest.status !== 'pending') {
+            await transaction.rollback();
+            return sendErrorResponse(res, 400, `Cannot broadcast: Request status is '${deliveryRequest.status}'. Must be 'pending'.`);
+        }
+        if (deliveryRequest.pickup_lat == null || deliveryRequest.pickup_lng == null) { // Use == null to check for both undefined and null
+            await transaction.rollback();
+            return sendErrorResponse(res, 400, `Request #${reqId} missing pickup coordinates.`);
+        }
 
-        // Find Eligible Drivers
+
         const { pickup_lat, pickup_lng } = deliveryRequest;
         const boundingBox = getBoundingBox(pickup_lat, pickup_lng, radius);
         const potentialDrivers = await Driver.findAll({
@@ -996,23 +970,27 @@ export const adminBroadcastRequest = async (req, res) => {
                 is_available_for_new: true, current_status: 'idle',
                 current_lat: { [Op.between]: [boundingBox.minLat, boundingBox.maxLat] },
                 current_lng: { [Op.between]: [boundingBox.minLng, boundingBox.maxLng] },
+                // Sequelize.fn('ST_DWithin', ...) // ለበለጠ ትክክለኛ የጂኦ-ስፓሻል ጥያቄዎች PostGIS ከተጠቀሙ
             },
             include: [{ model: AdminApproval, as: 'approvalStatus', where: { status: 'approved' }, required: true }],
-            attributes: ['id', 'full_name', 'current_lat', 'current_lng'],
+            attributes: ['id', 'full_name', 'current_lat', 'current_lng'], // አስፈላጊ የሆኑትን ብቻ ይምረጡ
             transaction
         });
+
         const driversInRadius = potentialDrivers.filter(driver => {
-            if (!driver.current_lat || !driver.current_lng) return false;
+            if (driver.current_lat == null || driver.current_lng == null) return false;
             const distance = calculateDistance(pickup_lat, pickup_lng, driver.current_lat, driver.current_lng);
             return distance <= radius;
         });
-        if (driversInRadius.length === 0) { await transaction.rollback(); return sendErrorResponse(res, 404, `No available drivers found within ${radius} km.`); }
 
-        // Update Request Status
+        if (driversInRadius.length === 0) {
+            // await transaction.rollback(); // ባይገኝም ጥያቄው 'pending' ሆኖ መቀጠል ይችላል
+            return sendErrorResponse(res, 404, `No available drivers found within ${radius} km.`);
+        }
+
         deliveryRequest.status = 'broadcasting';
         await deliveryRequest.save({ transaction });
 
-        // Create Notifications
         const notificationPromises = driversInRadius.map(driver => {
             const distance = calculateDistance(pickup_lat, pickup_lng, driver.current_lat, driver.current_lng);
             return createNotification({
@@ -1032,27 +1010,44 @@ export const adminBroadcastRequest = async (req, res) => {
     }
 };
 
+
 // =============================================
-// Pricing Functions (Open Routes)
+// Pricing Functions (Open Routes - !! ደህንነታቸውን ያረጋግጡ !!)
 // =============================================
 
 export const setOrUpdatePricing = async (req, res) => {
-    // Validation
-    const { price_per_km, price_per_kg, price_per_size_unit, price_per_quantity } = req.body;
+    // !! ADMIN ROUTE - ደህንነቱን ያረጋግጡ !!
+    const { price_per_km, price_per_kg, base_fee, minimum_charge, price_per_quantity } = req.body; // price_per_size_unit ተወግዷል
     const updateData = {};
-    if (price_per_km !== undefined && !isNaN(parseFloat(price_per_km)) && isFinite(price_per_km)) updateData.price_per_km = parseFloat(price_per_km);
-    if (price_per_kg !== undefined && !isNaN(parseFloat(price_per_kg)) && isFinite(price_per_kg)) updateData.price_per_kg = parseFloat(price_per_kg);
-    if (price_per_size_unit !== undefined && !isNaN(parseFloat(price_per_size_unit)) && isFinite(price_per_size_unit)) updateData.price_per_size_unit = parseFloat(price_per_size_unit);
-    if (price_per_quantity !== undefined && !isNaN(parseFloat(price_per_quantity)) && isFinite(price_per_quantity)) updateData.price_per_quantity = parseFloat(price_per_quantity);
 
-    if (Object.keys(updateData).length === 0) return sendErrorResponse(res, 400, 'At least one valid pricing parameter required.');
+    const parseFloatIfValid = (val) => {
+        const num = parseFloat(val);
+        return !isNaN(num) && isFinite(num) && num >=0 ? num : undefined; // አሉታዊ ያልሆኑትን ብቻ ይቀበሉ
+    };
+
+    updateData.price_per_km = parseFloatIfValid(price_per_km);
+    updateData.price_per_kg = parseFloatIfValid(price_per_kg);
+    updateData.base_fee = parseFloatIfValid(base_fee);
+    updateData.minimum_charge = parseFloatIfValid(minimum_charge);
+    updateData.price_per_quantity = parseFloatIfValid(price_per_quantity);
+
+    // ቢያንስ አንድ ትክክለኛ የዋጋ መለኪያ ያስፈልጋል
+    const validUpdateKeys = Object.keys(updateData).filter(key => updateData[key] !== undefined);
+    if (validUpdateKeys.length === 0) {
+        return sendErrorResponse(res, 400, 'At least one valid non-negative pricing parameter (price_per_km, price_per_kg, base_fee, minimum_charge, price_per_quantity) required.');
+    }
+
+    // ትክክለኛ ያልሆኑትን ከ updateData ያስወግዱ
+    const finalUpdateData = {};
+    validUpdateKeys.forEach(key => finalUpdateData[key] = updateData[key]);
+
 
     try {
         // Upsert the single pricing row (ID 1)
-        const [pricing, created] = await DynamicPricing.upsert({ id: 1, ...updateData }, { returning: true });
+        const [pricing, created] = await DynamicPricing.upsert({ id: 1, ...finalUpdateData }, { returning: true });
         res.status(200).json({ message: `Pricing config ${created ? 'created' : 'updated'}.`, pricing });
     } catch (err) {
-        if (err.name === 'SequelizeValidationError') return sendErrorResponse(res, 400, 'Pricing update failed: Validation.', err.errors);
+        if (err.name === 'SequelizeValidationError') return sendErrorResponse(res, 400, 'Pricing update failed: Validation.', err);
         console.error("Error updating pricing:", err);
         sendErrorResponse(res, 500, 'Failed to update pricing.', err);
     }
@@ -1060,12 +1055,17 @@ export const setOrUpdatePricing = async (req, res) => {
 
 export const getPricing = async (req, res) => {
     try {
-        const pricing = await DynamicPricing.findByPk(1); // Assumes ID 1 for global config
-        if (!pricing) return sendErrorResponse(res, 404, 'Pricing configuration not found.');
-
-        const pricingData = { ...pricing.toJSON() };
-        delete pricingData.id; // Hide internal ID
-        res.status(200).json({ message: "Pricing configuration retrieved.", pricing: pricingData });
+        const pricing = await DynamicPricing.findByPk(1); // ID 1 ዓለም አቀፍ ውቅር ነው ብለን እናስብ
+        if (!pricing) {
+            // If no pricing config exists, create a default one
+            console.log("No pricing config found, creating default entry.");
+            const defaultPricing = { id:1, price_per_km: 0, base_fee: 0, price_per_kg:0, price_per_quantity:0, minimum_charge:0};
+            const newPricing = await DynamicPricing.create(defaultPricing);
+            return res.status(200).json({ message: "Default pricing configuration created.", pricing: newPricing });
+        }
+        // const pricingData = { ...pricing.toJSON() }; // ወደ plain object ይቀይሩ
+        // delete pricingData.id; // የውስጥ መለያን ይደብቁ (አማራጭ)
+        res.status(200).json({ message: "Pricing configuration retrieved.", pricing: pricing });
     } catch (err) {
         console.error("Error getting pricing:", err);
         sendErrorResponse(res, 500, 'Failed to retrieve pricing.', err);
