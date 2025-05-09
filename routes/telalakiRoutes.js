@@ -4,8 +4,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import * as apiController from '../controllers/telalakiController.js'; 
-// Adjust path
+import * as apiController from '../controllers/telalakiController.js';
+// እንደአስፈላጊነቱ የፋይል ዱካውን ያስተካክሉ
 
 const router = express.Router();
 
@@ -14,9 +14,9 @@ console.log("--- Telalaki API Routes Initializing (WARNING: OPEN ROUTES!) ---");
 // --- START MULTER CONFIGURATION (Integrated into router file) ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadDir = path.join(__dirname, '../uploads/payment_proofs'); // Adjust path relative to this routes file
+const uploadDir = path.join(__dirname, '../uploads/payment_proofs'); // የዱካውን ትክክለኛነት ያረጋግጡ
 
-// Ensure upload directory exists
+// የመጫኛ ፎልደር መኖሩን ያረጋግጡ
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
     console.log(`Created upload directory: ${uploadDir}`);
@@ -26,24 +26,28 @@ const storage = multer.diskStorage({
     destination: function (req, file, cb) { cb(null, uploadDir); },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        // ኦሪጅናል የፋይል ስም ላይ ያሉ ክፍተቶችን በ "_" መተካት
         const originalNameSafe = file.originalname.replace(/\s+/g, '_');
         const extension = path.extname(originalNameSafe);
-        cb(null, file.fieldname + '-' + uniqueSuffix + extension);
+        // 'payment_proof_file' በ frontend ላይ ካለው የ input field name ጋር መመሳሰል አለበት
+        cb(null, 'payment_proof_file' + '-' + uniqueSuffix + extension);
     }
 });
 
 const fileFilter = (req, file, cb) => {
-    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png' || file.mimetype === 'image/jpg') {
+    // የሚፈቀዱ የፋይል አይነቶችን ማረጋገጥ
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png' || file.mimetype === 'image/jpg' || file.mimetype === 'application/pdf') {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type. Only JPEG, JPG, PNG allowed.'), false);
+        // ስህተት በሚፈጠርበት ጊዜ cb(new Error(...)) መጠቀም የተሻለ ነው
+        cb(new Error('Invalid file type. Only JPEG, JPG, PNG, PDF allowed.'), false);
     }
 };
 
 const uploadPaymentProof = multer({
     storage: storage,
     fileFilter: fileFilter,
-    limits: { fileSize: 1024 * 1024 * 5 } // 5MB limit
+    limits: { fileSize: 1024 * 1024 * 10 } // 10MB ገደብ (እንደአስፈላጊነቱ ያስተካክሉ)
 });
 // --- END MULTER CONFIGURATION ---
 
@@ -51,43 +55,71 @@ const uploadPaymentProof = multer({
 // --- Authentication ---
 router.post('/auth/register/sender', apiController.registerSender);
 router.post('/auth/login/sender', apiController.loginSender);
-router.post('/auth/register/driver', apiController.registerDriver);
+router.post('/auth/register/driver', apiController.registerDriver); // ይህ ብዙ ዳታ ስለሚቀበል የ body parser limit ን ማረጋገጥ ጥሩ ነው
 router.post('/auth/login/driver', apiController.loginDriver);
 router.get(
     '/notifications/my',
+    // protectSender, // የማንነት ማረጋገጫ middleware እዚህ ጋር መጨመር አለበት
     apiController.getMyNotifications
 );
+
 // --- Drivers ---
-// Uses :driverId URL parameter
-router.put('/drivers/:driverId/location', apiController.updateDriverLocation);
+// :driverId የ URL parameter ይጠቀማል
+router.put('/drivers/:driverId/location', apiController.updateDriverLocation); // የማንነት ማረጋገጫ ያስፈልገዋል
 
 // --- Deliveries ---
-// Requires senderId in body
-router.post('/deliveries', apiController.createDeliveryRequest);
-// Applies multer middleware for file upload named 'paymentProofImage'
-// Requires senderId in body
-router.post('/deliveries/payment-proof',
-    uploadPaymentProof.single('paymentProofImage'), // Apply multer middleware here
-    apiController.submitPaymentProof
+// አዲስ የመላኪያ ጥያቄ ለመፍጠር (ከአማራጭ የክፍያ ማረጋገጫ ምስል ጋር)
+// Multer middleware 'payment_proof_file' ለተባለው መስክ ይተገበራል
+router.post('/deliveries',
+    uploadPaymentProof.single('payment_proof_file'), // Multer middleware ለፋይል ጭነት
+    apiController.createDeliveryRequest
 );
-// Requires driverId and deliveryRequestId in body
-router.post('/deliveries/accept', apiController.driverAcceptRequest);
 
-// --- Admin Functions (Open Routes) ---
-// Requires driver_id, status in body
+// <<<< ይሰረዝ፡ የድሮው የተለየ የክፍያ ማረጋገጫ ራውት >>>>
+// router.post('/deliveries/payment-proof',
+//     uploadPaymentProof.single('paymentProofImage'), // የድሮው የመስክ ስም ነበር
+//     apiController.submitPaymentProof // ይህ ፈንክሽን አሁን createDeliveryRequest ውስጥ ተዋህዷል
+// );
+
+// driverId እና deliveryRequestId በ body ውስጥ ያስፈልጋል
+router.post('/deliveries/accept', apiController.driverAcceptRequest); // የማንነት ማረጋገጫ ያስፈልገዋል
+
+// --- Admin Functions (Open Routes - !! ደህንነታቸውን ያረጋግጡ !!) ---
+// driver_id, status በ body ውስጥ ያስፈልጋል
 router.put('/admin/drivers/approval', apiController.updateApproval);
-// Requires delivery_id in body
+// delivery_id በ body ውስጥ ያስፈልጋል
 router.post('/admin/payments/approve', apiController.adminApprovePayment);
-// Supports query params for filtering/pagination
+// የማጣሪያ/የገጽ ቁጥር query params ይደግፋል
 router.get('/admin/deliveries', apiController.getAllDeliveryRequests);
-// Requires deliveryRequestId, driverId in body
+// deliveryRequestId, driverId በ body ውስጥ ያስፈልጋል
 router.post('/admin/deliveries/assign', apiController.adminAssignDriver);
-// Requires deliveryRequestId, radiusKm in body
+// deliveryRequestId, radiusKm በ body ውስጥ ያስፈልጋል
 router.post('/admin/deliveries/broadcast', apiController.adminBroadcastRequest);
 
 // --- Pricing ---
-// Requires pricing params in body
-router.put('/pricing', apiController.setOrUpdatePricing);
+// የዋጋ መለኪያዎች በ body ውስጥ ያስፈልጋሉ
+router.put('/pricing', apiController.setOrUpdatePricing); // የአስተዳዳሪ ጥበቃ ያስፈልገዋል
 router.get('/pricing', apiController.getPricing);
+
+
+// አጠቃላይ የ Multer ስህተት አያያዝ (ከሁሉም ራውቶች በኋላ ቢቀመጥ ይመረጣል)
+// ይህንን በዋናው app.js ፋይልዎ ላይ ማስቀመጥ ይችላሉ ወይም እዚሁ መጨረሻ ላይ
+router.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        // ከ Multer የመጣ ስህተት (ለምሳሌ የፋይል መጠን ገደብ ማለፍ)
+        console.error("Multer Error:", err);
+        return res.status(400).json({ message: `File upload error: ${err.message}`, error: { field: err.field } });
+    } else if (err && err.message && err.message.includes('Invalid file type')) {
+        // ከ fileFilter የመጣ ብጁ ስህተት
+        console.error("File Type Error:", err.message);
+        return res.status(400).json({ message: err.message });
+    } else if (err) {
+        // ሌላ ያልታወቀ ስህተት
+        console.error("Unknown Middleware Error:", err);
+        return res.status(500).json({ message: "An unexpected error occurred." });
+    }
+    next();
+});
+
 
 export default router;
