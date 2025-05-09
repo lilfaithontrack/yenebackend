@@ -385,19 +385,20 @@ export const updateDriverLocation = async (req, res) => {
 // =============================================
 
 export const createDeliveryRequest = async (req, res) => {
-    // 1. ከ req.body የሚጠበቁ እና አማራጭ የሆኑ መስኮችን ማውጣት
-    // (እሴቶቹ መጀመሪያ ላይ እንደ ጽሑፍ ሊሆኑ ይችላሉ ከ multipart/form-data ሲመጡ)
+    // 1. ከ req.body እና req.file (ለክፍያ ማረጋገጫ) የሚጠበቁ መስኮችን ማውጣት
     let {
         senderId, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
         weight, size, quantity,
         vehicle,
-        payment_method,
+        payment_method, // የክፍያ ዘዴ ከጥያቄው መምጣት አለበት
         bank_account,
         receiver_name,
         receiver_phone,
     } = req.body;
 
-    // --- የቁጥር መስኮችን ወደ ቁጥር አይነት መቀየር (Type Conversion for Numeric Fields) ---
+    const paymentProofFile = req.file; // ከ Multer middleware ለክፍያ ማረጋገጫ ምስል
+
+    // --- የቁጥር መስኮችን ወደ ቁጥር አይነት መቀየር ---
     const parsedSenderId = parseInt(senderId, 10);
     const parsedPickupLat = parseFloat(pickup_lat);
     const parsedPickupLng = parseFloat(pickup_lng);
@@ -405,19 +406,16 @@ export const createDeliveryRequest = async (req, res) => {
     const parsedDropoffLng = parseFloat(dropoff_lng);
 
     let parsedWeight;
-    // ክብደት ከተሰጠ እና ባዶ ካልሆነ ብቻ ወደ ቁጥር ይቀይሩ
     if (weight !== undefined && weight !== null && String(weight).trim() !== '') {
         parsedWeight = parseFloat(weight);
     }
 
     let parsedQuantity;
-    // ብዛት ከተሰጠ እና ባዶ ካልሆነ ብቻ ወደ ቁጥር ይቀይሩ
     if (quantity !== undefined && quantity !== null && String(quantity).trim() !== '') {
         parsedQuantity = parseInt(quantity, 10);
     }
 
-    // --- መሰረታዊ የግቤት ማረጋገጫ (Basic Input Validation) ---
-
+    // --- መሰረታዊ የግቤት ማረጋገጫ ---
     if (!Number.isInteger(parsedSenderId) || parsedSenderId <= 0) {
         return sendErrorResponse(res, 400, 'Valid senderId (positive integer) is required.');
     }
@@ -427,7 +425,7 @@ export const createDeliveryRequest = async (req, res) => {
     }
 
     const validateCoord = (val, coordName, originalVal, range) => {
-        if (typeof val !== 'number' || !isFinite(val)) { // isFinite() NaN ንም ይይዛል
+        if (typeof val !== 'number' || !isFinite(val)) {
             return `${coordName} must be a finite number. Received: '${originalVal}'`;
         }
         if (Math.abs(val) > range) {
@@ -454,54 +452,60 @@ export const createDeliveryRequest = async (req, res) => {
         return sendErrorResponse(res, 400, 'Vehicle name exceeds maximum length of 255 characters.');
     }
 
-    // --- የአማራጭ መስኮች ማረጋገጫ (Optional Fields Validation) ---
+    // የክፍያ ዘዴ ማረጋገጫ
+    const validPaymentMethods = ['screenshot', 'cash'];
+    const currentPaymentMethod = (payment_method !== undefined && payment_method !== null && String(payment_method).trim() !== '') ? String(payment_method).trim() : DeliveryRequest.rawAttributes.payment_method.defaultValue;
+
+    if (!currentPaymentMethod || !validPaymentMethods.includes(currentPaymentMethod)) {
+        return sendErrorResponse(res, 400, `Payment_method is required and must be one of: ${validPaymentMethods.join(', ')}.`);
+    }
+
+    // የክፍያ ማረጋገጫ ምስል እና የባንክ አካውንት ማረጋገጫ (ለ 'screenshot' ዘዴ)
+    let paymentProofImageString;
+    if (currentPaymentMethod === 'screenshot') {
+        if (!paymentProofFile) {
+            return sendErrorResponse(res, 400, 'Payment proof image is required for screenshot payment method.');
+        }
+        paymentProofImageString = paymentProofFile.filename; // ወይም paymentProofFile.path እንደ ምርጫዎ
+
+        const validBankAccounts = ['Cbe', 'Telebirr', 'Abyssinia'];
+        if (bank_account === undefined || bank_account === null || String(bank_account).trim() === '' || !validBankAccounts.includes(String(bank_account).trim())) {
+            return sendErrorResponse(res, 400, `If payment method is 'screenshot', a valid bank_account (one of: ${validBankAccounts.join(', ')}) is required.`);
+        }
+    } else {
+        if (bank_account !== undefined && bank_account !== null && String(bank_account).trim() !== '') {
+            console.log("Bank account provided for non-screenshot payment, will be ignored.");
+        }
+        if (paymentProofFile) {
+            // ተጠቃሚው 'cash' መርጦ ነገር ግን ፋይል ከላከ፤ ፋይሉን ችላ ማለት ወይም ስህተት መመለስ ይቻላል
+            console.warn("Payment proof file provided for non-screenshot payment method. It will be ignored.");
+            // አማራጭ፡ የተሰቀለውን ፋይል ከፋይል ሲስተም መሰረዝ
+            // if (paymentProofFile && paymentProofFile.path) {
+            // try { fs.unlinkSync(paymentProofFile.path); } catch (e) { console.error("Error deleting extraneous file:", e); }
+            // }
+        }
+    }
+
+
+    // --- የአማራጭ መስኮች ማረጋገጫ --- (ክብደት፣ መጠን፣ ብዛት፣ ተቀባይ መረጃ)
     if (weight !== undefined && weight !== null && String(weight).trim() !== '') {
         if (typeof parsedWeight !== 'number' || !isFinite(parsedWeight) || parsedWeight <= 0) {
             return sendErrorResponse(res, 400, `If provided, weight must be a positive finite number. Received: '${weight}'`);
         }
     }
-
     if (size !== undefined && size !== null) {
-        if (typeof size !== 'string' || String(size).trim() === '') { // size እንደ ጽሑፍ ነው የሚጠበቀው
+        if (typeof size !== 'string' || String(size).trim() === '') {
             return sendErrorResponse(res, 400, 'If provided, size must be a non-empty string.');
         }
         if (String(size).length > 255) {
             return sendErrorResponse(res, 400, 'Size string exceeds maximum length of 255 characters.');
         }
     }
-
     if (quantity !== undefined && quantity !== null && String(quantity).trim() !== '') {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
             return sendErrorResponse(res, 400, `If provided, quantity must be a positive integer. Received: '${quantity}'`);
         }
     }
-
-    const validPaymentMethods = ['screenshot', 'cash'];
-    // የክፍያ ዘዴ ከተሰጠ ብቻ ያረጋግጡ፤ ካልሆነ ሞዴሉ ነባሪውን ይጠቀማል
-    if (payment_method !== undefined && payment_method !== null && String(payment_method).trim() !== '') {
-        if (typeof payment_method !== 'string' || !validPaymentMethods.includes(String(payment_method).trim())) {
-            return sendErrorResponse(res, 400, `Payment_method must be one of: ${validPaymentMethods.join(', ')}.`);
-        }
-    }
-
-
-    const validBankAccounts = ['Cbe', 'Telebirr', 'Abyssinia'];
-    const currentPaymentMethod = (payment_method !== undefined && payment_method !== null && String(payment_method).trim() !== '') ? String(payment_method).trim() : DeliveryRequest.rawAttributes.payment_method.defaultValue; // ከሞዴል ነባሪውን ይውሰዱ
-
-    if (currentPaymentMethod === 'screenshot') {
-        if (bank_account === undefined || bank_account === null || String(bank_account).trim() === '' || !validBankAccounts.includes(String(bank_account).trim())) {
-            return sendErrorResponse(res, 400, `If payment method is 'screenshot', a valid bank_account (one of: ${validBankAccounts.join(', ')}) is required.`);
-        }
-    } else {
-        // 'screenshot' ካልሆነ የባንክ አካውንት መሰጠት የለበትም ወይም ችላ ይባላል
-        if (bank_account !== undefined && bank_account !== null && String(bank_account).trim() !== '') {
-            // አማራጭ፡ ስህተት ይመልሱ ወይም ችላ ይበሉ
-            // return sendErrorResponse(res, 400, 'Bank account should not be provided for non-screenshot payments.');
-            console.log("Bank account provided for non-screenshot payment, will be ignored.");
-        }
-    }
-
-
     if (receiver_name !== undefined && receiver_name !== null) {
         if (typeof receiver_name !== 'string' || String(receiver_name).trim() === '') {
             return sendErrorResponse(res, 400, 'If provided, receiver_name must be a non-empty string.');
@@ -510,16 +514,16 @@ export const createDeliveryRequest = async (req, res) => {
             return sendErrorResponse(res, 400, 'Receiver name exceeds maximum length of 255 characters.');
         }
     }
-
     if (receiver_phone !== undefined && receiver_phone !== null) {
         if (typeof receiver_phone !== 'string' || String(receiver_phone).trim() === '') {
             return sendErrorResponse(res, 400, 'If provided, receiver_phone must be a non-empty string.');
         }
-        if (String(receiver_phone).length > 50) { // ለምሳሌ ርዝመት ገደብ
+        if (String(receiver_phone).length > 50) {
             return sendErrorResponse(res, 400, 'Receiver phone exceeds maximum length of 50 characters.');
         }
     }
 
+    // --- የዳታቤዝ ክንውኖች ---
     let transaction;
     try {
         transaction = await sequelize.transaction();
@@ -536,10 +540,10 @@ export const createDeliveryRequest = async (req, res) => {
             console.warn(`Delivery creation blocked for Sender ${parsedSenderId}: Pricing configuration invalid or missing.`);
             return sendErrorResponse(res, 503, 'Service Unavailable: Pricing configuration error.');
         }
-        const pricingConfig = pricingConfigResult.toJSON(); // ወደ plain object ይቀይሩ
+        const pricingConfig = pricingConfigResult.toJSON();
 
         const distanceKm = calculateDistance(parsedPickupLat, parsedPickupLng, parsedDropoffLat, parsedDropoffLng);
-        if (!isFinite(distanceKm)) { // ርቀት ማስላት ካልተቻለ
+        if (!isFinite(distanceKm)) {
             await transaction.rollback();
             return sendErrorResponse(res, 400, 'Could not calculate distance. Please check coordinates.');
         }
@@ -560,6 +564,7 @@ export const createDeliveryRequest = async (req, res) => {
         }
         calculatedPrice = Math.max(0, Math.round(calculatedPrice * 100) / 100);
 
+        // ለዳታቤዝ የሚዘጋጅ ዳታ
         const deliveryData = {
             sender_id: parsedSenderId,
             pickup_lat: parsedPickupLat,
@@ -569,32 +574,42 @@ export const createDeliveryRequest = async (req, res) => {
             status: 'pending',
             price: calculatedPrice,
             vehicle: String(vehicle).trim(),
+            payment_method: currentPaymentMethod, // የተረጋገጠውን የክፍያ ዘዴ ይጠቀሙ
+            // is_payment_approved በሞዴል default ወደ false መሆን አለበት
         };
 
         if (isFinite(parsedWeight) && parsedWeight > 0) deliveryData.weight = parsedWeight;
         if (size !== undefined && size !== null && String(size).trim() !== '') deliveryData.size = String(size).trim();
         if (Number.isInteger(parsedQuantity) && parsedQuantity > 0) deliveryData.quantity = parsedQuantity;
-        if (currentPaymentMethod) deliveryData.payment_method = currentPaymentMethod;
 
-        if (currentPaymentMethod === 'screenshot' && bank_account !== undefined && bank_account !== null && String(bank_account).trim() !== '') {
+        if (currentPaymentMethod === 'screenshot') {
             deliveryData.bank_account = String(bank_account).trim();
+            deliveryData.payment_proof_image = paymentProofImageString; // የተቀመጠው የፋይል ስም
+            // deliveryData.is_payment_approved = false; // ሞዴሉ default ካለው ይህ ላያስፈልግ ይችላል
         }
 
         if (receiver_name !== undefined && receiver_name !== null && String(receiver_name).trim() !== '') deliveryData.receiver_name = String(receiver_name).trim();
         if (receiver_phone !== undefined && receiver_phone !== null && String(receiver_phone).trim() !== '') deliveryData.receiver_phone = String(receiver_phone).trim();
 
-
         console.log("Attempting to create DeliveryRequest with data:", deliveryData);
         const newDelivery = await DeliveryRequest.create(deliveryData, { transaction });
 
+        let notificationMessage = `Request #${newDelivery.id} created. Price: ${calculatedPrice.toFixed(2)} ETB.`;
+        if (currentPaymentMethod === 'screenshot') {
+            notificationMessage += " Payment proof submitted, pending review.";
+        } else {
+            notificationMessage += " Payment on delivery.";
+        }
+        notificationMessage += " Searching for drivers...";
+
+
         await createNotification({
             sender_id: parsedSenderId,
-            message: `Request #${newDelivery.id} created. Price: ${calculatedPrice.toFixed(2)} ETB. Searching...`,
+            message: notificationMessage,
             type: 'delivery_created', related_entity_id: newDelivery.id, related_entity_type: 'DeliveryRequest'
         }, transaction);
 
         console.log(`INFO: Delivery Request ${newDelivery.id} created by Sender ${parsedSenderId}.`);
-        // TODO: የአሽከርካሪ መፈለጊያ ሎጂክ እዚህ ጋር ያስገቡ
 
         await transaction.commit();
         res.status(201).json(newDelivery);
@@ -604,6 +619,11 @@ export const createDeliveryRequest = async (req, res) => {
             try { await transaction.rollback(); }
             catch (rollbackError) { console.error("Error rolling back transaction:", rollbackError); }
         }
+        // ጥያቄው ሳይሳካ ከቀረ እና ፋይል ተጭኖ ከነበረ ፋይሉን መሰረዝ
+        // if (currentPaymentMethod === 'screenshot' && paymentProofFile && paymentProofFile.path) {
+        // try { fs.unlinkSync(paymentProofFile.path); console.log("Rolled back transaction, deleted uploaded payment proof.");}
+        // catch (e) { console.error("Error deleting uploaded payment proof after failed TX:", e); }
+        // }
 
         if (err.name === 'SequelizeValidationError') {
             console.error("Sequelize Validation Error details:", err.errors);
@@ -619,58 +639,6 @@ export const createDeliveryRequest = async (req, res) => {
 };
 
 
-export const submitPaymentProof = async (req, res) => {
-    // !! INSECURE: senderId ከ body መምጣት አለበት !! (ወይም ከ authenticated user)
-    const { delivery_id, senderId } = req.body;
-    const uploadedFile = req.file; // ከ multer middleware
-
-    const reqId = parseInt(delivery_id, 10);
-    const sId = parseInt(senderId, 10); // ይህ ከ authenticated user መምጣት አለበት
-    if (!reqId || !sId || isNaN(reqId) || isNaN(sId) || reqId <= 0 || sId <= 0) return sendErrorResponse(res, 400, 'Valid deliveryId and senderId required.');
-    if (!uploadedFile) return sendErrorResponse(res, 400, 'Payment proof image file required.');
-
-    const filePathUrl = `/uploads/payment_proofs/${uploadedFile.filename}`; // የፋይል ዱካ URL
-    let transaction;
-    try {
-        transaction = await sequelize.transaction();
-        const delivery = await DeliveryRequest.findByPk(reqId, { transaction });
-        if (!delivery) {
-            await transaction.rollback();
-            // fs.unlink(uploadedFile.path, ...) // የተሰቀለውን ፋይል መሰረዝ ያስቡበት
-            return sendErrorResponse(res, 404, `Delivery request #${reqId} not found.`);
-        }
-
-        // የባለቤትነት ማረጋገጫ (senderId ከ body መምጣቱ ደህንነቱ ያልተጠበቀ ነው)
-        if (delivery.sender_id !== sId) { // sId ከ authenticated user መሆን አለበት
-            await transaction.rollback();
-            return sendErrorResponse(res, 403, 'Forbidden: You do not own this request.');
-        }
-        if (delivery.is_payment_approved) {
-            await transaction.rollback();
-            return sendErrorResponse(res, 400, `Payment for #${delivery.id} already approved.`);
-        }
-
-        delivery.payment_method = 'screenshot'; // የክፍያ ዘዴን ያረጋግጡ ወይም ያዘምኑ
-        delivery.payment_proof_url = filePathUrl;
-        delivery.receipt_link = null; // ሌላ የማረጋገጫ አይነት ያጽዱ
-        delivery.is_payment_approved = false; // ግምገማ በመጠባበቅ ላይ
-        delivery.approved_by = null;
-        await delivery.save({ transaction });
-
-        await createNotification({
-            sender_id: sId, message: `Payment proof image submitted for delivery #${delivery.id}. Pending review.`,
-            type: 'payment_proof_submitted', related_entity_id: delivery.id, related_entity_type: 'DeliveryRequestPayment'
-        }, transaction);
-
-        await transaction.commit();
-        res.status(200).json({ message: 'Payment proof submitted successfully.', filePath: filePathUrl });
-    } catch (err) {
-        if (transaction) await transaction.rollback();
-        // if (uploadedFile?.path) { try { fs.unlinkSync(uploadedFile.path); } catch(e){...}} // በDB ስህተት ጊዜ ፋይልን መሰረዝ
-        console.error(`Error submitting payment proof for Req ${delivery_id}:`, err);
-        sendErrorResponse(res, 500, 'Failed to submit payment proof.', err);
-    }
-};
 
 export const driverAcceptRequest = async (req, res) => {
     // !! INSECURE: driverId ከ body መምጣት አለበት !! (ወይም ከ authenticated user)
