@@ -167,7 +167,7 @@ export const DeliveryRequest = sequelize.define('DeliveryRequest', {
   payment_proof_url: { type: DataTypes.STRING, allowNull: true }, // Path/URL from upload
   receipt_link: { type: DataTypes.STRING, allowNull: true },
   is_payment_approved: { type: DataTypes.BOOLEAN, defaultValue: false },
-  vehicle: {type: DataTypes.STRING, allowNull: false},
+  vehicle: {type: DataTypes.STRING, allowNull: true},
   approved_by: { type: DataTypes.ENUM('admin', 'driver'), allowNull: true },
   receiver_name:{type: DataTypes.STRING, allowNull: true},
   receiver_phone:{type: DataTypes.STRING, allowNull: true},
