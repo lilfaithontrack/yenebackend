@@ -3,7 +3,7 @@
 
 // --- Imports ---
 import {
-    Sender, Vehicle, Driver, AdminApproval, DeliveryRequest,
+    Sender, Vehicle, Driver, AdminApproval, DeliveryRequest,Shufer,
     DynamicPricing, Notification, sequelize, Sequelize // Sequelize በካፒታል 'S' ለትራንዛክሽን ደረጃዎች
 } from '../models/Telalaki.js'; // እንደአስፈላጊነቱ የፋይል ዱካውን ያስተካክሉ
 import bcrypt from 'bcrypt';
@@ -1031,4 +1031,221 @@ export const getPricing = async (req, res) => {
         console.error("Error getting pricing:", err);
         sendErrorResponse(res, 500, 'Failed to retrieve pricing.', err);
     }
+};
+export const registerShufer = async (req, res) => {
+  const {
+    // Credentials & Core Driver Info
+    driver_phone,
+    pin,
+    driver_full_name,
+    driver_email, // Optional
+    sender_id,    // Optional: If Shufer has a Sender account
+
+    // Driver Address & Documents
+    driver_region,
+    driver_zone,
+    driver_district,
+    driver_house_number,
+    driver_license_photo,
+    driver_identification_photo,
+
+    // Vehicle Details
+    license_plate,
+    car_type,
+    car_name,
+    manufacture_year,
+    cargo_capacity,
+    commercial_license_number,
+    vehicle_tin_number,
+    car_license_photo,
+    car_photo,
+
+    // Ownership Details
+    is_vehicle_owner, // Boolean, defaults to true in model if not provided
+    actual_owner_full_name,
+    actual_owner_phone,
+    actual_owner_email,
+    actual_owner_region,
+    actual_owner_zone,
+    actual_owner_district,
+    actual_owner_house_number,
+    actual_owner_id_photo,
+    actual_owner_photo,
+
+    // Operational Details (usually not set at registration, but can be if needed)
+    // current_lat, // Model defaults to null
+    // current_lng, // Model defaults to null
+    // last_location_update, // Model defaults to null
+    // is_available_for_new, // Model defaults to true
+    // current_status, // Model defaults to 'offline'
+
+    // Approval Status (will be set by model default to 'pending')
+    // approval_status,
+    // approval_admin_notes,
+    // approved_at,
+  } = req.body;
+
+  // Minimal validation for essential fields
+  if (!driver_phone || !pin || !driver_full_name || !license_plate || !car_type || !car_name) {
+    return res.status(400).json({
+      message: 'Please provide essential fields: driver_phone, pin, driver_full_name, license_plate, car_type, car_name.',
+    });
+  }
+
+  try {
+    // 1. Check if Shufer (driver_phone or license_plate) already exists
+    const existingShuferByPhone = await Shufer.findOne({ where: { driver_phone } });
+    if (existingShuferByPhone) {
+      return res.status(409).json({ message: 'Shufer with this phone number already exists.' });
+    }
+
+    const existingShuferByLicense = await Shufer.findOne({ where: { license_plate } });
+    if (existingShuferByLicense) {
+      return res.status(409).json({ message: 'Shufer with this license plate already exists.' });
+    }
+
+    // 2. Hash the PIN
+    const salt = await bcrypt.genSalt(10);
+    const hashedPin = await bcrypt.hash(pin, salt);
+
+    // 3. Prepare data for new Shufer creation
+    const shuferCreationData = {
+      driver_phone,
+      pin: hashedPin,
+      driver_full_name,
+      driver_email: driver_email || null,
+      sender_id: sender_id || null,
+
+      driver_region: driver_region || null,
+      driver_zone: driver_zone || null,
+      driver_district: driver_district || null,
+      driver_house_number: driver_house_number || null,
+      driver_license_photo: driver_license_photo || null,
+      driver_identification_photo: driver_identification_photo || null,
+
+      license_plate,
+      car_type,
+      car_name,
+      manufacture_year: manufacture_year || null,
+      cargo_capacity: cargo_capacity || null,
+      commercial_license_number: commercial_license_number || null,
+      vehicle_tin_number: vehicle_tin_number || null,
+      car_license_photo: car_license_photo || null,
+      car_photo: car_photo || null,
+
+      // Handle ownership: model defaults is_vehicle_owner to true
+      // If is_vehicle_owner is explicitly false, then actual_owner fields are relevant
+      is_vehicle_owner: typeof is_vehicle_owner === 'boolean' ? is_vehicle_owner : true,
+    };
+
+    // Add actual owner details only if is_vehicle_owner is false
+    if (shuferCreationData.is_vehicle_owner === false) {
+      shuferCreationData.actual_owner_full_name = actual_owner_full_name || null;
+      shuferCreationData.actual_owner_phone = actual_owner_phone || null;
+      shuferCreationData.actual_owner_email = actual_owner_email || null;
+      shuferCreationData.actual_owner_region = actual_owner_region || null;
+      shuferCreationData.actual_owner_zone = actual_owner_zone || null;
+      shuferCreationData.actual_owner_district = actual_owner_district || null;
+      shuferCreationData.actual_owner_house_number = actual_owner_house_number || null;
+      shuferCreationData.actual_owner_id_photo = actual_owner_id_photo || null;
+      shuferCreationData.actual_owner_photo = actual_owner_photo || null;
+    }
+    
+    // Sequelize model defaults will handle:
+    // current_lat, current_lng, last_location_update, is_available_for_new, current_status,
+    // approval_status, approval_admin_notes, approved_at
+    // unless they are explicitly provided in req.body (which is less common for these at registration)
+
+    const newShufer = await Shufer.create(shuferCreationData);
+
+    // 4. Respond (excluding PIN)
+    const shuferData = { ...newShufer.get({ plain: true }) };
+    delete shuferData.pin; // Never send the hashed pin back
+
+    res.status(201).json({
+      message: 'Shufer registered successfully. Your application is pending approval.',
+      shufer: shuferData,
+    });
+
+  } catch (error) {
+    console.error('Registration Error:', error);
+    // Sequelize validation errors (these might still occur e.g. if unique constraint fails unexpectedly)
+    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+        const messages = error.errors.map(err => err.message);
+        return res.status(400).json({ message: 'Validation Error', errors: messages });
+    }
+    res.status(500).json({ message: 'Server error during registration.' });
+  }
+};export const loginShufer = async (req, res) => {
+  const { driver_phone, pin } = req.body;
+
+  if (!driver_phone || !pin) {
+    return res.status(400).json({ message: 'Please provide both phone number and PIN.' });
+  }
+
+  try {
+    const shufer = await Shufer.findOne({ where: { driver_phone } });
+
+    if (!shufer) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    const isMatch = await bcrypt.compare(pin, shufer.pin);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    // !!! CRITICAL: Check approval status !!!
+    if (shufer.approval_status !== 'approved') {
+      let accessDeniedMessage = 'Access denied.';
+      if (shufer.approval_status === 'pending') {
+        accessDeniedMessage = 'Your account is pending approval. Please wait for an administrator to review your application.';
+      } else if (shufer.approval_status === 'rejected') {
+        accessDeniedMessage = `Your account application was rejected. ${shufer.approval_admin_notes ? `Reason: ${shufer.approval_admin_notes}` : 'Please contact support for more information.'}`;
+      }
+      return res.status(403).json({ message: accessDeniedMessage });
+    }
+
+    // (Optional) Update Shufer's status upon successful login
+    // if (shufer.current_status === 'offline') {
+    //   try {
+    //     shufer.current_status = 'idle';
+    //     shufer.last_location_update = new Date();
+    //     await shufer.save();
+    //   } catch (updateError) {
+    //     console.error('Error updating Shufer status on login:', updateError);
+    //   }
+    // }
+
+    // Generate JWT (JSON Web Token)
+    const payload = {
+      shufer: {
+        id: shufer.id,
+        phone: shufer.driver_phone,
+        name: shufer.driver_full_name,
+        approval_status: shufer.approval_status, // <<< ADDED THIS LINE
+        // At this point, shufer.approval_status will always be 'approved'
+        // You could also use a boolean: is_approved: true
+      },
+    };
+
+    const token = jwt.sign(
+      payload,
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    const shuferData = { ...shufer.get({ plain: true }) };
+    delete shuferData.pin;
+
+    res.status(200).json({
+      message: 'Login successful.',
+      token,
+      shufer: shuferData,
+    });
+
+  } catch (error) {
+    console.error('Login Error:', error);
+    res.status(500).json({ message: 'Server error during login process.' });
+  }
 };
