@@ -95,7 +95,8 @@ router.get('/admin/deliveries', apiController.getAllDeliveryRequests);
 router.post('/admin/deliveries/assign', apiController.adminAssignDriver);
 // deliveryRequestId, radiusKm በ body ውስጥ ያስፈልጋል
 router.post('/admin/deliveries/broadcast', apiController.adminBroadcastRequest);
-
+router.post('/register/shufer',apiController.registerShufer);
+router.post('/login/shufer',apiController.loginShufer)
 // --- Pricing ---
 // የዋጋ መለኪያዎች በ body ውስጥ ያስፈልጋሉ
 router.put('/pricing', apiController.setOrUpdatePricing); // የአስተዳዳሪ ጥበቃ ያስፈልገዋል
