@@ -114,7 +114,7 @@ router.post('/admin/payments/approve', apiController.adminApprovePayment);
 router.get('/admin/deliveries', apiController.getAllDeliveryRequests);
 router.post('/admin/deliveries/assign', apiController.adminAssignDriver);
 router.post('/admin/deliveries/broadcast', apiController.adminBroadcastRequest);
-
+router.get('/shufer/me', apiController.getMyProfile);
 // Shufer Registration Route (NEW - WITH FILE UPLOADS)
 router.post(
     '/register/shufer',
