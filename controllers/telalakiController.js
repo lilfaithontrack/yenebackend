@@ -14,6 +14,7 @@ import dotenv from 'dotenv';
 dotenv.config(); // JWT_SECRET መጫኑን ያረጋግጡ
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '90d'
 const SALT_ROUNDS = 10;
 const MAX_ASSIGNMENT_DISTANCE_KM = 50; // ለርቀት ጥበቃ የናሙና ቋሚ
 
