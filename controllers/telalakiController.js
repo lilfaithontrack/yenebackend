@@ -1032,22 +1032,22 @@ export const getPricing = async (req, res) => {
         sendErrorResponse(res, 500, 'Failed to retrieve pricing.', err);
     }
 };
+
+
 export const registerShufer = async (req, res) => {
   const {
-    // Credentials & Core Driver Info
+    // Core Info
     driver_phone,
     pin,
     driver_full_name,
-    driver_email, // Optional
-    sender_id,    // Optional: If Shufer has a Sender account
+    driver_email,
+    sender_id,
 
-    // Driver Address & Documents
+    // Driver Address
     driver_region,
     driver_zone,
     driver_district,
     driver_house_number,
-    driver_license_photo,
-    driver_identification_photo,
 
     // Vehicle Details
     license_plate,
@@ -1057,11 +1057,9 @@ export const registerShufer = async (req, res) => {
     cargo_capacity,
     commercial_license_number,
     vehicle_tin_number,
-    car_license_photo,
-    car_photo,
 
     // Ownership Details
-    is_vehicle_owner, // Boolean, defaults to true in model if not provided
+    is_vehicle_owner,
     actual_owner_full_name,
     actual_owner_phone,
     actual_owner_email,
@@ -1069,46 +1067,34 @@ export const registerShufer = async (req, res) => {
     actual_owner_zone,
     actual_owner_district,
     actual_owner_house_number,
-    actual_owner_id_photo,
-    actual_owner_photo,
-
-    // Operational Details (usually not set at registration, but can be if needed)
-    // current_lat, // Model defaults to null
-    // current_lng, // Model defaults to null
-    // last_location_update, // Model defaults to null
-    // is_available_for_new, // Model defaults to true
-    // current_status, // Model defaults to 'offline'
-
-    // Approval Status (will be set by model default to 'pending')
-    // approval_status,
-    // approval_admin_notes,
-    // approved_at,
   } = req.body;
 
-  // Minimal validation for essential fields
+  // --- VALIDATION ---
   if (!driver_phone || !pin || !driver_full_name || !license_plate || !car_type || !car_name) {
     return res.status(400).json({
-      message: 'Please provide essential fields: driver_phone, pin, driver_full_name, license_plate, car_type, car_name.',
+      message: 'Missing required fields: driver_phone, pin, driver_full_name, license_plate, car_type, car_name.',
     });
   }
 
   try {
-    // 1. Check if Shufer (driver_phone or license_plate) already exists
-    const existingShuferByPhone = await Shufer.findOne({ where: { driver_phone } });
-    if (existingShuferByPhone) {
+    // --- CHECK FOR EXISTING SHUFER ---
+    const existingByPhone = await Shufer.findOne({ where: { driver_phone } });
+    if (existingByPhone) {
       return res.status(409).json({ message: 'Shufer with this phone number already exists.' });
     }
 
-    const existingShuferByLicense = await Shufer.findOne({ where: { license_plate } });
-    if (existingShuferByLicense) {
+    const existingByLicense = await Shufer.findOne({ where: { license_plate } });
+    if (existingByLicense) {
       return res.status(409).json({ message: 'Shufer with this license plate already exists.' });
     }
 
-    // 2. Hash the PIN
-    const salt = await bcrypt.genSalt(10);
-    const hashedPin = await bcrypt.hash(pin, salt);
+    // --- HASH PIN ---
+    const hashedPin = await bcrypt.hash(pin, 10);
 
-    // 3. Prepare data for new Shufer creation
+    // --- HANDLE FILE UPLOADS ---
+    const getFilePath = (field) =>
+      req.files && req.files[field] ? req.files[field][0].path : null;
+
     const shuferCreationData = {
       driver_phone,
       pin: hashedPin,
@@ -1120,8 +1106,6 @@ export const registerShufer = async (req, res) => {
       driver_zone: driver_zone || null,
       driver_district: driver_district || null,
       driver_house_number: driver_house_number || null,
-      driver_license_photo: driver_license_photo || null,
-      driver_identification_photo: driver_identification_photo || null,
 
       license_plate,
       car_type,
@@ -1130,16 +1114,18 @@ export const registerShufer = async (req, res) => {
       cargo_capacity: cargo_capacity || null,
       commercial_license_number: commercial_license_number || null,
       vehicle_tin_number: vehicle_tin_number || null,
-      car_license_photo: car_license_photo || null,
-      car_photo: car_photo || null,
 
-      // Handle ownership: model defaults is_vehicle_owner to true
-      // If is_vehicle_owner is explicitly false, then actual_owner fields are relevant
+      // Uploaded Files
+      driver_license_photo: getFilePath('driver_license_photo'),
+      driver_identification_photo: getFilePath('driver_identification_photo'),
+      car_license_photo: getFilePath('car_license_photo'),
+      car_photo: getFilePath('car_photo'),
+
       is_vehicle_owner: typeof is_vehicle_owner === 'boolean' ? is_vehicle_owner : true,
     };
 
-    // Add actual owner details only if is_vehicle_owner is false
-    if (shuferCreationData.is_vehicle_owner === false) {
+    // Handle owner details conditionally
+    if (!shuferCreationData.is_vehicle_owner) {
       shuferCreationData.actual_owner_full_name = actual_owner_full_name || null;
       shuferCreationData.actual_owner_phone = actual_owner_phone || null;
       shuferCreationData.actual_owner_email = actual_owner_email || null;
@@ -1147,36 +1133,31 @@ export const registerShufer = async (req, res) => {
       shuferCreationData.actual_owner_zone = actual_owner_zone || null;
       shuferCreationData.actual_owner_district = actual_owner_district || null;
       shuferCreationData.actual_owner_house_number = actual_owner_house_number || null;
-      shuferCreationData.actual_owner_id_photo = actual_owner_id_photo || null;
-      shuferCreationData.actual_owner_photo = actual_owner_photo || null;
+      shuferCreationData.actual_owner_id_photo = getFilePath('actual_owner_id_photo');
+      shuferCreationData.actual_owner_photo = getFilePath('actual_owner_photo');
     }
-    
-    // Sequelize model defaults will handle:
-    // current_lat, current_lng, last_location_update, is_available_for_new, current_status,
-    // approval_status, approval_admin_notes, approved_at
-    // unless they are explicitly provided in req.body (which is less common for these at registration)
 
+    // --- CREATE SHUFER ---
     const newShufer = await Shufer.create(shuferCreationData);
 
-    // 4. Respond (excluding PIN)
+    // --- RESPONSE ---
     const shuferData = { ...newShufer.get({ plain: true }) };
-    delete shuferData.pin; // Never send the hashed pin back
+    delete shuferData.pin;
 
-    res.status(201).json({
-      message: 'Shufer registered successfully. Your application is pending approval.',
+    return res.status(201).json({
+      message: 'Shufer registered successfully. Awaiting admin approval.',
       shufer: shuferData,
     });
 
   } catch (error) {
     console.error('Registration Error:', error);
-    // Sequelize validation errors (these might still occur e.g. if unique constraint fails unexpectedly)
     if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-        const messages = error.errors.map(err => err.message);
-        return res.status(400).json({ message: 'Validation Error', errors: messages });
+      return res.status(400).json({ errors: error.errors.map(e => e.message) });
     }
-    res.status(500).json({ message: 'Server error during registration.' });
+    return res.status(500).json({ message: 'Server error during registration.' });
   }
-};export const loginShufer = async (req, res) => {
+};
+export const loginShufer = async (req, res) => {
   const { driver_phone, pin } = req.body;
 
   if (!driver_phone || !pin) {
