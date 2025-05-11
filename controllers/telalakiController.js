@@ -1035,127 +1035,145 @@ export const getPricing = async (req, res) => {
 
 
 export const registerShufer = async (req, res) => {
-  const {
-    // Core Info
-    driver_phone,
-    pin,
-    driver_full_name,
-    driver_email,
-    sender_id,
+    const {
+        // Credentials & Core Driver Info
+        driver_phone,
+        pin,
+        driver_full_name,
+        driver_email,
+        sender_id,
 
-    // Driver Address
-    driver_region,
-    driver_zone,
-    driver_district,
-    driver_house_number,
+        // Driver Address
+        driver_region,
+        driver_zone,
+        driver_district,
+        driver_house_number,
 
-    // Vehicle Details
-    license_plate,
-    car_type,
-    car_name,
-    manufacture_year,
-    cargo_capacity,
-    commercial_license_number,
-    vehicle_tin_number,
+        // Vehicle Details
+        license_plate,
+        car_type,
+        car_name,
+        manufacture_year,
+        cargo_capacity,
+        commercial_license_number,
+        vehicle_tin_number,
 
-    // Ownership Details
-    is_vehicle_owner,
-    actual_owner_full_name,
-    actual_owner_phone,
-    actual_owner_email,
-    actual_owner_region,
-    actual_owner_zone,
-    actual_owner_district,
-    actual_owner_house_number,
-  } = req.body;
+        // Ownership Details
+        is_vehicle_owner,
+        actual_owner_full_name,
+        actual_owner_phone,
+        actual_owner_email,
+        actual_owner_region,
+        actual_owner_zone,
+        actual_owner_district,
+        actual_owner_house_number,
+    } = req.body;
 
-  // --- VALIDATION ---
-  if (!driver_phone || !pin || !driver_full_name || !license_plate || !car_type || !car_name) {
-    return res.status(400).json({
-      message: 'Missing required fields: driver_phone, pin, driver_full_name, license_plate, car_type, car_name.',
-    });
-  }
-
-  try {
-    // --- CHECK FOR EXISTING SHUFER ---
-    const existingByPhone = await Shufer.findOne({ where: { driver_phone } });
-    if (existingByPhone) {
-      return res.status(409).json({ message: 'Shufer with this phone number already exists.' });
+    // Minimal validation for essential fields
+    if (!driver_phone || !pin || !driver_full_name || !license_plate || !car_type || !car_name) {
+        return res.status(400).json({
+            message: 'Please provide essential fields: driver_phone, pin, driver_full_name, license_plate, car_type, car_name.',
+        });
     }
 
-    const existingByLicense = await Shufer.findOne({ where: { license_plate } });
-    if (existingByLicense) {
-      return res.status(409).json({ message: 'Shufer with this license plate already exists.' });
+    try {
+        // 1. Check if Shufer (driver_phone or license_plate) already exists
+        const existingByPhone = await Shufer.findOne({ where: { driver_phone } });
+        if (existingByPhone) {
+            return res.status(409).json({ message: 'Shufer with this phone number already exists.' });
+        }
+
+        const existingByLicense = await Shufer.findOne({ where: { license_plate } });
+        if (existingByLicense) {
+            return res.status(409).json({ message: 'Shufer with this license plate already exists.' });
+        }
+
+        // 2. Hash the PIN
+        const salt = await bcrypt.genSalt(10);
+        const hashedPin = await bcrypt.hash(pin, salt);
+
+        // Helper function to get file paths from req.files
+        const getFilePath = (field) =>
+            req.files && req.files[field] ? req.files[field][0].path : null;
+
+        // 3. Prepare data for new Shufer creation
+        const shuferCreationData = {
+            driver_phone,
+            pin: hashedPin,
+            driver_full_name,
+            driver_email: driver_email || null,
+            sender_id: sender_id || null,
+
+            driver_region: driver_region || null,
+            driver_zone: driver_zone || null,
+            driver_district: driver_district || null,
+            driver_house_number: driver_house_number || null,
+
+            license_plate,
+            car_type,
+            car_name,
+            manufacture_year: manufacture_year || null,
+            cargo_capacity: cargo_capacity || null,
+            commercial_license_number: commercial_license_number || null,
+            vehicle_tin_number: vehicle_tin_number || null,
+
+            driver_license_photo: getFilePath('driver_license_photo'),
+            driver_identification_photo: getFilePath('driver_identification_photo'),
+            car_license_photo: getFilePath('car_license_photo'),
+            car_photo: getFilePath('car_photo'),
+
+            is_vehicle_owner: typeof is_vehicle_owner === 'boolean' ? is_vehicle_owner : true,
+        };
+
+        // Add actual owner details only if is_vehicle_owner is false
+        if (shuferCreationData.is_vehicle_owner === false) {
+            shuferCreationData.actual_owner_full_name = actual_owner_full_name || null;
+            shuferCreationData.actual_owner_phone = actual_owner_phone || null;
+            shuferCreationData.actual_owner_email = actual_owner_email || null;
+            shuferCreationData.actual_owner_region = actual_owner_region || null;
+            shuferCreationData.actual_owner_zone = actual_owner_zone || null;
+            shuferCreationData.actual_owner_district = actual_owner_district || null;
+            shuferCreationData.actual_owner_house_number = actual_owner_house_number || null;
+            shuferCreationData.actual_owner_id_photo = getFilePath('actual_owner_id_photo');
+            shuferCreationData.actual_owner_photo = getFilePath('actual_owner_photo');
+        }
+
+        // 4. Create Shufer
+        const newShufer = await Shufer.create(shuferCreationData);
+
+        // 5. Generate JWT token
+        const token = jwt.sign(
+            {
+                shufer: {
+                    id: newShufer.id,
+                    phone: newShufer.driver_phone,
+                    name: newShufer.driver_full_name,
+                    approval_status: newShufer.approval_status,
+                },
+            },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRES_IN }
+        );
+
+        // 6. Remove sensitive info before sending response
+        const shuferData = { ...newShufer.get({ plain: true }) };
+        delete shuferData.pin;
+
+        // 7. Send success response with token
+        res.status(201).json({
+            message: 'Shufer registered successfully. Your application is pending approval.',
+            token, // ✅ Token returned here
+            shufer: shuferData,
+        });
+
+    } catch (error) {
+        console.error('Registration Error:', error);
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+            const messages = error.errors.map(err => err.message);
+            return res.status(400).json({ message: 'Validation Error', errors: messages });
+        }
+        res.status(500).json({ message: 'Server error during registration.' });
     }
-
-    // --- HASH PIN ---
-    const hashedPin = await bcrypt.hash(pin, 10);
-
-    // --- HANDLE FILE UPLOADS ---
-    const getFilePath = (field) =>
-      req.files && req.files[field] ? req.files[field][0].path : null;
-
-    const shuferCreationData = {
-      driver_phone,
-      pin: hashedPin,
-      driver_full_name,
-      driver_email: driver_email || null,
-      sender_id: sender_id || null,
-
-      driver_region: driver_region || null,
-      driver_zone: driver_zone || null,
-      driver_district: driver_district || null,
-      driver_house_number: driver_house_number || null,
-
-      license_plate,
-      car_type,
-      car_name,
-      manufacture_year: manufacture_year || null,
-      cargo_capacity: cargo_capacity || null,
-      commercial_license_number: commercial_license_number || null,
-      vehicle_tin_number: vehicle_tin_number || null,
-
-      // Uploaded Files
-      driver_license_photo: getFilePath('driver_license_photo'),
-      driver_identification_photo: getFilePath('driver_identification_photo'),
-      car_license_photo: getFilePath('car_license_photo'),
-      car_photo: getFilePath('car_photo'),
-
-      is_vehicle_owner: typeof is_vehicle_owner === 'boolean' ? is_vehicle_owner : true,
-    };
-
-    // Handle owner details conditionally
-    if (!shuferCreationData.is_vehicle_owner) {
-      shuferCreationData.actual_owner_full_name = actual_owner_full_name || null;
-      shuferCreationData.actual_owner_phone = actual_owner_phone || null;
-      shuferCreationData.actual_owner_email = actual_owner_email || null;
-      shuferCreationData.actual_owner_region = actual_owner_region || null;
-      shuferCreationData.actual_owner_zone = actual_owner_zone || null;
-      shuferCreationData.actual_owner_district = actual_owner_district || null;
-      shuferCreationData.actual_owner_house_number = actual_owner_house_number || null;
-      shuferCreationData.actual_owner_id_photo = getFilePath('actual_owner_id_photo');
-      shuferCreationData.actual_owner_photo = getFilePath('actual_owner_photo');
-    }
-
-    // --- CREATE SHUFER ---
-    const newShufer = await Shufer.create(shuferCreationData);
-
-    // --- RESPONSE ---
-    const shuferData = { ...newShufer.get({ plain: true }) };
-    delete shuferData.pin;
-
-    return res.status(201).json({
-      message: 'Shufer registered successfully. Awaiting admin approval.',
-      shufer: shuferData,
-    });
-
-  } catch (error) {
-    console.error('Registration Error:', error);
-    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ errors: error.errors.map(e => e.message) });
-    }
-    return res.status(500).json({ message: 'Server error during registration.' });
-  }
 };
 export const loginShufer = async (req, res) => {
   const { driver_phone, pin } = req.body;
