@@ -1230,3 +1230,31 @@ export const loginShufer = async (req, res) => {
     res.status(500).json({ message: 'Server error during login process.' });
   }
 };
+export const getMyProfile = async (req, res) => {
+    try {
+        const shuferId = req.shufer?.id;
+
+        if (!shuferId) {
+            return res.status(401).json({ message: 'Unauthorized: Missing or invalid token.' });
+        }
+
+        const shufer = await Shufer.findByPk(shuferId, {
+            attributes: {
+                exclude: ['pin'] // Never send PIN back
+            }
+        });
+
+        if (!shufer) {
+            return res.status(404).json({ message: 'Shufer not found.' });
+        }
+
+        res.status(200).json({
+            message: 'Profile fetched successfully.',
+            shufer: shufer
+        });
+
+    } catch (error) {
+        console.error('Error fetching Shufer profile:', error);
+        res.status(500).json({ message: 'Server error while fetching profile.' });
+    }
+};
