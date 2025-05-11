@@ -178,6 +178,125 @@ export const DeliveryRequest = sequelize.define('DeliveryRequest', {
   estimated_dropoff_time: { type: DataTypes.DATE, allowNull: true },
 }, { tableName: 'DeliveryRequests', timestamps: true });
 
+export const Shufer = sequelize.define('Shufer', {
+  // --- Shufer Identification & Core Info ---
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  pin: { // Hashed PIN for the Shufer
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  driver_full_name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  driver_phone: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    // unique: true, // Consider if Shufer's phone should be unique
+  },
+  driver_email: {
+    type: DataTypes.STRING,
+    allowNull: true, // Or false, depending on requirements
+    // unique: true, // Consider if Shufer's email should be unique
+    validate: {
+      isEmail: true,
+    }
+  },
+  driver_region: DataTypes.STRING,
+  driver_zone: DataTypes.STRING,
+  driver_district: DataTypes.STRING,
+  driver_house_number: DataTypes.STRING,
+  driver_license_photo: DataTypes.STRING, // URL or path
+  driver_identification_photo: DataTypes.STRING, // URL or path
+
+  // --- Vehicle-specific Details ---
+  license_plate: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true, // License plate should be unique for each vehicle
+  },
+  car_type: DataTypes.STRING, // e.g., Motorcycle, Van, Truck
+  car_name: DataTypes.STRING, // e.g., "Bajaj Boxer", "Toyota Hiace", "Isuzu NPR"
+  manufacture_year: DataTypes.STRING, // Consider DataTypes.INTEGER
+  cargo_capacity: DataTypes.STRING, // e.g., "150kg", "1 Tonne". Consider DataTypes.FLOAT for kg/volume
+  commercial_license_number: DataTypes.STRING, // For the vehicle
+  vehicle_tin_number: DataTypes.STRING, // TIN number associated with the vehicle/owner
+  car_license_photo: DataTypes.STRING, // URL or path
+  car_photo: DataTypes.STRING,         // URL or path
+
+  // --- Ownership Details ---
+  is_vehicle_owner: { // Is the driver the owner of the vehicle?
+    type: DataTypes.BOOLEAN,
+    defaultValue: true, // Assuming driver is often the owner
+    allowNull: false,
+  },
+  // These fields are for when the driver is NOT the vehicle owner
+  actual_owner_full_name: { type: DataTypes.STRING, allowNull: true },
+  actual_owner_phone: { type: DataTypes.STRING, allowNull: true },
+  actual_owner_email: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+        isEmail: true,
+    }
+  },
+  actual_owner_region: { type: DataTypes.STRING, allowNull: true },
+  actual_owner_zone: { type: DataTypes.STRING, allowNull: true },
+  actual_owner_district: { type: DataTypes.STRING, allowNull: true },
+  actual_owner_house_number: { type: DataTypes.STRING, allowNull: true },
+  actual_owner_id_photo: { type: DataTypes.STRING, allowNull: true }, // URL or path
+  actual_owner_photo: { type: DataTypes.STRING, allowNull: true },    // URL or path
+
+
+  // --- Operational Details (from Driver model) ---
+  current_lat: {
+    type: DataTypes.DOUBLE,
+    allowNull: true,
+  },
+  current_lng: {
+    type: DataTypes.DOUBLE,
+    allowNull: true,
+  },
+  last_location_update: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  is_available_for_new: { // Can Shufer accept more requests right now?
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    allowNull: false,
+  },
+  current_status: { // Shufer's current working status
+    type: DataTypes.ENUM('offline', 'idle', 'assigned', 'en_route_pickup', 'at_pickup', 'en_route_dropoff', 'at_dropoff', 'busy', 'pending_approval', 'rejected'),
+    defaultValue: 'offline',
+    allowNull: false,
+  },
+  // --- Approval Status (can be integrated from AdminApproval) ---
+  // If you want to simplify and not have a separate AdminApproval table for Shufer:
+  approval_status: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    defaultValue: 'pending',
+    allowNull: false,
+  },
+  approval_admin_notes: { // Reason for rejection or other notes
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  approved_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  }
+
+}, {
+  tableName: 'Shufers', // Using plural form for table name
+  timestamps: true,     // Adds createdAt and updatedAt fields
+  // Optional: Add indexes for frequently queried fields
+});
+
 export const DynamicPricing = sequelize.define('DynamicPricing', {
     id: { // Explicit PK with default 1
        type: DataTypes.INTEGER,
