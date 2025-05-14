@@ -838,7 +838,9 @@ export const getAllDeliveryRequests = async (req, res) => {
         sendErrorResponse(res, 500, 'Failed to retrieve delivery requests.', err);
     }
 };
+//  assigning the shufer 
 
+    
 export const adminAssignDriver = async (req, res) => {
     // !! ADMIN ROUTE - ደህንነቱን ያረጋግጡ !!
     const { deliveryRequestId, driverId } = req.body;
@@ -1275,5 +1277,269 @@ export const getMyProfile = async (req, res) => {
     } catch (error) {
         console.error('Error fetching Shufer profile:', error);
         res.status(500).json({ message: 'Server error while fetching profile.' });
+    }
+};
+// assign the shufer 
+export const assignDeliveryRequestToShufer = async (req, res) => {
+    // Assuming an admin/dispatcher auth middleware has verified the requesting user
+    // const adminId = req.admin?.id;
+    // if (!adminId) {
+    //     return sendErrorResponse(res, 403, 'Forbidden: Only authorized personnel can assign deliveries.');
+    // }
+
+    const { deliveryRequestId, shuferId } = req.body;
+
+    // Validate inputs
+    const reqId = parseInt(deliveryRequestId, 10);
+    const drvId = parseInt(shuferId, 10);
+
+    if (isNaN(reqId) || reqId <= 0) {
+        return sendErrorResponse(res, 400, 'A valid deliveryRequestId (positive integer) is required.');
+    }
+    if (isNaN(drvId) || drvId <= 0) {
+        return sendErrorResponse(res, 400, 'A valid shuferId (Driver ID, positive integer) is required to assign the request.');
+    }
+
+    let transaction;
+    try {
+        transaction = await sequelize.transaction();
+
+        // 1. Fetch the Shufer (Driver) to be assigned
+        const shuferToAssign = await Driver.findByPk(drvId, {
+            attributes: ['id', 'full_name', 'is_available'], // Add other relevant attributes like current_vehicle_id, etc.
+            include: [{ model: AdminApproval, as: 'approvalStatus', attributes: ['status'] }],
+            transaction
+        });
+
+        if (!shuferToAssign) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 404, `Shufer (Driver) with ID ${drvId} not found.`);
+        }
+        if (shuferToAssign.approvalStatus?.status !== 'approved') {
+            await transaction.rollback();
+            return sendErrorResponse(res, 400, `Shufer ${shuferToAssign.full_name} (ID: ${drvId}) is not approved. Current status: ${shuferToAssign.approvalStatus?.status || 'N/A'}.`);
+        }
+        // Optional: Check if Shufer is available or meets other assignment criteria
+        // if (!shuferToAssign.is_available) { // Assuming 'is_available' field
+        //     await transaction.rollback();
+        //     return sendErrorResponse(res, 409, `Shufer ${shuferToAssign.full_name} is currently marked as unavailable.`);
+        // }
+
+        // 2. Fetch the DeliveryRequest to be assigned, with a lock
+        const deliveryRequest = await DeliveryRequest.findByPk(reqId, {
+            include: [{ model: Sender, as: 'sender', attributes: ['id', 'full_name'] }], // For notifications
+            transaction,
+            lock: transaction.LOCK.UPDATE
+        });
+
+        if (!deliveryRequest) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 404, `Delivery Request with ID ${reqId} not found.`);
+        }
+
+        // 3. Validate the state of the DeliveryRequest for assignment
+        if (deliveryRequest.driver_id) {
+            await transaction.rollback();
+            if (deliveryRequest.driver_id === drvId) {
+                return sendErrorResponse(res, 409, `Delivery Request ${reqId} is already assigned to this Shufer (${shuferToAssign.full_name}).`);
+            }
+            return sendErrorResponse(res, 409, `Delivery Request ${reqId} is already assigned to another Shufer. Unassign first if you wish to reassign.`);
+        }
+
+        // Define statuses eligible for assignment (e.g., after payment is confirmed)
+        const assignableStatuses = ['payment_approved', 'pending_assignment']; // Adjust as per your workflow
+        if (!assignableStatuses.includes(deliveryRequest.status)) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 409, `Delivery Request ${reqId} cannot be assigned. Current status is '${deliveryRequest.status}'. Expected one of: ${assignableStatuses.join(', ')}.`);
+        }
+         // Ensure payment is approved before assignment
+        if (!deliveryRequest.is_payment_approved) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 403, `Payment for Delivery Request ${reqId} has not been approved. Cannot assign.`);
+        }
+
+
+        // 4. Assign the request to the Shufer and update its status
+        deliveryRequest.driver_id = drvId;
+        deliveryRequest.status = 'assigned_to_shufer'; // Or 'pending_shufer_acceptance' if the shufer needs to confirm
+        deliveryRequest.assigned_at = new Date(); // Or use a more specific field like 'admin_assigned_at'
+        // deliveryRequest.assigned_by_admin_id = adminId; // Optional: if tracking who assigned
+
+        await deliveryRequest.save({ transaction });
+
+        // 5. Optionally, update the Shufer's availability status
+        // shuferToAssign.is_available = false; // Or a specific status like 'tasked'
+        // await shuferToAssign.save({ transaction });
+
+        // 6. Create notifications
+        const senderMessage = `Good news! Your delivery request #${deliveryRequest.id} has been assigned to Shufer ${shuferToAssign.full_name}.`;
+        await createNotification({
+            sender_id: deliveryRequest.sender_id,
+            message: senderMessage,
+            type: 'delivery_assigned_by_admin',
+            related_entity_id: deliveryRequest.id,
+            related_entity_type: 'DeliveryRequest'
+        }, transaction);
+
+        const shuferMessage = `You have been assigned a new delivery: Request #${deliveryRequest.id}. Please check your task list and proceed accordingly.`;
+        await createNotification({
+            driver_id: drvId,
+            message: shuferMessage,
+            type: 'new_delivery_assignment',
+            related_entity_id: deliveryRequest.id,
+            related_entity_type: 'DeliveryRequest'
+        }, transaction);
+
+        // Commit the transaction
+        await transaction.commit();
+
+        res.status(200).json({
+            message: `Delivery Request ${reqId} successfully assigned to Shufer ${shuferToAssign.full_name} (ID: ${drvId}).`,
+            deliveryRequest: deliveryRequest.toJSON()
+        });
+
+    } catch (error) {
+        if (transaction) {
+            try { await transaction.rollback(); }
+            catch (rollbackError) { console.error("Error rolling back transaction:", rollbackError); }
+        }
+        console.error(`Error assigning delivery request ${reqId} to Shufer ${drvId}:`, error);
+        if (error.name === 'SequelizeOptimisticLockError' || error.name === 'SequelizeTimeoutError') {
+            return sendErrorResponse(res, 409, 'The delivery request or Shufer details were updated by another process, or the operation timed out. Please try again.');
+        }
+        return sendErrorResponse(res, 500, 'An unexpected error occurred while assigning the delivery request.', error);
+    }
+};
+// accpet the  admin request from the  admin 
+export const shuferAcceptRequest = async (req, res) => {
+    const { deliveryRequestId } = req.body;
+    const shuferId = req.driver?.id; // Authenticated Shufer's ID (from auth middleware)
+
+    // Validate Shufer authentication
+    if (!shuferId) {
+        return sendErrorResponse(res, 401, 'Authentication required: Shufer ID not found. Please login.');
+    }
+
+    // Validate deliveryRequestId
+    const reqId = parseInt(deliveryRequestId, 10);
+    if (isNaN(reqId) || reqId <= 0) {
+        return sendErrorResponse(res, 400, 'A valid deliveryRequestId (positive integer) is required in the request body.');
+    }
+
+    let transaction;
+    try {
+        transaction = await sequelize.transaction({
+            // Optional: Set isolation level if specific concurrency issues are anticipated
+            // isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED
+        });
+
+        // 1. Verify the Shufer (Driver)
+        const shufer = await Driver.findByPk(shuferId, {
+            attributes: ['id', 'full_name', 'is_available', 'current_lat', 'current_lng'], // Add other relevant attributes
+            include: [{ model: AdminApproval, as: 'approvalStatus', attributes: ['status'] }],
+            transaction
+        });
+
+        if (!shufer) {
+            await transaction.rollback();
+            // This case should ideally be caught by authentication middleware
+            return sendErrorResponse(res, 404, `Authenticated Shufer with ID ${shuferId} not found in the system.`);
+        }
+
+        if (shufer.approvalStatus?.status !== 'approved') {
+            await transaction.rollback();
+            return sendErrorResponse(res, 403, `Your account is currently not approved. Status: ${shufer.approvalStatus?.status || 'N/A'}. Please contact support.`);
+        }
+
+        // Optional: Check if Shufer is available (e.g., not on another critical task)
+        // if (!shufer.is_available) { // Assuming 'is_available' field exists
+        //     await transaction.rollback();
+        //     return sendErrorResponse(res, 409, 'You are currently marked as unavailable or on another delivery.');
+        // }
+
+        // 2. Fetch the DeliveryRequest with a lock to prevent race conditions
+        const deliveryRequest = await DeliveryRequest.findByPk(reqId, {
+            include: [{ model: Sender, as: 'sender', attributes: ['id', 'full_name'] }], // To notify the sender
+            transaction,
+            lock: transaction.LOCK.UPDATE // Locks the row for the duration of the transaction (in supported DBs like PostgreSQL, MySQL)
+        });
+
+        if (!deliveryRequest) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 404, `Delivery Request with ID ${reqId} not found.`);
+        }
+
+        // 3. Validate the state of the DeliveryRequest
+        if (deliveryRequest.driver_id) {
+            await transaction.rollback();
+            if (deliveryRequest.driver_id === shuferId) {
+                return sendErrorResponse(res, 409, `You have already accepted this delivery request (ID: ${reqId}).`);
+            }
+            return sendErrorResponse(res, 409, `Delivery Request ${reqId} has already been accepted by another Shufer.`);
+        }
+
+        // Define statuses eligible for acceptance.
+        // This depends on your workflow, e.g., after payment approval or direct assignment.
+        const acceptableStatuses = ['pending', 'payment_approved', 'pending_assignment'];
+        if (!acceptableStatuses.includes(deliveryRequest.status)) {
+            await transaction.rollback();
+            return sendErrorResponse(res, 409, `Delivery Request ${reqId} cannot be accepted. Current status is '${deliveryRequest.status}'.`);
+        }
+
+        // Crucial: Check if payment is approved, if it's a prerequisite
+        if (!deliveryRequest.is_payment_approved) {
+             await transaction.rollback();
+             return sendErrorResponse(res, 403, `Payment for Delivery Request ${reqId} has not been approved yet. Cannot accept.`);
+        }
+
+        // 4. Assign the request to the Shufer and update its status
+        deliveryRequest.driver_id = shuferId;
+        deliveryRequest.status = 'accepted_by_shufer'; // Or 'en_route_to_pickup', 'assigned', etc.
+        deliveryRequest.accepted_at = new Date();
+        // deliveryRequest.shufer_assigned_at = new Date(); // If you have a specific field
+        await deliveryRequest.save({ transaction });
+
+        // 5. Optionally, update the Shufer's availability status
+        // shufer.is_available = false; // Mark Shufer as busy
+        // await shufer.save({ transaction });
+
+        // 6. Create notifications
+        const senderMessage = `Your delivery request #${deliveryRequest.id} has been accepted by Shufer ${shufer.full_name}. They will proceed to the pickup location.`;
+        await createNotification({
+            sender_id: deliveryRequest.sender_id,
+            message: senderMessage,
+            type: 'delivery_accepted', // General type
+            related_entity_id: deliveryRequest.id,
+            related_entity_type: 'DeliveryRequest'
+        }, transaction);
+
+        const shuferMessage = `You have successfully accepted delivery request #${deliveryRequest.id}. Pickup: [Details from request if needed], Dropoff: [Details].`;
+        await createNotification({
+            driver_id: shuferId, // Target the notification to the Shufer (Driver)
+            message: shuferMessage,
+            type: 'delivery_assigned_to_you',
+            related_entity_id: deliveryRequest.id,
+            related_entity_type: 'DeliveryRequest'
+        }, transaction);
+
+        // Commit the transaction
+        await transaction.commit();
+
+        res.status(200).json({
+            message: `Delivery Request ${reqId} accepted successfully.`,
+            deliveryRequest: deliveryRequest.toJSON() // Return the updated delivery request
+        });
+
+    } catch (error) {
+        if (transaction) {
+            try { await transaction.rollback(); }
+            catch (rollbackError) { console.error("Error rolling back transaction:", rollbackError); }
+        }
+
+        console.error(`Error accepting delivery request ${reqId} by Shufer ${shuferId}:`, error);
+        if (error.name === 'SequelizeOptimisticLockError' || error.name === 'SequelizeTimeoutError') { // Handle lock contentions
+            return sendErrorResponse(res, 409, 'The delivery request was updated by another process or the operation timed out. Please try again.');
+        }
+        return sendErrorResponse(res, 500, 'An unexpected error occurred while accepting the delivery request.', error);
     }
 };
