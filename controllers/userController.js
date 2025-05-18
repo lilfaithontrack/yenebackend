@@ -47,7 +47,52 @@ export const registerUser = async (req, res) => {
     res.status(500).json({ success: false, message: 'An error occurred while registering.' });
   }
 };
+//login 
+export const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
+    const normalizedEmail = email.toLowerCase();
+
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    // Update lastsignin to current time in GMT+3
+    await User.update(
+      {
+        lastsignin: sequelize.fn('convert_tz', sequelize.fn('utc_timestamp'), '+00:00', '+03:00')
+      },
+      { where: { id: user.id } }
+    );
+
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
+
+    res.status(200).json({
+      success: true,
+      token,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        status: user.status,
+        agent: user.agent,
+        referral_code: user.referral_code,
+        lastsignin: new Date(), // optional: or let frontend handle formatting
+      },
+    });
+  } catch (error) {
+    console.error('Error in loginUser:', error);
+    res.status(500).json({ success: false, message: 'An error occurred during login.' });
+  }
+};
 // Get user by ID (secured endpoint, requires token)
 export const getUserById = async (req, res) => {
   try {
