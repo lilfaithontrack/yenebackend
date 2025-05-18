@@ -1,3 +1,5 @@
+import { DataTypes } from 'sequelize';
+import sequelize from '../db/dbConnect.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
