@@ -5,37 +5,46 @@ const User = sequelize.define('User', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
-    autoIncrement: true,  // Auto increment ID
+    autoIncrement: true,
   },
   name: {
     type: DataTypes.TEXT,
-    allowNull: false,  // Not nullable
+    allowNull: false,
   },
   email: {
     type: DataTypes.TEXT,
-    allowNull: false,  // Not nullable
+    allowNull: false,
   },
   phone: {
     type: DataTypes.TEXT,
-    allowNull: false,  // Not nullable
+    allowNull: false,
   },
   password: {
     type: DataTypes.TEXT,
-    allowNull: false,  // Not nullable
+    allowNull: false,
   },
   lastsignin: {
     type: DataTypes.DATE,
-    defaultValue: sequelize.fn('convert_tz', sequelize.fn('utc_timestamp'), '+00:00', '+03:00'),  // Convert UTC timestamp to GMT+3 timezone
-    allowNull: true,  // Nullable
+    defaultValue: sequelize.fn('convert_tz', sequelize.fn('utc_timestamp'), '+00:00', '+03:00'),
+    allowNull: true,
   },
   status: {
     type: DataTypes.TEXT,
-    defaultValue: 'Inactive',  // Default to 'Inactive'
-    allowNull: true,  // Nullable
+    defaultValue: 'Inactive',
+    allowNull: true,
+  },
+  agent: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+  },
+  referral_code: {
+    type: DataTypes.STRING,
+    allowNull: true, // Only agents will use this
   },
 }, {
-  timestamps: false,  // Disable automatic timestamps (we use 'lastsignin' instead)
-  tableName: 'users',  // Matches the table name
+  timestamps: false,
+  tableName: 'users',
 });
 
 export default User;
