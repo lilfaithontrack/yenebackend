@@ -6,28 +6,27 @@ import { v4 as uuidv4 } from 'uuid';
 export const registerUser = async (req, res) => {
   try {
     const { name, email, phone, password, status, agent, referral_code } = req.body;
-
-    // Normalize email
     const normalizedEmail = email.toLowerCase();
 
-    // Check if user already exists
     const existingUser = await User.findOne({ where: { email: normalizedEmail } });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'User already exists with this email.' });
     }
 
-    // Prevent referral_code for non-agents
-    if (!agent && referral_code) {
-      return res.status(400).json({ success: false, message: 'Only agents can have a referral code.' });
-    }
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate referral code automatically if not provided (optional logic)
-    const finalReferralCode = agent
-      ? referral_code || `REF-${uuidv4().split('-')[0].toUpperCase()}`
-      : null;
+    let referredById = null;
+
+    if (referral_code) {
+      const referrer = await User.findOne({ where: { referral_code } });
+      if (!referrer || !referrer.agent) {
+        return res.status(400).json({ success: false, message: 'Invalid referral code.' });
+      }
+      referredById = referrer.id;
+    }
+
+    // Auto-generate referral code if agent
+    const generatedReferralCode = agent ? crypto.randomBytes(4).toString('hex') : null;
 
     const user = await User.create({
       name,
@@ -36,59 +35,14 @@ export const registerUser = async (req, res) => {
       password: hashedPassword,
       status: status || 'Inactive',
       agent: agent || false,
-      referral_code: finalReferralCode,
+      referral_code: generatedReferralCode,
+      referred_by: referredById,
     });
 
     res.status(201).json({ success: true, data: user });
   } catch (error) {
     console.error('Error in registerUser:', error);
     res.status(500).json({ success: false, message: 'An error occurred while registering.' });
-  }
-};
-// Login user
-export const loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const normalizedEmail = email.toLowerCase();
-
-    const user = await User.findOne({ where: { email: normalizedEmail } });
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
-    }
-
-    // Update lastsignin to current time in GMT+3
-    await User.update(
-      {
-        lastsignin: sequelize.fn('convert_tz', sequelize.fn('utc_timestamp'), '+00:00', '+03:00')
-      },
-      { where: { id: user.id } }
-    );
-
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
-
-    res.status(200).json({
-      success: true,
-      token,
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        status: user.status,
-        agent: user.agent,
-        referral_code: user.referral_code,
-        lastsignin: new Date(), // optional: or let frontend handle formatting
-      },
-    });
-  } catch (error) {
-    console.error('Error in loginUser:', error);
-    res.status(500).json({ success: false, message: 'An error occurred during login.' });
   }
 };
 
