@@ -1,29 +1,42 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-
+import { v4 as uuidv4 } from 'uuid';
 // Register a new user with hashed password
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, phone, password, status } = req.body;
+    const { name, email, phone, password, status, agent, referral_code } = req.body;
 
-    // Normalize email to lowercase for consistency
+    // Normalize email
     const normalizedEmail = email.toLowerCase();
 
+    // Check if user already exists
     const existingUser = await User.findOne({ where: { email: normalizedEmail } });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'User already exists with this email.' });
     }
 
-    // Hash the password before saving
+    // Prevent referral_code for non-agents
+    if (!agent && referral_code) {
+      return res.status(400).json({ success: false, message: 'Only agents can have a referral code.' });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Generate referral code automatically if not provided (optional logic)
+    const finalReferralCode = agent
+      ? referral_code || `REF-${uuidv4().split('-')[0].toUpperCase()}`
+      : null;
 
     const user = await User.create({
       name,
       email: normalizedEmail,
       phone,
-      password: hashedPassword, // Store hashed password
-      status: status || 'Inactive',  // Default to 'Inactive' if no status is provided
+      password: hashedPassword,
+      status: status || 'Inactive',
+      agent: agent || false,
+      referral_code: finalReferralCode,
     });
 
     res.status(201).json({ success: true, data: user });
@@ -32,13 +45,11 @@ export const registerUser = async (req, res) => {
     res.status(500).json({ success: false, message: 'An error occurred while registering.' });
   }
 };
-
 // Login user
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Normalize email to lowercase for case-insensitive login
     const normalizedEmail = email.toLowerCase();
 
     const user = await User.findOne({ where: { email: normalizedEmail } });
@@ -46,13 +57,19 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
 
-    // Compare hashed password with input password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
 
-    // Generate JWT token
+    // Update lastsignin to current time in GMT+3
+    await User.update(
+      {
+        lastsignin: sequelize.fn('convert_tz', sequelize.fn('utc_timestamp'), '+00:00', '+03:00')
+      },
+      { where: { id: user.id } }
+    );
+
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1y' });
 
     res.status(200).json({
@@ -64,7 +81,9 @@ export const loginUser = async (req, res) => {
         email: user.email,
         phone: user.phone,
         status: user.status,
-        lastsignin: user.lastsignin,
+        agent: user.agent,
+        referral_code: user.referral_code,
+        lastsignin: new Date(), // optional: or let frontend handle formatting
       },
     });
   } catch (error) {
@@ -76,23 +95,40 @@ export const loginUser = async (req, res) => {
 // Get user by ID (secured endpoint, requires token)
 export const getUserById = async (req, res) => {
   try {
-    const token = req.headers.authorization.split(' ')[1]; // Extract the token from the header
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Decode the token
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
 
-    const userId = decoded.id; // Get user ID from the token
-    const user = await User.findByPk(userId); // Fetch the user from the database
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
 
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    res.status(200).json({ success: true, data: user });
+    // Only return referral_code if user is an agent
+    const responseData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      status: user.status,
+      agent: user.agent,
+      lastsignin: user.lastsignin,
+    };
+
+    if (user.agent) {
+      responseData.referral_code = user.referral_code;
+    }
+
+    res.status(200).json({ success: true, data: responseData });
   } catch (error) {
     console.error('Error fetching user by ID:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
-
 // Update user details
 export const updateUser = async (req, res) => {
   try {
