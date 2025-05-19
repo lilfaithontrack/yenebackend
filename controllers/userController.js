@@ -4,6 +4,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
+
 // Register a new user with hashed password
 export const registerUser = async (req, res) => {
   try {
