@@ -135,19 +135,21 @@ export const getUserById = async (req, res) => {
 // Update user details
 export const updateUser = async (req, res) => {
   try {
-    const { name, email, phone, password, status } = req.body;
+    const { name, email, phone, password, status, bank_name, account_number } = req.body;
 
-    const user = await User.findByPk(req.params.id);  // Get user by ID
+    const user = await User.findByPk(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     const updatedUser = await user.update({
       name: name || user.name,
-      email: email ? email.toLowerCase() : user.email,  // Ensure email is in lowercase
+      email: email ? email.toLowerCase() : user.email,
       phone: phone || user.phone,
-      password: password ? await bcrypt.hash(password, 10) : user.password,  // Hash password if provided
+      password: password ? await bcrypt.hash(password, 10) : user.password,
       status: status || user.status,
+      bank_name: bank_name || user.bank_name,
+      account_number: account_number || user.account_number,
     });
 
     res.status(200).json({ success: true, data: updatedUser });
