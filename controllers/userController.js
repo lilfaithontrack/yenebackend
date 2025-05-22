@@ -111,7 +111,7 @@ export const getUserById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Only return referral_code if user is an agent
+    // Return essential user details along with the new optional fields
     const responseData = {
       id: user.id,
       name: user.name,
@@ -120,6 +120,10 @@ export const getUserById = async (req, res) => {
       status: user.status,
       agent: user.agent,
       lastsignin: user.lastsignin,
+      wallet_balance: user.wallet_balance || 0.00,
+      bank_name: user.bank_name || "",
+      account_number: user.account_number || "",
+      referred_by: user.referred_by || "",
     };
 
     if (user.agent) {
@@ -132,6 +136,7 @@ export const getUserById = async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
+
 // Update user details
 export const updateUser = async (req, res) => {
   try {
