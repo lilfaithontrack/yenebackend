@@ -35,6 +35,7 @@ const paymentSchema = Joi.object({
   service_fee: Joi.number().default(0),
   delivery_fee: Joi.number().default(0),
   shipping_address: Joi.string().required(),
+  referral_code: Joi.string().optional().allow(''),
   customer_name: Joi.string().required(),
   customer_email: Joi.string().email().required(),
   customer_phone: Joi.string().required(),
