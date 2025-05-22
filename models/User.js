@@ -40,7 +40,28 @@ const User = sequelize.define('User', {
   },
   referral_code: {
     type: DataTypes.STRING,
-    allowNull: true, // Only agents will use this
+    allowNull: true,
+  },
+  referred_by: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id',
+    },
+  },
+  bank_name: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  account_number: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  wallet_balance: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+    allowNull: false,
   },
 }, {
   timestamps: false,
