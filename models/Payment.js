@@ -53,6 +53,10 @@ const Payment = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    referral_code: {
+    type: DataTypes.STRING,
+    allowNull: true,
+},
     guest_id: {
       type: DataTypes.STRING,
       allowNull: true,
