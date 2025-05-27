@@ -144,7 +144,7 @@ const startServer = async () => {
     // Start HTTPS server
     const PORT = process.env.PORT || 3000;
     https.createServer(sslOptions, app).listen(PORT, () => {
-      console.log(`Server is running securely on https://backend.yeniesuq.co`);
+      console.log(`Server running on http://localhost:${PORT}`);
     });
 
   } catch (error) {
