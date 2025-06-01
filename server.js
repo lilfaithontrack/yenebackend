@@ -164,8 +164,9 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
-Product.hasMany(UOM, { foreignKey: 'product_id', as: 'uoms' });
-UOM.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+AddProduct.hasMany(UOM, { foreignKey: 'product_id', as: 'uoms' });
+UOM.belongsTo(AddProduct, { foreignKey: 'product_id', as: 'product' });
+
 
 Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id', as: 'assignOrders' }); // Alias: assignOrders
 AssignOrder.belongsTo(Shopper, { foreignKey: 'shopper_id', as: 'shopper' }); // Alias: shopper
