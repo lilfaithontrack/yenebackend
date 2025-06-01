@@ -33,17 +33,24 @@ export const createUOM = async (req, res) => {
   console.log('--- createUOM ---'); // Log when the function is hit
   try {
     const { product_id, type, value, price, stock } = req.body;
-    console.log('req.body:', req.body); // Log the text fields
+    console.log('req.body (text fields):', req.body);
 
     if (!product_id || !type || !value || !price || !stock) {
       console.log('Validation failed: Missing required fields.');
-      return res.status(400).json({ message: 'All fields are required.' });
+      return res.status(400).json({ message: 'All fields are required (product_id, type, value, price, stock).' });
     }
 
-    console.log('req.file (from multer):', req.file); // THIS IS VERY IMPORTANT!
+    console.log('req.file (from multer for new image):', req.file);
 
-    const image_url = req.file ? `/uploads/uoms/${req.file.filename}` : null;
-    console.log('Constructed image_url for database:', image_url);
+    // Determine the value for the 'images' field in the database
+    // If a file is uploaded, its path will be stored in an array.
+    // If no file is uploaded, an empty array will be stored.
+    let images_for_db = []; // Default to empty array
+    if (req.file && req.file.filename) {
+      const imagePath = `/uploads/uoms/${req.file.filename}`; // Path relative to your server's public/uploads access
+      images_for_db = [imagePath]; // Store the single uploaded image path in an array
+    }
+    console.log('Constructed images_for_db (array for database):', images_for_db);
 
     const uomDataToCreate = {
       product_id,
@@ -51,27 +58,36 @@ export const createUOM = async (req, res) => {
       value,
       price,
       stock,
-      image_url, // Ensure this is the correct field name as per your UOM model
+      images: images_for_db, // Using 'images' (plural) and storing an array
     };
-    console.log('Data being passed to UOM.create():', uomDataToCreate);
+    console.log('Data being passed to UOM.create():', JSON.stringify(uomDataToCreate, null, 2));
 
     const uom = await UOM.create(uomDataToCreate);
-    console.log('UOM object created by Sequelize (from DB):', JSON.stringify(uom, null, 2)); // Log the created object
+    console.log('UOM object created by Sequelize (from DB):', JSON.stringify(uom, null, 2));
 
     res.status(201).json(uom);
   } catch (err) {
     console.error('--- ERROR in createUOM ---');
     console.error('Error Name:', err.name);
     console.error('Error Message:', err.message);
-    console.error('Error Stack:', err.stack);
-    // If it's a Sequelize validation error, it might have more details
-    if (err.errors && err.errors.length > 0) {
-        console.error('Sequelize Validation Errors:', err.errors.map(e => e.message));
+    console.error('Error Stack:', err.stack); // Can be verbose, but useful for deep bugs
+    
+    // Check for Sequelize validation errors specifically
+    if (err.name === 'SequelizeValidationError' && err.errors && err.errors.length > 0) {
+        console.error('Sequelize Validation Errors:', err.errors.map(e => ({ field: e.path, message: e.message })));
+        const validationMessages = err.errors.map(e => `${e.path}: ${e.message}`).join(', ');
+        return res.status(400).json({ message: `Validation failed: ${validationMessages}` });
     }
+    // Check for other common Sequelize errors like UniqueConstraintError
+    if (err.name === 'SequelizeUniqueConstraintError') {
+        console.error('Sequelize Unique Constraint Error:', err.errors.map(e => ({ field: e.path, message: e.message })));
+        const constraintMessage = err.errors.map(e => `Field '${e.path}' with value '${e.value}' violates a unique constraint.`).join(', ');
+        return res.status(409).json({ message: constraintMessage }); // 409 Conflict
+    }
+
     res.status(500).json({ message: 'Server error creating UOM.' });
   }
 };
-
 export const getUOMsByProduct = async (req, res) => {
   try {
     const { productId } = req.params;
