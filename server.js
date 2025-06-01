@@ -20,6 +20,7 @@ import deliveryBoyRoutes from './routes/deliveryBoyRoutes.js';
 import sellerRoutes from './routes/sellerRoutes.js';
 import shopperRoutes from './routes/shopperRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import UOM from './models/UOM.js';
 import deliveryRoutes from './routes/deliveryRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
@@ -163,6 +164,8 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+Product.hasMany(UOM, { foreignKey: 'product_id', as: 'uoms' });
+UOM.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 
 Shopper.hasMany(AssignOrder, { foreignKey: 'shopper_id', as: 'assignOrders' }); // Alias: assignOrders
 AssignOrder.belongsTo(Shopper, { foreignKey: 'shopper_id', as: 'shopper' }); // Alias: shopper
