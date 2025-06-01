@@ -1,26 +1,60 @@
 import UOM from '../models/UOM.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
-// Create one or more UOMs for a product
+// ==== Multer Configuration (Inline) ====
+const uploadPath = 'uploads/uoms';
+if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, unique);
+  },
+});
+
+export const uomUpload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only jpg, png, and webp files are allowed'));
+  },
+});
+
+// ==== Controller Functions ====
+
 export const createUOM = async (req, res) => {
   try {
-    const { product_id, uoms } = req.body;
+    const { product_id, type, value, price, stock } = req.body;
 
-    if (!product_id || !Array.isArray(uoms)) {
-      return res.status(400).json({ message: 'product_id and uoms array are required.' });
+    if (!product_id || !type || !value || !price || !stock) {
+      return res.status(400).json({ message: 'All fields are required.' });
     }
 
-    const createdUOMs = await UOM.bulkCreate(
-      uoms.map(u => ({ ...u, product_id }))
-    );
+    const image_url = req.file ? `/uploads/uoms/${req.file.filename}` : null;
 
-    res.status(201).json(createdUOMs);
+    const uom = await UOM.create({
+      product_id,
+      type,
+      value,
+      price,
+      stock,
+      image_url,
+    });
+
+    res.status(201).json(uom);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error creating UOMs.' });
+    res.status(500).json({ message: 'Server error creating UOM.' });
   }
 };
 
-// Get all UOMs for a product
 export const getUOMsByProduct = async (req, res) => {
   try {
     const { productId } = req.params;
@@ -32,13 +66,18 @@ export const getUOMsByProduct = async (req, res) => {
   }
 };
 
-// Update a UOM
 export const updateUOM = async (req, res) => {
   try {
     const { id } = req.params;
-    const [updated] = await UOM.update(req.body, { where: { id } });
+    const existing = await UOM.findByPk(id);
+    if (!existing) return res.status(404).json({ message: 'UOM not found.' });
 
-    if (!updated) return res.status(404).json({ message: 'UOM not found.' });
+    const image_url = req.file ? `/uploads/uoms/${req.file.filename}` : existing.image_url;
+
+    await UOM.update(
+      { ...req.body, image_url },
+      { where: { id } }
+    );
 
     const updatedUOM = await UOM.findByPk(id);
     res.status(200).json(updatedUOM);
@@ -48,7 +87,6 @@ export const updateUOM = async (req, res) => {
   }
 };
 
-// Delete a UOM
 export const deleteUOM = async (req, res) => {
   try {
     const { id } = req.params;
