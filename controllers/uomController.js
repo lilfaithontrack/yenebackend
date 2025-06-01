@@ -29,31 +29,7 @@ export const uomUpload = multer({
 
 // ==== Controller Functions ====
 
-export const createUOM = async (req, res) => {
-  try {
-    const { product_id, type, value, price, stock } = req.body;
 
-    if (!product_id || !type || !value || !price || !stock) {
-      return res.status(400).json({ message: 'All fields are required.' });
-    }
-
-    const image_url = req.file ? `/uploads/uoms/${req.file.filename}` : null;
-
-    const uom = await UOM.create({
-      product_id,
-      type,
-      value,
-      price,
-      stock,
-      image_url,
-    });
-
-    res.status(201).json(uom);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error creating UOM.' });
-  }
-};
 
 export const getUOMsByProduct = async (req, res) => {
   try {
@@ -76,7 +52,48 @@ export const updateUOM = async (req, res) => {
 
     await UOM.update(
       { ...req.body, image_url },
-      { where: { id } }
+      { whexport const createUOM = async (req, res) => {
+  console.log('--- createUOM ---'); // Log when the function is hit
+  try {
+    const { product_id, type, value, price, stock } = req.body;
+    console.log('req.body:', req.body); // Log the text fields
+
+    if (!product_id || !type || !value || !price || !stock) {
+      console.log('Validation failed: Missing required fields.');
+      return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    console.log('req.file (from multer):', req.file); // THIS IS VERY IMPORTANT!
+
+    const image_url = req.file ? `/uploads/uoms/${req.file.filename}` : null;
+    console.log('Constructed image_url for database:', image_url);
+
+    const uomDataToCreate = {
+      product_id,
+      type,
+      value,
+      price,
+      stock,
+      image_url, // Ensure this is the correct field name as per your UOM model
+    };
+    console.log('Data being passed to UOM.create():', uomDataToCreate);
+
+    const uom = await UOM.create(uomDataToCreate);
+    console.log('UOM object created by Sequelize (from DB):', JSON.stringify(uom, null, 2)); // Log the created object
+
+    res.status(201).json(uom);
+  } catch (err) {
+    console.error('--- ERROR in createUOM ---');
+    console.error('Error Name:', err.name);
+    console.error('Error Message:', err.message);
+    console.error('Error Stack:', err.stack);
+    // If it's a Sequelize validation error, it might have more details
+    if (err.errors && err.errors.length > 0) {
+        console.error('Sequelize Validation Errors:', err.errors.map(e => e.message));
+    }
+    res.status(500).json({ message: 'Server error creating UOM.' });
+  }
+};ere: { id } }
     );
 
     const updatedUOM = await UOM.findByPk(id);
