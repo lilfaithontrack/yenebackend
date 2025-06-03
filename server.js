@@ -18,6 +18,7 @@ import uomRoutes from './routes/uomRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
 import deliveryBoyRoutes from './routes/deliveryBoyRoutes.js';
 import sellerRoutes from './routes/sellerRoutes.js';
+import withdrawRoutes from './routes/withdraw.js';
 import shopperRoutes from './routes/shopperRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import UOM from './models/UOM.js';
