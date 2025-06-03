@@ -1,7 +1,7 @@
 import WithdrawRequest from '../models/WithdrawRequest.js';
 import User from '../models/User.js';
 
-const requestWithdraw = async (req, res) => {
+export const requestWithdraw = async (req, res) => {
   const { user_id } = req.body;
 
   try {
