@@ -91,6 +91,7 @@ app.use('/api/deliveryboy', deliveryBoyRoutes );
 app.use('/api/category', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/uoms', uomRoutes);
+app.use('/api/withdraw', withdrawRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/order', orderRoutes);
