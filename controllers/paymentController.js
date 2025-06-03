@@ -4,7 +4,7 @@ import fs from 'fs';
 import Joi from 'joi';
 import QRCode from 'qrcode';
 import Payment from '../models/Payment.js';
-
+import User from '../models/User.js';
 // Ensure the uploads directory exists
 const uploadDir = 'uploads/screenshots';
 if (!fs.existsSync(uploadDir)) {
@@ -86,8 +86,21 @@ const updatePaymentStatus = async (req, res) => {
     const payment = await Payment.findByPk(payment_id);
     if (!payment) return res.status(404).json({ message: 'Payment not found.' });
 
+    const previousStatus = payment.payment_status;
     payment.payment_status = payment_status;
     await payment.save();
+
+    // 💰 If approved for the first time and referral code exists
+    if (payment_status === 'Approved' && previousStatus !== 'Approved') {
+      if (payment.referral_code) {
+        const referrer = await User.findOne({ where: { referral_code: payment.referral_code } });
+        if (referrer) {
+          referrer.wallet = (referrer.wallet || 0) + 5; // 5 ETB added
+          await referrer.save();
+          console.log(`Referrer ${referrer.id} rewarded with 5 ETB.`);
+        }
+      }
+    }
 
     return res.status(200).json({ message: 'Payment status updated successfully.', payment });
   } catch (error) {
@@ -95,7 +108,6 @@ const updatePaymentStatus = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
-
 // Assign order to shopper/delivery & generate QR code
 const sendOrderToShopperAndDelivery = async (req, res) => {
   const { payment_id } = req.params;
