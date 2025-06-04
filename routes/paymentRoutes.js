@@ -4,9 +4,11 @@ import {
   updatePaymentStatus, 
   sendOrderToShopperAndDelivery, 
   getOrderHistory, 
+    getOrdersByReferralCode,
   getAllOrders ,
   getPaymentOrderById 
 } from '../controllers/paymentController.js';
+
 
 const router = express.Router();
 
@@ -18,7 +20,12 @@ router.put('/update-status/:payment_id', updatePaymentStatus);
 
 // Route to fetch order history by customer_email or guest_id
 router.get('/orders/history', getOrderHistory);
-
+router.get(
+  '/orders/by-referral/:referral_code_from_param', 
+  // protect, // General authentication
+  // authorizeAgent, // Middleware to check if user is an agent and matches the referral code
+  getOrdersByReferralCode
+);
 // Route to fetch all orders
 router.get('/orders', getAllOrders);
 //route to fetch the payment order based on the id 
