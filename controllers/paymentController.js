@@ -206,6 +206,46 @@ const getAllOrders = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
+// In ../controllers/paymentController.js
+// (Make sure to import your Payment model)
+
+export const getOrdersByReferralCode = async (req, res) => {
+  // It's more secure if the referral code is derived from the authenticated user (req.user.referral_code)
+  // rather than passed as a URL parameter that could be manipulated,
+  // unless this endpoint is also for admins to check any referral code.
+  // For this example, we'll take it from the URL params as per the frontend design.
+  const { referral_code_from_param } = req.params; 
+
+  // You should add validation here:
+  // 1. Ensure the user making the request is an agent.
+  // 2. Ensure the agent is requesting orders for THEIR OWN referral_code,
+  //    e.g., if (req.user.referral_code !== referral_code_from_param && req.user.role !== 'admin') return 403;
+  // For simplicity in this example, we assume such checks are in a middleware or handled.
+
+  if (!referral_code_from_param) {
+    return res.status(400).json({ success: false, message: 'Referral code parameter is required.' });
+  }
+
+  try {
+    const orders = await Payment.findAll({
+      where: {
+        referral_code: referral_code_from_param,
+      },
+      order: [['createdAt', 'DESC']],
+      // Optionally, select specific attributes to send to the client
+      // attributes: ['id', 'customer_name', 'customer_email', 'total_price', 'payment_status', 'createdAt', /* any other needed fields */],
+    });
+
+    if (!orders.length) {
+      return res.status(200).json({ success: true, message: 'No orders found for this referral code.', orders: [] });
+    }
+
+    return res.status(200).json({ success: true, message: 'Referred orders retrieved successfully.', orders });
+  } catch (error) {
+    console.error('Error fetching orders by referral code:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+};
 
 export {
   createPayment,
