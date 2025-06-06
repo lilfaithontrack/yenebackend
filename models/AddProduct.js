@@ -22,14 +22,6 @@ const Product = sequelize.define('Product', {
       min: 0
     }
   },
-  color: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  size: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
   brand: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -57,23 +49,79 @@ const Product = sequelize.define('Product', {
   },
   image: {
     type: DataTypes.JSON,
-    allowNull: true,
+    allowNull: true, // Optional general image gallery
     get() {
       const value = this.getDataValue('image');
-      return value ? JSON.parse(value) : [];
+      try {
+        return value ? JSON.parse(value) : [];
+      } catch (e) {
+        return [];
+      }
     },
     set(value) {
-      this.setDataValue('image', JSON.stringify(value));
+      this.setDataValue('image', JSON.stringify(value || []));
     }
   },
-  unit_of_measurement: {
-    type: DataTypes.STRING,
-    allowNull: true,
+  color_options: {
+    type: DataTypes.JSON,
+    allowNull: true, // Optional color-specific images, can be null
+    get() {
+      const value = this.getDataValue('color_options');
+      try {
+        return value ? JSON.parse(value) : [];
+      } catch (e) {
+        return [];
+      }
+    },
+    set(value) {
+      if (value === null || value === undefined) {
+        this.setDataValue('color_options', null);
+        return;
+      }
+      if (!Array.isArray(value)) {
+        throw new Error('Color options must be an array of objects.');
+      }
+      value.forEach(opt => {
+        if (!opt.color_name || typeof opt.color_name !== 'string') {
+          throw new Error('Each color option must have a valid "color_name".');
+        }
+        if (!opt.images || !Array.isArray(opt.images)) {
+          throw new Error(`The images for color "${opt.color_name}" must be an array.`);
+        }
+      });
+      this.setDataValue('color_options', JSON.stringify(value));
+    }
   },
-  stock: {
-    type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
+  variations: {
+    type: DataTypes.JSON,
     allowNull: false,
-    defaultValue: 'in_stock',
+    defaultValue: [],
+    get() {
+        const value = this.getDataValue('variations');
+        try {
+            return value ? JSON.parse(value) : [];
+        } catch (e) {
+            return [];
+        }
+    },
+    set(value) {
+        if (!Array.isArray(value)) {
+            throw new Error('Variations must be an array.');
+        }
+        const validStockValues = ['in_stock', 'out_of_stock', 'limited_stock'];
+        value.forEach(v => {
+            if (v.price === undefined || v.stock === undefined) {
+                throw new Error('Each variation must have a price and stock.');
+            }
+            if (typeof v.price !== 'number' || v.price < 0) {
+                throw new Error('Variation price must be a non-negative number.');
+            }
+            if (!validStockValues.includes(v.stock)) {
+                throw new Error(`Invalid stock value. Must be one of: ${validStockValues.join(', ')}`);
+            }
+        });
+        this.setDataValue('variations', JSON.stringify(value));
+    }
   },
   productfor: {
     type: DataTypes.ENUM('for_seller', 'for_user'),
@@ -92,7 +140,7 @@ const Product = sequelize.define('Product', {
       return this.getDataValue('location_prices') || {};
     },
     set(value) {
-      let prices = typeof value === 'object' ? value : {};
+      let prices = typeof value === 'object' && value !== null ? value : {};
       if (!prices['Addis Ababa']) {
         prices['Addis Ababa'] = this.getDataValue('price') || 0;
       }
