@@ -48,7 +48,7 @@ export const upload = multer({
 export const createProduct = async (req, res) => {
   try {
     const {
-      title, price, description, brand, catItems, subcat, productfor,
+      title, price, description, brand, catItems, subcat, productfor,stock,
       variations: variationsJSON,
       color_options: colorOptionsJSON,
       general_image_count,
@@ -78,7 +78,7 @@ export const createProduct = async (req, res) => {
 
     // 3. Create product with the new, correct model structure
     const product = await Product.create({
-      title, price, description, brand, catItems, subcat, productfor,
+      title, price, description, brand, catItems, subcat, productfor,stock,
       status: 'pending', // Default status
       image: generalImages,
       color_options: color_options_data,
