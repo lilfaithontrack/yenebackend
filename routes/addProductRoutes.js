@@ -1,33 +1,45 @@
 import express from 'express';
-import { 
+import {
+  // Import all the necessary functions from your controller
   getAllProducts,
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
   getProductsByLocation,
-  getLocationPrice,
-  updateLocationPrice,
-
+  // Make sure to import the upload middleware you defined in your controller
   upload
-} from '../controllers/addProductController.js';
+} from '../controllers/addProductController.js'; // Using your controller file name
 
 const router = express.Router();
 
-// PUBLIC ROUTES
-router.get('/', getAllProducts); // Get all products
-router.get('/location', getProductsByLocation); // Get products by location
-router.get('/:id', getProductById); // Get single product
-router.get('/:id/price', getLocationPrice); // Get location price
+// --- PUBLIC ROUTES (for anyone to view products) ---
 
-// PRODUCT MANAGEMENT ROUTES
-router.post('/add', upload.array('image', 10),  createProduct); // Create product
-router.put('/:id', upload.array('image', 10), updateProduct); // Update product
-router.delete('/:id', deleteProduct); // Delete product
+// GET /api/products -> Gets all products, with optional filters
+router.get('/', getAllProducts);
 
- // Approve product
+// GET /api/products/location -> Gets products based on a geographic radius search
+// This must be defined BEFORE '/:id' to work correctly.
+router.get('/location', getProductsByLocation);
 
-// LOCATION PRICING ROUTES
-router.put('/:id/price/:location', updateLocationPrice); // Update location price
+// GET /api/products/:id -> Gets a single product by its unique ID
+router.get('/:id', getProductById);
+
+
+// --- PRODUCT MANAGEMENT ROUTES (for authenticated users/admins) ---
+
+// POST /api/products -> Creates a new product.
+// The 'upload' middleware is essential here, using the correct field name 'images'.
+router.post('/', upload, createProduct);
+
+// PUT /api/products/:id -> Updates an existing product.
+// The 'upload' middleware is also needed here for updating images.
+router.put('/:id', upload, updateProduct);
+
+// DELETE /api/products/:id -> Deletes a product.
+router.delete('/:id', deleteProduct);
+
+
+// The old location price routes are now handled by the main GET and PUT routes for a product.
 
 export default router;
