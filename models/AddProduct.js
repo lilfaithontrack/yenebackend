@@ -22,6 +22,11 @@ const Product = sequelize.define('Product', {
       min: 0
     }
   },
+  stock: {
+    type: DataTypes.ENUM('in_stock', 'out_of_stock', 'limited_stock'),
+    allowNull: false,
+    defaultValue: 'in_stock',
+  },
   brand: {
     type: DataTypes.STRING,
     allowNull: true,
