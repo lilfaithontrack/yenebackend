@@ -2,7 +2,7 @@
 
 import jwt from 'jsonwebtoken';
 import { Sender } from '../models/Telalaki.js';
-import Shopper from '../models/shopper.js'; 
+import Shopper from '../models/Shopper.js'; 
 // Adjust path to your models file
 // Import your error response helper if you have one
 // import { sendErrorResponse } from '../controllers/helpers.js'; // Adjust path
