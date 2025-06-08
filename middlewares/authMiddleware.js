@@ -1,7 +1,9 @@
 // Example: middleware/authMiddleware.js
 
 import jwt from 'jsonwebtoken';
-import { Sender } from '../models/Telalaki.js'; // Adjust path to your models file
+import { Sender } from '../models/Telalaki.js';
+import Shopper from '../models/shopper.js'; 
+// Adjust path to your models file
 // Import your error response helper if you have one
 // import { sendErrorResponse } from '../controllers/helpers.js'; // Adjust path
 
@@ -67,5 +69,55 @@ export const protectSender = async (req, res, next) => {
   if (!token) {
     console.log('>>> Protect Middleware: No valid Bearer token found in header.');
     return sendErrorResponse(res, 401, 'Not authorized, no token provided.');
+  }
+};
+export const protect = async (req, res, next) => {
+  let token;
+  console.log('>>> Protect Middleware: Checking authentication...');
+
+  // 1. Check for Authorization header and Bearer token format
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      // 2. Extract token from "Bearer <token>"
+      token = req.headers.authorization.split(' ')[1];
+      console.log('>>> Protect Middleware: Token found.');
+
+      // 3. Verify the token using your secret key
+      const decoded = jwt.verify(token, JWT_SECRET);
+      console.log('>>> Protect Middleware: Token verified, payload:', decoded);
+
+      // 4. Use the ID from the token payload to find the shopper in the database.
+      //    The property name in 'decoded' (e.g., 'id') depends on how you created the token.
+      //    IMPORTANT: We exclude the password for security.
+      const loggedInShopper = await Shopper.findByPk(decoded.id, {
+        attributes: { exclude: ['password'] } // CHANGED: Exclude 'password' instead of 'pin'
+      });
+
+      // 5. Check if the shopper still exists
+      if (!loggedInShopper) {
+        // IMPROVEMENT: Fail fast. If user for a valid token doesn't exist, it's a clear authorization failure.
+        console.error('>>> Protect Middleware: Shopper not found for ID in token:', decoded.id);
+        return res.status(401).json({ message: 'Not authorized, user for this token no longer exists.' });
+      }
+
+      // 6. Attach the fetched shopper object to the request object as `req.user`
+      //    This matches the usage in your controllers (e.g., req.user.id).
+      req.user = loggedInShopper; // CHANGED: Using `req.user` for convention
+      console.log('>>> Protect Middleware: Shopper context attached to req.user.');
+
+      // 7. Proceed to the next middleware or controller
+      next();
+
+    } catch (error) {
+      // Handle errors during token verification (e.g., expired, invalid signature)
+      console.error('>>> Protect Middleware: Token verification failed!', error.message);
+      return res.status(401).json({ message: 'Not authorized, token failed or expired.' });
+    }
+  }
+
+  // If the header is missing or not in 'Bearer <token>' format
+  if (!token) {
+    console.log('>>> Protect Middleware: No valid Bearer token found in header.');
+    return res.status(401).json({ message: 'Not authorized, no token provided.' });
   }
 };
