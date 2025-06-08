@@ -14,6 +14,8 @@ import chatRoutes from './routes/chatRoutes.js';
 import telalakiRoutes from'./routes/telalakiRoutes.js';
 import assignOrderRoutes from './routes/assignOrderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import ShopperProduct from './models/shopperProduct.js';
+import shopperProductRoutes from './routes/shopperProductRoutes.js';
 import uomRoutes from './routes/uomRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
 import deliveryBoyRoutes from './routes/deliveryBoyRoutes.js';
@@ -101,7 +103,8 @@ app.use('/api/assign',assignOrderRoutes);
 app.use('/api/telalaki', telalakiRoutes);
 app.use('/api/sellerproduct', sellerProductRoutes);
 
-
+app.use('/api/shoppers', shopperRoutes);
+app.use('/api/shoppers/product', shopperProductRoutes);
 // Handle 404 errors (Route not found)
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
@@ -182,6 +185,23 @@ AssignOrder.belongsTo(DeliveryBoy, {
   as: 'deliveryBoy',
 });
 
+// A Shopper can have many Products.
+Shopper.hasMany(ShopperProduct, {
+  foreignKey: {
+    name: 'shopper_id',
+    allowNull: false
+  },
+  as: 'products' // An alias for querying
+});
+
+// A Product belongs to one Shopper (the seller).
+ShopperProduct.belongsTo(Shopper, {
+  foreignKey: {
+    name: 'shopper_id',
+    allowNull: false
+  },
+  as: 'seller' // An alias for querying
+});
 
 // Start the server
 startServer();
