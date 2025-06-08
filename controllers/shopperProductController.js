@@ -134,7 +134,42 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to update product', error: error.message });
   }
 };
+export const getMyShopProductById = async (req, res) => {
+  // Authentication: Ensure a shopper is logged in
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Authentication required. Please log in.' });
+  }
 
+  try {
+    const { id } = req.params;
+    const sellerId = req.user.id;
+
+    // Use findOne to match both the product ID and the owner's ID
+    const product = await ShopperProduct.findOne({
+      where: {
+        id: id,
+        shopper_id: sellerId
+      },
+      include: { // It's still good to include the seller info for consistency
+        model: Shopper,
+        as: 'seller',
+        attributes: ['id', 'full_name']
+      }
+    });
+
+    // If no product is found, it's either the wrong ID or doesn't belong to them.
+    // In either case, it's "Not Found" from their perspective.
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found or you do not have permission to view it.' });
+    }
+
+    res.status(200).json(product);
+
+  } catch (error) {
+    console.error('Error fetching single product for shopper:', error);
+    res.status(500).json({ message: 'Failed to fetch your product.', error: error.message });
+  }
+};
 export const deleteProduct = async (req, res) => {
     if (!req.user || !req.user.id) {
         return res.status(401).json({ message: 'Authentication required.' });
