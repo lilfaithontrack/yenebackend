@@ -11,7 +11,7 @@ import {
     getMyShopProductById,
     upload // multer middleware
 } from '../controllers/shopperProductController.js';
-import { protect } from '../middleware/authMiddleware.js'; // Import protect middleware
+import { protect } from '../middlewares/authMiddleware.js'; // Import protect middleware
 
 const router = express.Router();
 
