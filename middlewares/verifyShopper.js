@@ -1,6 +1,6 @@
 // middleware/verifyShopper.js
 import jwt from 'jsonwebtoken';
-import { Shopper } from '../models/index.js';
+import Shopper from '../models/Shopper.js';
 
 export const verifyShopper = async (req, res, next) => {
   try {
