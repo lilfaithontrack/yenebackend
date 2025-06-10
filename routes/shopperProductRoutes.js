@@ -10,8 +10,7 @@ import {
     getMyShopPendingProducts,
     getMyShopProductById,
     upload // multer middleware
-} from '../controllers/shopperProductController.js';
-import { protect } from '../middlewares/authMiddleware.js'; // Import protect middleware
+} from '../controllers/shopperProductController.js'; // Import protect middleware
 
 const router = express.Router();
 
@@ -23,7 +22,7 @@ router.route('/')
 router.get('/my-shop/approved', getMyShopApprovedProducts);
 router.get('/my-shop/pending', getMyShopPendingProducts);
 router.get('/search/location', getProductsByLocation);
-router.get('/my-shop/:id', protect, getMyShopProductById);
+router.get('/my-shop/:id',  getMyShopProductById);
 
 // Single Product Routes (Get, Update, Delete by ID)
 router.route('/:id')
