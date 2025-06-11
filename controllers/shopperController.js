@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import Shopper from '../models/Shopper.js';
-import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 
 // Haversine formula to calculate distance between two points (lat/lng)
 const haversine = (lat1, lng1, lat2, lng2) => {
@@ -144,28 +144,27 @@ export const loginShopper = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    // Check if shopper exists by email
+    // Check if shopper exists
     const shopper = await Shopper.findOne({ where: { email } });
-
     if (!shopper) {
       return res.status(404).json({ message: 'Shopper not found.' });
     }
 
-    // Compare the entered password with the stored hashed password
+    // Compare password
     const isPasswordValid = await bcrypt.compare(password, shopper.password);
-
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid password.' });
     }
 
-    // If login is successful, create a JWT token
-    const { id, full_name, location_lat, location_lng } = shopper;
-    const token = jwt.sign({ id, email }, 'your_jwt_secret', { expiresIn: '1h' });  // Customize the expiry time
+    // Generate a new session token
+    const sessionToken = uuidv4();
+    await shopper.update({ session_token: sessionToken });
 
-    // Return the shopper details along with the token
+    // Return session token and shopper info
+    const { id, full_name, location_lat, location_lng } = shopper;
     res.status(200).json({
       message: 'Login successful.',
-      token,  // Include the token
+      token: sessionToken,
       shopper: { id, full_name, email, location_lat, location_lng },
     });
   } catch (error) {
@@ -173,7 +172,6 @@ export const loginShopper = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
-
 // Find nearby shoppers within a specified radius (e.g., 10 km)
 export const findNearbyShoppers = async (req, res) => {
   try {
