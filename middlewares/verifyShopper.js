@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
+import Shopper from '../models/Shopper.js';
 
-export const verifyShopper = (req, res, next) => {
+export const verifyShopper = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -10,11 +10,17 @@ export const verifyShopper = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, 'your_jwt_secret'); // Use same secret as in login
-    req.shopper = decoded; // Attach shopper info to request
+    // Find shopper with matching session token
+    const shopper = await Shopper.findOne({ where: { session_token: token } });
+
+    if (!shopper) {
+      return res.status(401).json({ message: 'Invalid or expired session token' });
+    }
+
+    req.shopper = shopper; // Attach full shopper object to request
     next();
   } catch (err) {
-    console.error('Token verification failed:', err.message);
-    return res.status(401).json({ message: 'Session expired. Please log in again.' });
+    console.error('Token verification error:', err.message);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
