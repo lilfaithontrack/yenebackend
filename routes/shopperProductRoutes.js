@@ -9,26 +9,25 @@ import {
     getMyShopApprovedProducts,
     getMyShopPendingProducts,
     getMyShopProductById,
-    upload // multer middleware
-} from '../controllers/shopperProductController.js'; // Import protect middleware
+    upload
+} from '../controllers/shopperProductController.js';
 import { verifyShopper } from '../middlewares/verifyShopper.js';
 
 const router = express.Router();
 
-// Main Product Routes
-router.route('/')
-    .get(getAllProducts)
-    .post(upload, createProduct);
-
-router.get('/my-shop/approved', verifyShopper, getMyShopApprovedProducts);
-router.get('/my-shop/pending',  verifyShopper, getMyShopPendingProducts);
+// Public Route
+router.get('/', getAllProducts);
 router.get('/search/location', getProductsByLocation);
-router.get('/my-shop/:id',  verifyShopper, getMyShopProductById);
 
-// Single Product Routes (Get, Update, Delete by ID)
-router.route('/:id')
-    .get(getProductById)
-    .put(upload, updateProduct)
-    .delete(deleteProduct);
+// Protected Routes for Shop Owner
+router.post('/', verifyShopper, upload, createProduct);
+router.put('/:id', verifyShopper, upload, updateProduct);
+router.delete('/:id', verifyShopper, deleteProduct);
+router.get('/my-shop/approved', verifyShopper, getMyShopApprovedProducts);
+router.get('/my-shop/pending', verifyShopper, getMyShopPendingProducts);
+router.get('/my-shop/:id', verifyShopper, getMyShopProductById);
+
+// Public Product Detail
+router.get('/:id', getProductById);
 
 export default router;
