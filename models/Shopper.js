@@ -27,6 +27,11 @@ const Shopper = sequelize.define(
       type: DataTypes.DOUBLE,
       allowNull: false,
     },
+  session_token: {
+  type: DataTypes.STRING,
+  allowNull: true,
+  unique: true,
+},
     location_lng: {
       type: DataTypes.DOUBLE,
       allowNull: false,
