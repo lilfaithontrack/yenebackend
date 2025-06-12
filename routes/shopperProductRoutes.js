@@ -20,7 +20,7 @@ router.get('/', getAllProducts);
 router.get('/search/location', getProductsByLocation);
 
 // Protected Routes for Shop Owner
-router.post('/', verifyShopper, upload, createProduct);
+router.post('/', upload, createProduct);
 router.put('/:id', verifyShopper, upload, updateProduct);
 router.delete('/:id', verifyShopper, deleteProduct);
 router.get('/my-shop/approved', verifyShopper, getMyShopApprovedProducts);
