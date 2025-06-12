@@ -39,9 +39,6 @@ export const upload = multer({
 // --- CORE CRUD FUNCTIONS (CREATE, UPDATE, DELETE) ---
 
 export const createProduct = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Authentication required. Please log in.' });
-  }
   try {
     const {
       title, price, description, brand, catItems, subcat, productfor, stock,
