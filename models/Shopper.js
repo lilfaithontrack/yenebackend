@@ -27,11 +27,6 @@ const Shopper = sequelize.define(
       type: DataTypes.DOUBLE,
       allowNull: false,
     },
-  session_token: {
-  type: DataTypes.STRING,
-  allowNull: true,
-  unique: true,
-},
     location_lng: {
       type: DataTypes.DOUBLE,
       allowNull: false,
@@ -41,8 +36,8 @@ const Shopper = sequelize.define(
     sequelize,
     modelName: 'Shopper',
     tableName: 'shoppers',
-    timestamps: true, // Automatically adds createdAt and updatedAt
-    underscored: true, // Creates columns as created_at, updated_at
+    timestamps: true,
+    underscored: true,
   }
 );
 
