@@ -1,10 +1,14 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import Shopper from '../models/Shopper.js';
-import { v4 as uuidv4 } from 'uuid';
 
-// Haversine formula to calculate distance between two points (lat/lng)
+// JWT secret and options
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const JWT_EXPIRES_IN = '7d'; // adjust as needed
+
+// Haversine formula
 const haversine = (lat1, lng1, lat2, lng2) => {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLng = (lng2 - lng1) * (Math.PI / 180);
   const a =
@@ -13,30 +17,23 @@ const haversine = (lat1, lng1, lat2, lng2) => {
       Math.cos(lat2 * (Math.PI / 180)) *
       Math.sin(dLng / 2) * Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // Distance in km
-  return distance;
+  return R * c;
 };
 
-// Create a new shopper
+// Create shopper
 export const createShopper = async (req, res) => {
   try {
     const { full_name, email, location_lat, location_lng, password } = req.body;
 
-    // Validate input
     if (!full_name || !email || !location_lat || !location_lng || !password) {
       return res.status(400).json({ message: 'All fields are required.' });
     }
 
-    // Check if email already exists
-    const existingShopper = await Shopper.findOne({ where: { email } });
-    if (existingShopper) {
-      return res.status(400).json({ message: 'Email already in use.' });
-    }
+    const existing = await Shopper.findOne({ where: { email } });
+    if (existing) return res.status(400).json({ message: 'Email already in use.' });
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create a new shopper
     const newShopper = await Shopper.create({
       full_name,
       email,
@@ -47,10 +44,47 @@ export const createShopper = async (req, res) => {
 
     res.status(201).json({
       message: 'Shopper created successfully.',
-      shopper: { id: newShopper.id, full_name, email, location_lat, location_lng },
+      shopper: {
+        id: newShopper.id,
+        full_name,
+        email,
+        location_lat,
+        location_lng,
+      },
     });
   } catch (error) {
     console.error('Error creating shopper:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+// Shopper Login (using JWT)
+export const loginShopper = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) return res.status(400).json({ message: 'Email and password are required.' });
+
+    const shopper = await Shopper.findOne({ where: { email } });
+    if (!shopper) return res.status(404).json({ message: 'Shopper not found.' });
+
+    const isValid = await bcrypt.compare(password, shopper.password);
+    if (!isValid) return res.status(401).json({ message: 'Invalid password.' });
+
+    const token = jwt.sign(
+      { id: shopper.id, role: 'shopper' },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    const { id, full_name, location_lat, location_lng } = shopper;
+    res.status(200).json({
+      message: 'Login successful.',
+      token,
+      shopper: { id, full_name, email, location_lat, location_lng },
+    });
+  } catch (error) {
+    console.error('Error logging in shopper:', error);
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
@@ -66,16 +100,12 @@ export const getAllShoppers = async (req, res) => {
   }
 };
 
-// Get a single shopper by ID
+// Get by ID
 export const getShopperById = async (req, res) => {
   try {
     const { id } = req.params;
     const shopper = await Shopper.findByPk(id);
-
-    if (!shopper) {
-      return res.status(404).json({ message: 'Shopper not found.' });
-    }
-
+    if (!shopper) return res.status(404).json({ message: 'Shopper not found.' });
     res.status(200).json({ shopper });
   } catch (error) {
     console.error('Error fetching shopper:', error);
@@ -83,24 +113,17 @@ export const getShopperById = async (req, res) => {
   }
 };
 
-// Update a shopper
+// Update
 export const updateShopper = async (req, res) => {
   try {
     const { id } = req.params;
     const { full_name, email, location_lat, location_lng, password } = req.body;
 
     const shopper = await Shopper.findByPk(id);
-    if (!shopper) {
-      return res.status(404).json({ message: 'Shopper not found.' });
-    }
+    if (!shopper) return res.status(404).json({ message: 'Shopper not found.' });
 
-    // Hash the new password if provided
-    let hashedPassword = shopper.password;
-    if (password) {
-      hashedPassword = await bcrypt.hash(password, 10);
-    }
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : shopper.password;
 
-    // Update fields
     await shopper.update({
       full_name: full_name || shopper.full_name,
       email: email || shopper.email,
@@ -116,15 +139,12 @@ export const updateShopper = async (req, res) => {
   }
 };
 
-// Delete a shopper
+// Delete
 export const deleteShopper = async (req, res) => {
   try {
     const { id } = req.params;
-
     const shopper = await Shopper.findByPk(id);
-    if (!shopper) {
-      return res.status(404).json({ message: 'Shopper not found.' });
-    }
+    if (!shopper) return res.status(404).json({ message: 'Shopper not found.' });
 
     await shopper.destroy();
     res.status(200).json({ message: 'Shopper deleted successfully.' });
@@ -134,54 +154,15 @@ export const deleteShopper = async (req, res) => {
   }
 };
 
-// Shopper Login function
-export const loginShopper = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required.' });
-    }
-
-    // Check if shopper exists
-    const shopper = await Shopper.findOne({ where: { email } });
-    if (!shopper) {
-      return res.status(404).json({ message: 'Shopper not found.' });
-    }
-
-    // Compare password
-    const isPasswordValid = await bcrypt.compare(password, shopper.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid password.' });
-    }
-
-    // Generate a new session token
-    const sessionToken = uuidv4();
-    await shopper.update({ session_token: sessionToken });
-
-    // Return session token and shopper info
-    const { id, full_name, location_lat, location_lng } = shopper;
-    res.status(200).json({
-      message: 'Login successful.',
-      token: sessionToken,
-      shopper: { id, full_name, email, location_lat, location_lng },
-    });
-  } catch (error) {
-    console.error('Error logging in shopper:', error);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-};
-// Find nearby shoppers within a specified radius (e.g., 10 km)
+// Find nearby shoppers
 export const findNearbyShoppers = async (req, res) => {
   try {
-    const { latitude, longitude, radius = 10 } = req.query; // default radius is 10 km
+    const { latitude, longitude, radius = 10 } = req.query;
 
     if (!latitude || !longitude) {
       return res.status(400).json({ message: 'Latitude and longitude are required.' });
     }
 
-    // Find all shoppers and calculate the distance from the given coordinates
     const shoppers = await Shopper.findAll();
 
     const nearbyShoppers = shoppers.filter(shopper => {
