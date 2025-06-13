@@ -276,14 +276,10 @@ export const getProductsByLocation = async (req, res) => {
 // --- SHOPPER-SPECIFIC "READ" FUNCTIONS ---
 
 export const getMyShopApprovedProducts = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Authentication required. Please log in.' });
-  }
   try {
-    const sellerId = req.user.id;
     const products = await ShopperProduct.findAll({
       where: {
-        shopper_id: sellerId,
+        shopper_id: req.user.id,
         status: 'approved'
       },
       order: [['updated_at', 'DESC']]
@@ -296,14 +292,10 @@ export const getMyShopApprovedProducts = async (req, res) => {
 };
 
 export const getMyShopPendingProducts = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Authentication required. Please log in.' });
-  }
   try {
-    const sellerId = req.user.id;
     const products = await ShopperProduct.findAll({
       where: {
-        shopper_id: sellerId,
+        shopper_id: req.user.id,
         status: 'pending'
       },
       order: [['created_at', 'DESC']]
@@ -314,6 +306,7 @@ export const getMyShopPendingProducts = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch your pending products.', error: error.message });
   }
 };
+
 
 
 // --- HELPER FUNCTIONS ---
