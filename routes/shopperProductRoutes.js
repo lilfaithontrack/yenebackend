@@ -8,7 +8,7 @@ import {
     getProductsByLocation,
     getMyShopApprovedProducts,
     getMyShopPendingProducts,
-    getAllMyProduct,
+    getAllMyProducts,
     getMyShopProductById,
     upload
 } from '../controllers/shopperProductController.js';
