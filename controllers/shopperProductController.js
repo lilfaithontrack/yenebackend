@@ -334,3 +334,23 @@ async function deleteUploadedImages(imagePaths) {
   });
   await Promise.all(deletePromises);
 }
+export const getAllMyProducts = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Authentication required.' });
+  }
+
+  try {
+    const products = await ShopperProduct.findAll({
+      where: {
+        shopper_id: req.user.id
+      },
+      order: [['updated_at', 'DESC']]
+    });
+
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching all products for shopper:', error);
+    res.status(500).json({ message: 'Failed to fetch your products.', error: error.message });
+  }
+};
+
