@@ -8,6 +8,7 @@ import {
     getProductsByLocation,
     getMyShopApprovedProducts,
     getMyShopPendingProducts,
+    getAllMyProduct,
     getMyShopProductById,
     upload
 } from '../controllers/shopperProductController.js';
@@ -26,6 +27,8 @@ router.delete('/:id', verifyShopper, deleteProduct);
 router.get('/my-shop/approved', verifyShopper, getMyShopApprovedProducts);
 router.get('/my-shop/pending', verifyShopper, getMyShopPendingProducts);
 router.get('/my-shop/:id', verifyShopper, getMyShopProductById);
+router.get('/my-products', verifyShopper, getAllMyProducts);
+
 
 // Public Product Detail
 router.get('/:id', getProductById);
