@@ -4,7 +4,7 @@ import Shopper from '../models/Shopper.js';
 
 // JWT secret and options
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
-const JWT_EXPIRES_IN = '7d'; // adjust as needed
+const JWT_EXPIRES_IN = '1y'; // adjust as needed
 
 // Haversine formula
 const haversine = (lat1, lng1, lat2, lng2) => {
