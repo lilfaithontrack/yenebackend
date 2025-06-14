@@ -91,11 +91,11 @@ const updatePaymentStatus = async (req, res) => {
     await payment.save();
 
     // 💰 If approved for the first time and referral code exists
-    if (payment_status === 'Approved' && previousStatus !== 'Approved') {
+    if (payment_status === 'Completed' && previousStatus !== 'Completed') {
       if (payment.referral_code) {
         const referrer = await User.findOne({ where: { referral_code: payment.referral_code } });
         if (referrer) {
-          referrer.wallet = (referrer.wallet || 0) + 5; // 5 ETB added
+          referrer.wallet_balance = (referrer.wallet_balance || 0) + 5; // 5 ETB added
           await referrer.save();
           console.log(`Referrer ${referrer.id} rewarded with 5 ETB.`);
         }
