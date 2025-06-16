@@ -61,7 +61,7 @@ const app = express();
 app.use(express.json()); // Parse JSON
 app.use(compression());
 app.use(cors({
-  origin: ['http://localhost:3000','https://shop.piazdelivery.com','http://localhost:5173','https://mobapp.piazdelivery.com','https://piazdelivery.com','https://mobadmin.piazdelivery.com','https://deliveryapp.piazdelivery.com','https://shopper.piazdelivery.com'], // Update to match your frontend URLs
+  origin: ['http://localhost:3000','https://test.piazdelivery.com','https://shop.piazdelivery.com','http://localhost:5173','https://mobapp.piazdelivery.com','https://piazdelivery.com','https://mobadmin.piazdelivery.com','https://deliveryapp.piazdelivery.com','https://shopper.piazdelivery.com'], // Update to match your frontend URLs
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   credentials: true,
 }));
