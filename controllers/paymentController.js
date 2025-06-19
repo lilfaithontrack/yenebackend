@@ -95,7 +95,8 @@ const updatePaymentStatus = async (req, res) => {
       if (payment.referral_code) {
         const referrer = await User.findOne({ where: { referral_code: payment.referral_code } });
         if (referrer) {
-          referrer.wallet_balance = (referrer.wallet_balance || 0) + 5; // 5 ETB added
+         referrer.wallet_balance = (parseFloat(referrer.wallet_balance) || 0) + 5;
+// 5 ETB added
           await referrer.save();
           console.log(`Referrer ${referrer.id} rewarded with 5 ETB.`);
         }
