@@ -9,7 +9,7 @@ import crypto from 'crypto';
 // Register a new user with hashed password
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, phone, password, status, agent, referral_code,referred_by} = req.body;
+    const { name, email, phone, password, status, agent, referral_code, referred_by} = req.body;
     const normalizedEmail = email.toLowerCase();
 
     const existingUser = await User.findOne({ where: { email: normalizedEmail } });
