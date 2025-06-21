@@ -58,6 +58,12 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  is_company: {
+  type: DataTypes.BOOLEAN,
+  allowNull: false,
+  defaultValue: false,
+},
+
   wallet_balance: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0.00,
