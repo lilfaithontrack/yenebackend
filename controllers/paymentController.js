@@ -90,15 +90,26 @@ const updatePaymentStatus = async (req, res) => {
     payment.payment_status = payment_status;
     await payment.save();
 
-    // 💰 If approved for the first time and referral code exists
+    // 💰 Handle referral bonus on completed status
     if (payment_status === 'Completed' && previousStatus !== 'Completed') {
       if (payment.referral_code) {
         const referrer = await User.findOne({ where: { referral_code: payment.referral_code } });
         if (referrer) {
-         referrer.wallet_balance = (parseFloat(referrer.wallet_balance) || 0) + 5;
-// 5 ETB added
+          const bonusAmount = referrer.is_company ? 10 : 5;
+
+          referrer.wallet_balance = (parseFloat(referrer.wallet_balance) || 0) + bonusAmount;
           await referrer.save();
-          console.log(`Referrer ${referrer.id} rewarded with 5 ETB.`);
+          console.log(`Referrer ${referrer.id} rewarded with ${bonusAmount} ETB.`);
+
+          // 🎯 2nd Gen Agent Reward
+          if (referrer.referred_by) {
+            const secondLevelReferrer = await User.findByPk(referrer.referred_by);
+            if (secondLevelReferrer && secondLevelReferrer.agent) {
+              secondLevelReferrer.wallet_balance = (parseFloat(secondLevelReferrer.wallet_balance) || 0) + 5;
+              await secondLevelReferrer.save();
+              console.log(`2nd level referrer (agent) ${secondLevelReferrer.id} rewarded with 5 ETB.`);
+            }
+          }
         }
       }
     }
@@ -109,6 +120,7 @@ const updatePaymentStatus = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
+
 // Assign order to shopper/delivery & generate QR code
 const sendOrderToShopperAndDelivery = async (req, res) => {
   const { payment_id } = req.params;
