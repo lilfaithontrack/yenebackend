@@ -43,12 +43,15 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
   referred_by: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users', // this must match the actual table name in MySQL
+        key: 'id',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL',
+    
   },
   bank_name: {
     type: DataTypes.STRING,
