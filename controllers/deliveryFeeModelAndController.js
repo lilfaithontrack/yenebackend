@@ -9,42 +9,50 @@ const DeliveryFeeSetting = sequelize.define('DeliveryFeeSetting', {
   startup_fee: {
     type: DataTypes.FLOAT,
     allowNull: false,
-    defaultValue: 50,
+    defaultValue: 150,
   },
   per_quantity_fee: {
     type: DataTypes.FLOAT,
     allowNull: false,
     defaultValue: 5,
   },
-  per_kg_fee: {
-    type: DataTypes.FLOAT,
-    allowNull: false,
-    defaultValue: 10,
-  },
   per_km_fee: {
     type: DataTypes.FLOAT,
     allowNull: false,
     defaultValue: 15,
+  },
+  weight_threshold: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 100, // kg
+  },
+  weight_percentage_increase: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 10, // means +10% on per_km_fee
+  },
+  pickup_lat: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 9.0306, // Default: Figa, Addis Ababa
+  },
+  pickup_lng: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 38.7613,
   },
 }, {
   tableName: 'DeliveryFeeSettings',
   timestamps: true,
 });
 
-// Seed default config if not exists
+// Seed default config
 await DeliveryFeeSetting.findOrCreate({
   where: { id: 1 },
-  defaults: {
-    startup_fee: 50,
-    per_quantity_fee: 5,
-    per_kg_fee: 10,
-    per_km_fee: 15,
-  },
+  defaults: {}
 });
 
 // ---------- 2. HELPERS ----------
-const FIGA_LOCATION = { lat: 9.0306, lng: 38.7613 };
-
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   const toRad = deg => (deg * Math.PI) / 180;
   const R = 6371;
@@ -57,7 +65,7 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// ---------- 3. CONTROLLER: GET FEE ----------
+// ---------- 3. CONTROLLER: CALCULATE FEE ----------
 router.post('/calculate-fee', async (req, res) => {
   try {
     const { quantity, weight_kg, dropoff_lat, dropoff_lng } = req.body;
@@ -69,17 +77,31 @@ router.post('/calculate-fee', async (req, res) => {
     const config = await DeliveryFeeSetting.findByPk(1);
     if (!config) return res.status(500).json({ error: 'Fee config not found' });
 
-    const distanceKm = calculateDistanceKm(FIGA_LOCATION.lat, FIGA_LOCATION.lng, dropoff_lat, dropoff_lng);
+    const distanceKm = calculateDistanceKm(
+      config.pickup_lat,
+      config.pickup_lng,
+      dropoff_lat,
+      dropoff_lng
+    );
+
+    let effectivePerKmFee = config.per_km_fee;
+
+    if (weight_kg > config.weight_threshold) {
+      const increase = (config.weight_percentage_increase / 100) * config.per_km_fee;
+      effectivePerKmFee += increase;
+    }
 
     const fee =
       config.startup_fee +
       quantity * config.per_quantity_fee +
-      weight_kg * config.per_kg_fee +
-      distanceKm * config.per_km_fee;
+      distanceKm * effectivePerKmFee;
 
     res.json({
       delivery_fee: parseFloat(fee.toFixed(2)),
       distance_km: parseFloat(distanceKm.toFixed(2)),
+      weight_kg,
+      quantity,
+      effective_per_km_fee: effectivePerKmFee,
       config_used: config,
     });
 
@@ -89,13 +111,29 @@ router.post('/calculate-fee', async (req, res) => {
   }
 });
 
-// ---------- 4. CONTROLLER: UPDATE FEE CONFIG ----------
+// ---------- 4. CONTROLLER: UPDATE CONFIG ----------
 router.put('/update-fee-config', async (req, res) => {
   try {
-    const { startup_fee, per_quantity_fee, per_kg_fee, per_km_fee } = req.body;
+    const {
+      startup_fee,
+      per_quantity_fee,
+      per_km_fee,
+      weight_threshold,
+      weight_percentage_increase,
+      pickup_lat,
+      pickup_lng,
+    } = req.body;
 
     const updated = await DeliveryFeeSetting.update(
-      { startup_fee, per_quantity_fee, per_kg_fee, per_km_fee },
+      {
+        startup_fee,
+        per_quantity_fee,
+        per_km_fee,
+        weight_threshold,
+        weight_percentage_increase,
+        pickup_lat,
+        pickup_lng,
+      },
       { where: { id: 1 } }
     );
 
