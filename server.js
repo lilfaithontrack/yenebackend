@@ -96,7 +96,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/uoms', uomRoutes);
 app.use('/api/withdraw', withdrawRoutes);
 app.use('/api/cart', cartRoutes);
-app.use('/api', deliveryFeeRoutes);
+app.use('/api/deliveryFee', deliveryFeeRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
