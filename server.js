@@ -37,6 +37,7 @@ import SubCat from './models/Subcat.js';
 import AddProduct from './models/AddProduct.js';
 import notificationRoutes from './routes/notificationRoutes.js'; 
 import addProductRoutes from './routes/addProductRoutes.js';
+ import deliveryFeeRoutes from './routes/deliveryFeeRoutes.js';
 import subcatRoutes from './routes/subCatRoutes.js';
 // Import models (for potential associations)
 import Category from './models/Category.js';
@@ -95,6 +96,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/uoms', uomRoutes);
 app.use('/api/withdraw', withdrawRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api', deliveryFeeRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
