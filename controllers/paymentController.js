@@ -225,7 +225,7 @@ const getAllOrders = async (req, res) => {
 // sending order  to  delivery routes 
 const MAX_RADIUS_KM = 5;
 
-const assignOrderToNearbyDeliveries = async (req, res) => {
+export const assignOrderToNearbyDeliveries = async (req, res) => {
   const { payment_id } = req.params;
   const { shopper_id, location } = req.body; // location: { lat, lng }
 
@@ -289,7 +289,7 @@ const assignOrderToNearbyDeliveries = async (req, res) => {
   }
 };
 // accepting the orders  from the  route 
-const acceptDeliveryOrder = async (req, res) => {
+export const acceptDeliveryOrder = async (req, res) => {
   const { payment_id } = req.params;
   const delivery_id = req.body.delivery_id;
 
