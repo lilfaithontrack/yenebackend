@@ -8,7 +8,7 @@ import {
   getAllOrders ,
   getPaymentOrderById ,
   assignOrderToNearbyDeliveries,
-  acceptDeliveryOrder,
+  acceptDeliveryOrder
 } from '../controllers/paymentController.js';
 
 
