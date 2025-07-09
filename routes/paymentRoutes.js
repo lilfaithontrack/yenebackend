@@ -4,9 +4,11 @@ import {
   updatePaymentStatus, 
   sendOrderToShopperAndDelivery, 
   getOrderHistory, 
-    getOrdersByReferralCode,
+  getOrdersByReferralCode,
   getAllOrders ,
-  getPaymentOrderById 
+  getPaymentOrderById ,
+  assignOrderToNearbyDeliveries,
+  acceptDeliveryOrder,
 } from '../controllers/paymentController.js';
 
 
@@ -30,6 +32,11 @@ router.get(
 router.get('/orders', getAllOrders);
 //route to fetch the payment order based on the id 
 router.get('/orders/:payment_id', getPaymentOrderById);
+router.post('/assign-nearby/:payment_id', assignOrderToNearbyDeliveries);
+
+// 2. Delivery user accepts the order
+router.post('/accept/:payment_id', acceptDeliveryOrder);
+
 
 // Route to send order to shopper and delivery (approve and assign)
 router.put('/:payment_id/send-order', sendOrderToShopperAndDelivery);
