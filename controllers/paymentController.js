@@ -2,6 +2,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import Joi from 'joi';
+import geolib from 'geolib';
 import QRCode from 'qrcode';
 import Payment from '../models/Payment.js';
 import User from '../models/User.js';
@@ -223,69 +224,87 @@ const getAllOrders = async (req, res) => {
 // (Make sure to import your Payment model)
 
 // sending order  to  delivery routes 
+
+
 const MAX_RADIUS_KM = 5;
 
 export const assignOrderToNearbyDeliveries = async (req, res) => {
   const { payment_id } = req.params;
-  const { shopper_id, location } = req.body; // location: { lat, lng }
+  let { shopper_ids, location } = req.body;
 
-  if (!shopper_id || !location) {
-    return res.status(400).json({ message: 'Shopper ID and location are required.' });
+  // Backward compatibility for single shopper_id
+  if (!shopper_ids && req.body.shopper_id) shopper_ids = [req.body.shopper_id];
+
+  if (!Array.isArray(shopper_ids) || shopper_ids.length === 0 || !location) {
+    console.error('[assignOrderToNearbyDeliveries] Missing shopper_ids or location', { shopper_ids, location });
+    return res.status(400).json({ message: 'shopper_ids (array) and location are required.' });
   }
 
   try {
     const payment = await Payment.findByPk(payment_id);
-    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (!payment) {
+      console.error(`[assignOrderToNearbyDeliveries] Payment not found: ${payment_id}`);
+      return res.status(404).json({ message: 'Payment not found.' });
+    }
 
     if (payment.payment_status !== 'Approved') {
+      console.warn(`[assignOrderToNearbyDeliveries] Payment not approved. Current status: ${payment.payment_status}`);
       return res.status(400).json({ message: 'Order must be approved before assigning.' });
     }
 
-    // Find available delivery within radius
+    // Find available deliveries within radius
     const allDeliveries = await Delivery.findAll({
-      where: { is_available: true } // Ensure this field exists
+      where: { is_available: true }
     });
 
     const nearbyDeliveries = allDeliveries.filter(del => {
       if (!del.latitude || !del.longitude) return false;
-
       const distance = geolib.getDistance(
         { latitude: location.lat, longitude: location.lng },
         { latitude: del.latitude, longitude: del.longitude }
       );
-
       return distance <= MAX_RADIUS_KM * 1000;
     });
 
     if (nearbyDeliveries.length === 0) {
+      console.info(`[assignOrderToNearbyDeliveries] No nearby delivery found for location:`, location);
       return res.status(404).json({ message: 'No nearby delivery found.' });
     }
 
-    // Mark order as pending for confirmation
+    // Generate one QR code for the order (or you can loop for each shopper if needed)
     const qrData = JSON.stringify({
       payment_id: payment.id,
       customer_name: payment.customer_name,
       total_price: payment.total_price,
+      shopper_ids,
     });
     const qrCode = await QRCode.toDataURL(qrData);
 
-    payment.shopper_id = shopper_id;
+    // Assign order to all shoppers (requires Payment model to accept JSON/array field)
+    payment.shopper_ids = shopper_ids; // Make sure your Payment model supports this
     payment.qr_code = qrCode;
     payment.payment_status = 'Pending Delivery Confirmation';
     await payment.save();
 
-    // Here you’d push notification or store pending request for all delivery in radius
-    // For example: save to Redis, send push, or emit socket event
-    // Emit: "new-order" with { payment_id, location, price } to all nearbyDeliveries
+    // Log assignment
+    console.log(`[assignOrderToNearbyDeliveries] Order ${payment_id} assigned to shoppers:`, shopper_ids);
+    console.log(`[assignOrderToNearbyDeliveries] Nearby deliveries:`, nearbyDeliveries.map(d => d.id));
 
     return res.status(200).json({
       message: 'Order sent to nearby deliveries. Awaiting confirmation.',
       payment,
+      shopper_ids,
       nearby_deliveries: nearbyDeliveries.map(d => ({ id: d.id, name: d.name }))
     });
   } catch (error) {
-    console.error('Error assigning order:', error);
-    res.status(500).json({ message: 'Internal server error.' });
+    console.error('[assignOrderToNearbyDeliveries] Error:', {
+      error: error.message,
+      stack: error.stack,
+      payment_id,
+      shopper_ids,
+      location
+    });
+    return res.status(500).json({ message: 'Internal server error.' });
   }
 };
 // accepting the orders  from the  route 
