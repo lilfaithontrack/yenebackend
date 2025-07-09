@@ -222,6 +222,103 @@ const getAllOrders = async (req, res) => {
 // In ../controllers/paymentController.js
 // (Make sure to import your Payment model)
 
+// sending order  to  delivery routes 
+const MAX_RADIUS_KM = 5;
+
+const assignOrderToNearbyDeliveries = async (req, res) => {
+  const { payment_id } = req.params;
+  const { shopper_id, location } = req.body; // location: { lat, lng }
+
+  if (!shopper_id || !location) {
+    return res.status(400).json({ message: 'Shopper ID and location are required.' });
+  }
+
+  try {
+    const payment = await Payment.findByPk(payment_id);
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+
+    if (payment.payment_status !== 'Approved') {
+      return res.status(400).json({ message: 'Order must be approved before assigning.' });
+    }
+
+    // Find available delivery within radius
+    const allDeliveries = await Delivery.findAll({
+      where: { is_available: true } // Ensure this field exists
+    });
+
+    const nearbyDeliveries = allDeliveries.filter(del => {
+      if (!del.latitude || !del.longitude) return false;
+
+      const distance = geolib.getDistance(
+        { latitude: location.lat, longitude: location.lng },
+        { latitude: del.latitude, longitude: del.longitude }
+      );
+
+      return distance <= MAX_RADIUS_KM * 1000;
+    });
+
+    if (nearbyDeliveries.length === 0) {
+      return res.status(404).json({ message: 'No nearby delivery found.' });
+    }
+
+    // Mark order as pending for confirmation
+    const qrData = JSON.stringify({
+      payment_id: payment.id,
+      customer_name: payment.customer_name,
+      total_price: payment.total_price,
+    });
+    const qrCode = await QRCode.toDataURL(qrData);
+
+    payment.shopper_id = shopper_id;
+    payment.qr_code = qrCode;
+    payment.payment_status = 'Pending Delivery Confirmation';
+    await payment.save();
+
+    // Here you’d push notification or store pending request for all delivery in radius
+    // For example: save to Redis, send push, or emit socket event
+    // Emit: "new-order" with { payment_id, location, price } to all nearbyDeliveries
+
+    return res.status(200).json({
+      message: 'Order sent to nearby deliveries. Awaiting confirmation.',
+      payment,
+      nearby_deliveries: nearbyDeliveries.map(d => ({ id: d.id, name: d.name }))
+    });
+  } catch (error) {
+    console.error('Error assigning order:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+// accepting the orders  from the  route 
+const acceptDeliveryOrder = async (req, res) => {
+  const { payment_id } = req.params;
+  const delivery_id = req.body.delivery_id;
+
+  try {
+    const payment = await Payment.findByPk(payment_id);
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+
+    if (payment.payment_status !== 'Pending Delivery Confirmation') {
+      return res.status(400).json({ message: 'Order already taken or invalid status.' });
+    }
+
+    // Lock check (optional: use transaction or Redis lock to avoid race condition)
+    if (payment.delivery_id) {
+      return res.status(409).json({ message: 'Order already accepted by someone else.' });
+    }
+
+    payment.delivery_id = delivery_id;
+    payment.payment_status = 'Pending Delivery';
+    await payment.save();
+
+    // Notify others it was taken (optional)
+
+    return res.status(200).json({ message: 'Order accepted successfully.', payment });
+  } catch (error) {
+    console.error('Error accepting order:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
 export const getOrdersByReferralCode = async (req, res) => {
   // It's more secure if the referral code is derived from the authenticated user (req.user.referral_code)
   // rather than passed as a URL parameter that could be manipulated,
