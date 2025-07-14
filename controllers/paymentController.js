@@ -230,14 +230,14 @@ const MAX_RADIUS_KM = 5;
 
 export const assignOrderToNearbyDeliveries = async (req, res) => {
   const { payment_id } = req.params;
-  let { shopper_ids, location } = req.body;
+  let { delivery_ids, location } = req.body;
 
-  // Backward compatibility for single shopper_id
-  if (!shopper_ids && req.body.shopper_id) shopper_ids = [req.body.shopper_id];
+  // Backward compatibility for single delivery_id
+  if (!delivery_ids && req.body.delivery_id) delivery_ids = [req.body.delivery_id];
 
-  if (!Array.isArray(shopper_ids) || shopper_ids.length === 0 || !location) {
-    console.error('[assignOrderToNearbyDeliveries] Missing shopper_ids or location', { shopper_ids, location });
-    return res.status(400).json({ message: 'shopper_ids (array) and location are required.' });
+  if (!Array.isArray(delivery_ids) || delivery_ids.length === 0 || !location) {
+    console.error('[assignOrderToNearbyDeliveries] Missing delivery_ids or location', { delivery_ids, location });
+    return res.status(400).json({ message: 'delivery_ids (array) and location are required.' });
   }
 
   try {
@@ -252,10 +252,8 @@ export const assignOrderToNearbyDeliveries = async (req, res) => {
       return res.status(400).json({ message: 'Order must be approved before assigning.' });
     }
 
-    // Find available deliveries within radius
-    const allDeliveries = await Delivery.findAll({
-      where: { is_available: true }
-    });
+    // Find available delivery people within radius
+    const allDeliveries = await Delivery.findAll({ where: { is_available: true } });
 
     const nearbyDeliveries = allDeliveries.filter(del => {
       if (!del.latitude || !del.longitude) return false;
@@ -271,42 +269,42 @@ export const assignOrderToNearbyDeliveries = async (req, res) => {
       return res.status(404).json({ message: 'No nearby delivery found.' });
     }
 
-    // Generate one QR code for the order (or you can loop for each shopper if needed)
+    // Generate QR code for frontend (if needed)
     const qrData = JSON.stringify({
       payment_id: payment.id,
       customer_name: payment.customer_name,
       total_price: payment.total_price,
-      shopper_ids,
+      delivery_ids,
     });
-    const qrCode = await QRCode.toDataURL(qrData);
+    const qrCode = await QRCode.toDataURL(qrData); // Only return — don't store in DB
 
-    // Assign order to all shoppers (requires Payment model to accept JSON/array field)
-    payment.shopper_ids = shopper_ids; // Make sure your Payment model supports this
-    payment.qr_code = qrCode;
+    // Assign delivery IDs to payment (if you're storing them)
+    payment.delivery_ids = delivery_ids; // Make sure model supports this or skip
     payment.payment_status = 'Pending Delivery Confirmation';
     await payment.save();
 
-    // Log assignment
-    console.log(`[assignOrderToNearbyDeliveries] Order ${payment_id} assigned to shoppers:`, shopper_ids);
+    console.log(`[assignOrderToNearbyDeliveries] Order ${payment_id} assigned to deliveries:`, delivery_ids);
     console.log(`[assignOrderToNearbyDeliveries] Nearby deliveries:`, nearbyDeliveries.map(d => d.id));
 
     return res.status(200).json({
       message: 'Order sent to nearby deliveries. Awaiting confirmation.',
       payment,
-      shopper_ids,
-      nearby_deliveries: nearbyDeliveries.map(d => ({ id: d.id, name: d.name }))
+      delivery_ids,
+      qr_code: qrCode,
+      nearby_deliveries: nearbyDeliveries.map(d => ({ id: d.id, name: d.name })),
     });
   } catch (error) {
     console.error('[assignOrderToNearbyDeliveries] Error:', {
       error: error.message,
       stack: error.stack,
       payment_id,
-      shopper_ids,
+      delivery_ids,
       location
     });
     return res.status(500).json({ message: 'Internal server error.' });
   }
 };
+
 // accepting the orders  from the  route 
 export const acceptDeliveryOrder = async (req, res) => {
   const { payment_id } = req.params;
