@@ -1,6 +1,5 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db/dbConnect.js';
-// Import AssignOrder first
 
 const Payment = sequelize.define(
   'Payment',
@@ -54,11 +53,38 @@ const Payment = sequelize.define(
       allowNull: false,
     },
     referral_code: {
-    type: DataTypes.STRING,
-    allowNull: true,
-},
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     guest_id: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    // 🆕 Location fields
+    latitude: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    longitude: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    search_radius_km: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 5, // Match MAX_RADIUS_KM
+    },
+
+    // 🆕 Shopper IDs (assigned)
+    shopper_ids: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+
+    // 🆕 QR Code
+    qr_code: {
+      type: DataTypes.TEXT, // base64 data URLs can be long
       allowNull: true,
     },
   },
