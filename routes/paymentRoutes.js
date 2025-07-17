@@ -8,6 +8,7 @@ import {
   getAllOrders ,
   getPaymentOrderById ,
   assignOrderToNearbyDeliveries,
+  getAvailableOrders,
   acceptDeliveryOrder
 } from '../controllers/paymentController.js';
 
@@ -19,7 +20,8 @@ router.post('/create', createPayment);
 
 // Route to update payment status
 router.put('/update-status/:payment_id', updatePaymentStatus);
-
+//
+router.get('/available', getAvailableOrders);
 // Route to fetch order history by customer_email or guest_id
 router.get('/orders/history', getOrderHistory);
 router.get(
