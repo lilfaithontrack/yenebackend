@@ -186,6 +186,12 @@ AssignOrder.belongsTo(DeliveryBoy, {
   foreignKey: 'delivery_id', // Use 'delivery_id' instead of 'delivery_boy_id'
   as: 'deliveryBoy',
 });
+//define the payment and the shopper association 
+// In Payment model or association file
+Payment.belongsTo(Shopper, { foreignKey: 'shopper_id' });
+
+// And optionally in Shopper model
+Shopper.hasMany(Payment, { foreignKey: 'shopper_id' });
 
 // A Shopper can have many Products.
 Shopper.hasMany(ShopperProduct, {
