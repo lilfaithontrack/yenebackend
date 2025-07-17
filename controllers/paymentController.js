@@ -5,7 +5,7 @@ import Joi from 'joi';
 import geolib from 'geolib';
 import QRCode from 'qrcode';
 import Payment from '../models/Payment.js';
-import Shopper from '../models/Shoper.js'
+import Shopper from '../models/Shopper.js'
 import User from '../models/User.js';
 // Ensure the uploads directory exists
 const uploadDir = 'uploads/screenshots';
