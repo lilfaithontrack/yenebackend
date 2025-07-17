@@ -121,7 +121,25 @@ const updatePaymentStatus = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 };
+export const getAvailableOrders = async (req, res) => {
+  try {
+    const availableOrders = await Payment.findAll({
+      where: {
+        payment_status: 'Pending Delivery Confirmation',
+        delivery_id: null,
+      },
+      include: [
+        { model: Shopper, as: 'shopper', attributes: ['full_name', 'email'] }
+        // Add other associations if needed
+      ]
+    });
 
+    res.status(200).json({ data: availableOrders });
+  } catch (error) {
+    console.error('Error fetching available orders:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
 // Assign order to shopper/delivery & generate QR code
 const sendOrderToShopperAndDelivery = async (req, res) => {
   const { payment_id } = req.params;
