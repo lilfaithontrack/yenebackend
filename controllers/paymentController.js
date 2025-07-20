@@ -130,7 +130,7 @@ export const getAvailableOrders = async (req, res) => {
         delivery_id: null,
       },
       include: [
-        { model: Shopper, as: 'shopper', attributes: ['full_name', 'email'] }
+        { model: Shopper, as: 'Shopper', attributes: ['full_name', 'email'] }
         // Add other associations if needed
       ]
     });
