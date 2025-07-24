@@ -181,11 +181,23 @@ export const deleteProduct = async (req, res) => {
     if (product.shopper_id !== req.user.id) {
         return res.status(403).json({ message: 'Forbidden. You do not have permission to delete this product.' });
     }
+    
+    // --- FIX STARTS HERE ---
+    
+    // 1. Safely parse color_options if it's a string, otherwise use it as is.
+    const colorOptions = typeof product.color_options === 'string'
+      ? JSON.parse(product.color_options)
+      : product.color_options;
 
+    // 2. Build the list of images to delete using the parsed array.
     const imagesToDelete = [
       ...(product.image || []),
-      ...(product.color_options || []).flatMap(option => option.images || [])
+      // Ensure colorOptions is an array before calling flatMap
+      ...(Array.isArray(colorOptions) ? colorOptions.flatMap(option => option.images || []) : [])
     ];
+    
+    // --- FIX ENDS HERE ---
+
     if (imagesToDelete.length > 0) {
         await deleteUploadedImages(imagesToDelete);
     }
@@ -197,7 +209,6 @@ export const deleteProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete product.' });
   }
 };
-
 
 // --- PUBLIC "READ" FUNCTIONS ---
 
