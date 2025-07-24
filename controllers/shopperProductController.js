@@ -424,4 +424,32 @@ export const getAllMyProducts = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch your products.', error: error.message });
   }
 };
+export const getMyShopProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the product by ID and ensure it belongs to the authenticated user
+    const product = await ShopperProduct.findOne({
+      where: {
+        id,
+        shopper_id: req.user.id
+      },
+      include: {
+        model: Shopper,
+        as: 'seller',
+        attributes: ['id', 'full_name']
+      }
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found or access denied.' });
+    }
+
+    res.status(200).json(product);
+  } catch (error) {
+    console.error('Error fetching product by ID for current shopper:', error);
+    res.status(500).json({ message: 'Failed to fetch product.', error: error.message });
+  }
+};
+
 
