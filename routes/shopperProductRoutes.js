@@ -24,7 +24,7 @@ router.get('/search/location', getProductsByLocation);
 // Protected Routes for Shop Owner
 router.post('/', verifyShopper, upload, createProduct);
 router.get('/pendings', getAllPendingProducts);
-router.put('/:id', verifyShopper, upload, updateProduct);
+router.put('/:id', upload, updateProduct);
 router.delete('/:id', verifyShopper, deleteProduct);
 router.get('/my-shop/approved', verifyShopper, getMyShopApprovedProducts);
 router.get('/my-shop/pending', verifyShopper, getMyShopPendingProducts);
