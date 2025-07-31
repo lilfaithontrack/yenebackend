@@ -292,17 +292,17 @@ export const getAllProducts = async (req, res) => {
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ message: 'Failed to fetch products.' });
-   
+  }
 };
+
 export const getAllPendingProducts = async (req, res) => {
   try {
     const { subcat, mode } = req.query;
-
     const where = { status: 'pending' };
     if (subcat) where.subcat = subcat;
     if (mode) where.productfor = mode;
 
-    const products = await ShoppperProduct.findAll({ where });
+    const products = await ShopperProduct.findAll({ where });
     res.status(200).json(products);
   } catch (error) {
     console.error('Error fetching pending products:', error);
