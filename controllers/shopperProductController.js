@@ -91,11 +91,6 @@ export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // ✅ Check if authentication middleware attached req.user
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: 'Unauthorized: No user data found' });
-    }
-
     const {
       existingImages: existingImagesJSON,
       variations: variationsJSON,
@@ -107,11 +102,6 @@ export const updateProduct = async (req, res) => {
     const product = await ShopperProduct.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
-    }
-
-    // ✅ Permission check
-    if (product.shopper_id !== req.user.id) {
-      return res.status(403).json({ message: 'Forbidden: You do not own this product' });
     }
 
     // =====================
@@ -234,7 +224,6 @@ const deleteFile = async (filePath) => {
   const fullPath = `./public${filePath}`;
   await fs.unlink(fullPath);
 };
-
 export const deleteProduct = async (req, res) => {
     if (!req.user || !req.user.id) {
         return res.status(401).json({ message: 'Authentication required.' });
