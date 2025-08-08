@@ -306,6 +306,25 @@ export const getAllPendingProducts = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch pending products' });
   }
 };
+ export const getAllApprovedProducts = async (req, res) => {
+  try {
+    const { subcat, mode } = req.query;
+
+    // Base condition: only approved products
+    const where = { status: 'approved' };
+
+    // Optional filters
+    if (subcat) where.subcat = subcat;
+    if (mode) where.productfor = mode;
+
+    const products = await ShopperProduct.findAll({ where });
+
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching approved products:', error);
+    res.status(500).json({ message: 'Failed to fetch approved products' });
+  }
+};
 
 export const getProductById = async (req, res) => {
   try {
