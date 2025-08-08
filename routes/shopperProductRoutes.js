@@ -11,6 +11,7 @@ import {
     getMyShopApprovedProducts,
     getMyShopPendingProducts,
     getAllMyProducts,
+    getApprovedProductDetail,
     getMyShopProductById,
     upload
 } from '../controllers/shopperProductController.js';
@@ -32,6 +33,8 @@ router.get('/my-shop/pending', verifyShopper, getMyShopPendingProducts);
 router.get('/my-shop/:id', verifyShopper, getMyShopProductById);
 router.get('/my-products/:shopper_id', verifyShopper, getAllMyProducts);
 router.get('/approve', getAllApprovedProducts);
+router.get('/approve/:id', getApprovedProductDetail);
+
 
 
 
