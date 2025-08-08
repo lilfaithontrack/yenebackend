@@ -88,9 +88,14 @@ export const createProduct = async (req, res) => {
 };
 
 export const updateProduct = async (req, res) => {
-  
   try {
     const { id } = req.params;
+
+    // ✅ Check if authentication middleware attached req.user
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: 'Unauthorized: No user data found' });
+    }
+
     const {
       existingImages: existingImagesJSON,
       variations: variationsJSON,
@@ -98,132 +103,138 @@ export const updateProduct = async (req, res) => {
       ...updateData
     } = req.body;
 
+    // ✅ Find product by ID
     const product = await ShopperProduct.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    // ✅ Permission check
     if (product.shopper_id !== req.user.id) {
-      return res.status(403).json({ message: 'Forbidden. You do not have permission to update this product.' });
+      return res.status(403).json({ message: 'Forbidden: You do not own this product' });
     }
 
-    // Handle image updates
+    // =====================
+    // 📌 Handle Images
+    // =====================
     let finalImages = [];
-    
-    // Parse existing images that should be kept
+
+    // Keep existing images
     if (existingImagesJSON) {
       try {
         const existingImages = JSON.parse(existingImagesJSON);
         if (Array.isArray(existingImages)) {
           finalImages = [...existingImages];
         }
-      } catch (e) {
-        console.error('Error parsing existing images:', e);
+      } catch (err) {
+        console.error('Error parsing existing images:', err);
       }
     }
 
-    // Handle new uploaded images
-    if (req.files && req.files.images) {
+    // Add new uploaded images
+    if (req.files?.images) {
       const uploadedFiles = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
-      
       for (const file of uploadedFiles) {
         try {
-          // Assuming you have an upload function that handles file saving and returns the path
           const imagePath = await uploadFile(file);
           finalImages.push(imagePath);
-        } catch (e) {
-          console.error('Error uploading new image:', e);
+        } catch (err) {
+          console.error('Error uploading new image:', err);
         }
       }
     }
 
-    // Handle color option images
+    // =====================
+    // 📌 Handle Color Options
+    // =====================
     let colorOptions = [];
     if (updateData.color_options) {
       try {
         colorOptions = JSON.parse(updateData.color_options);
         const colorOptionsCount = parseInt(updateData.color_options_count || '0');
 
-        // Process new color images
         for (let i = 0; i < colorOptionsCount; i++) {
-          const colorImages = req.files[`color_images_${i}`];
+          const colorImages = req.files?.[`color_images_${i}`];
           if (colorImages) {
             const images = Array.isArray(colorImages) ? colorImages : [colorImages];
-            const uploadedPaths = await Promise.all(
-              images.map(async (image) => await uploadFile(image))
-            );
+            const uploadedPaths = await Promise.all(images.map(uploadFile));
             if (colorOptions[i]) {
               colorOptions[i].images = uploadedPaths;
             }
           }
         }
-      } catch (e) {
-        console.error('Error processing color options:', e);
+      } catch (err) {
+        console.error('Error processing color options:', err);
       }
     }
 
-    // Prepare update fields
+    // =====================
+    // 📌 Prepare Update Fields
+    // =====================
     const updateFields = {
       ...updateData,
       image: JSON.stringify(finalImages),
       color_options: JSON.stringify(colorOptions)
     };
 
-    // Handle variations
     if (variationsJSON) {
       updateFields.variations = variationsJSON;
     }
 
-    // Handle coordinates
     if (coordinatesJSON) {
-      const geoData = JSON.parse(coordinatesJSON);
-      if (geoData && geoData.lat && geoData.lng) {
-        updateFields.coordinates = { type: 'Point', coordinates: [geoData.lng, geoData.lat] };
+      try {
+        const geoData = JSON.parse(coordinatesJSON);
+        if (geoData?.lat && geoData?.lng) {
+          updateFields.coordinates = {
+            type: 'Point',
+            coordinates: [geoData.lng, geoData.lat]
+          };
+        }
+      } catch (err) {
+        console.error('Error parsing coordinates:', err);
       }
     }
 
-    // Update the product
+    // =====================
+    // 📌 Update Product
+    // =====================
     await product.update(updateFields);
-    
-    // Clean up old images that are no longer used
-    const oldImages = JSON.parse(product.image || '[]');
-    const imagesToDelete = oldImages.filter(oldImage => !finalImages.includes(oldImage));
-    for (const imageToDelete of imagesToDelete) {
-      try {
+
+    // Delete unused images from storage
+    try {
+      const oldImages = JSON.parse(product.image || '[]');
+      const imagesToDelete = oldImages.filter(oldImage => !finalImages.includes(oldImage));
+      for (const imageToDelete of imagesToDelete) {
         await deleteFile(imageToDelete);
-      } catch (e) {
-        console.error('Error deleting old image:', e);
       }
+    } catch (err) {
+      console.error('Error deleting old images:', err);
     }
 
     const updatedProduct = await ShopperProduct.findByPk(id);
-    res.status(200).json(updatedProduct);
+    return res.status(200).json(updatedProduct);
 
   } catch (error) {
     console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Failed to update product', error: error.message });
+    return res.status(500).json({ message: 'Failed to update product', error: error.message });
   }
 };
 
-// Helper function to upload file
+// =====================
+// 📌 Helper Functions
+// =====================
 const uploadFile = async (file) => {
-  // Implement your file upload logic here
-  // This should handle the file saving and return the path
-  // Example:
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${file.name.split('.').pop()}`;
   const path = `/uploads/${fileName}`;
   await file.mv(`./public${path}`);
   return path;
 };
 
-// Helper function to delete file
 const deleteFile = async (filePath) => {
-  // Implement your file deletion logic here
-  // This should handle the removal of the file from your storage
-  // Example:
   const fullPath = `./public${filePath}`;
   await fs.unlink(fullPath);
 };
+
 export const deleteProduct = async (req, res) => {
     if (!req.user || !req.user.id) {
         return res.status(401).json({ message: 'Authentication required.' });
