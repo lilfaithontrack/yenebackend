@@ -31,7 +31,8 @@ router.get('/my-shop/approved', verifyShopper, getMyShopApprovedProducts);
 router.get('/my-shop/pending', verifyShopper, getMyShopPendingProducts);
 router.get('/my-shop/:id', verifyShopper, getMyShopProductById);
 router.get('/my-products/:shopper_id', verifyShopper, getAllMyProducts);
-router.get('/aprove'), getAllApprovedProducts);
+router.get('/approve', getAllApprovedProducts);
+
 
 
 // Public Product Detail
