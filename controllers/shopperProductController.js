@@ -88,10 +88,7 @@ export const createProduct = async (req, res) => {
 };
 
 export const updateProduct = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Authentication required.' });
-  }
-
+  
   try {
     const { id } = req.params;
     const {
