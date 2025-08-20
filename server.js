@@ -13,6 +13,7 @@ import catitemRoutes from './routes/catItemRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import telalakiRoutes from'./routes/telalakiRoutes.js';
 import assignOrderRoutes from './routes/assignOrderRoutes.js';
+import vehicleFilesRoutes from './routes/vehicleFilesRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import ShopperProduct from './models/shopperProduct.js';
 import shopperProductRoutes from './routes/shopperProductRoutes.js';
@@ -103,6 +104,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/prod', addProductRoutes);
 app.use('/api/assign',assignOrderRoutes);
 app.use('/api/telalaki', telalakiRoutes);
+app.use('/api/vehicle-files', vehicleFilesRoutes);
 app.use('/api/sellerproduct', sellerProductRoutes);
 
 app.use('/api/shoppers', shopperRoutes);
