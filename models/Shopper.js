@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../db/dbConnect.js';
+import {sequelize} from '../config/dbConnect.js';
 
 const Shopper = sequelize.define(
   'Shopper',
