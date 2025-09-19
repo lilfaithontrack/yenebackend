@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../db/dbConnect.js'; // Make sure this path is correct for your project
+import {sequelize} from '../config/dbConnect.js'; // Make sure this path is correct for your project
 
 /**
  * Defines the ShopperProduct model, representing a product listed by a shopper.
@@ -96,12 +96,13 @@ const ShopperProduct = sequelize.define('ShopperProduct', {
   color_options: {
     type: DataTypes.JSON,
     allowNull: true,
+    defaultValue: [],
     comment: 'An array of objects, e.g., [{ color_name: "Red", images: [...] }].'
   },
   variations: {
     type: DataTypes.JSON,
     allowNull: false,
-    defaultValue: '[]', // Default to an empty JSON array string
+    defaultValue: [], // Default to an empty JSON array string
     comment: 'e.g., [{ size: "M", color: "Blue", price: 15.99, stock: "in_stock" }]'
   },
 
