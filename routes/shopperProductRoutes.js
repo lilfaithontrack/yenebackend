@@ -13,7 +13,8 @@ import {
     getAllMyProducts,
     getApprovedProductDetail,
     getMyShopProductById,
-    upload
+    upload,
+    getAllProductDetailById
 } from '../controllers/shopperProductController.js';
 import { verifyShopper } from '../middlewares/verifyShopper.js';
 
@@ -25,8 +26,8 @@ router.get('/search/location', getProductsByLocation);
 
 // Protected Routes for Shop Owner
 router.post('/', verifyShopper, upload, createProduct);
-router.get('/pendings', getAllPendingProducts);
-router.put('/:id', upload, updateProduct);
+router.get('/pendings', getAllPendingProducts); 
+router.put('/:id', verifyShopper, upload, updateProduct);
 router.delete('/:id', verifyShopper, deleteProduct);
 router.get('/my-shop/approved', verifyShopper, getMyShopApprovedProducts);
 router.get('/my-shop/pending', verifyShopper, getMyShopPendingProducts);
@@ -34,8 +35,7 @@ router.get('/my-shop/:id', verifyShopper, getMyShopProductById);
 router.get('/my-products/:shopper_id', verifyShopper, getAllMyProducts);
 router.get('/approve', getAllApprovedProducts);
 router.get('/approve/:id', getApprovedProductDetail);
-
-
+router.get('/all-product/:id', verifyShopper,  getAllProductDetailById);
 
 
 // Public Product Detail
