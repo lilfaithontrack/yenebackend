@@ -1,6 +1,6 @@
 // routes/paymentRoutes.js
 import express from "express";
-import { verifyShopper } from "../../server/middlewares/verifyShopper.js";
+import { verifyShopper } from "../middlewares/verifyShopper.js";
 import {
   addPaymentAccount,
   getMyPaymentAccounts,
@@ -23,3 +23,4 @@ router.put("/:id", verifyShopper, updatePaymentAccount);
 router.delete("/:id", verifyShopper, deletePaymentAccount);
 
 export default router;
+
