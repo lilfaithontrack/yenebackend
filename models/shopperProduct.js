@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import {sequelize} from '../config/dbConnect.js'; // Make sure this path is correct for your project
+import sequelize from '../db/dbConnect.js'; // Make sure this path is correct for your project
 
 /**
  * Defines the ShopperProduct model, representing a product listed by a shopper.
@@ -168,3 +168,4 @@ const ShopperProduct = sequelize.define('ShopperProduct', {
 });
 
 export default ShopperProduct;
+
