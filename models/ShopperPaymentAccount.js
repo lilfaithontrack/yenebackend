@@ -1,6 +1,6 @@
 // models/ShopperPaymentAccount.js
 import { DataTypes } from "sequelize";
-import { sequelize } from "../../server/config/dbConnect.js";
+import sequelize from '../db/dbConnect.js';
 import Shopper from "../../server/models/Shopper.js";
 
 const ShopperPaymentAccount = sequelize.define(
@@ -27,5 +27,6 @@ const ShopperPaymentAccount = sequelize.define(
 // Associations
 ShopperPaymentAccount.belongsTo(Shopper, { foreignKey: "shopperId" });
 Shopper.hasMany(ShopperPaymentAccount, { foreignKey: "shopperId" });
+
 
 export default ShopperPaymentAccount;
