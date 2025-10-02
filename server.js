@@ -30,7 +30,7 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import productRoutes from './routes/productRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js';
+
 import checkoutRoutes from './routes/checkoutRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
 import CatItem from './models/CatItem.js';
@@ -101,7 +101,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/deliveryFee', deliveryFeeRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/order', orderRoutes);
-app.use('/api/payments', paymentRoutes);
+
 app.use('/api/prod', addProductRoutes);
 app.use('/api/assign',assignOrderRoutes);
 app.use('/api/telalaki', telalakiRoutes);
