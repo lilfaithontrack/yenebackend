@@ -1,6 +1,6 @@
 import ShopperProduct from '../models/shopperProduct.js';
 import Shopper from '../models/Shopper.js';
-import { sequelize } from '../db/dbConnect.js';
+import  sequelize  from '../db/dbConnect.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
@@ -688,4 +688,5 @@ export const getAllProductDetailById = async (req, res) => {
 		});
 	}
 };
+
 
