@@ -40,7 +40,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import addProductRoutes from './routes/addProductRoutes.js';
  import deliveryFeeRoutes from './routes/deliveryFeeRoutes.js';
 import subcatRoutes from './routes/subCatRoutes.js';
-import paymentRoutes from "./routes/ShoperPaymentRoutes.js";
+import paymentRoutes from './routes/paymentRoutes.js';
 // Import models (for potential associations)
 import Category from './models/Category.js';
 import Subcategory from './models/Subcategory.js';
@@ -109,7 +109,7 @@ app.use('/api/vehicle-files', vehicleFilesRoutes);
 app.use('/api/sellerproduct', sellerProductRoutes);
 
 app.use('/api/shoppers', shopperRoutes);
-app.use("/api/shopper/payment-accounts", paymentRoutes);
+app.use('/api/payment', paymentRoutes);  
 app.use('/api/shoppers/product', shopperProductRoutes);
 // Handle 404 errors (Route not found)
 app.use((req, res) => {
