@@ -109,7 +109,7 @@ app.use('/api/vehicle-files', vehicleFilesRoutes);
 app.use('/api/sellerproduct', sellerProductRoutes);
 
 app.use('/api/shoppers', shopperRoutes);
-app.use('/api/payment', paymentRoutes);  
+app.use('/api/payments', paymentRoutes);  
 app.use('/api/shoppers/product', shopperProductRoutes);
 // Handle 404 errors (Route not found)
 app.use((req, res) => {
