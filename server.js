@@ -30,6 +30,7 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+import ShopperPaymentRoutes from "./routes/ShoperPaymentRoutes.js";
 
 import checkoutRoutes from './routes/checkoutRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
@@ -98,6 +99,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/uoms', uomRoutes);
 app.use('/api/withdraw', withdrawRoutes);
 app.use('/api/cart', cartRoutes);
+app.use("/api/shopper/payment-accounts", ShopperPaymentRoutes);
 app.use('/api/deliveryFee', deliveryFeeRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/order', orderRoutes);
